@@ -802,6 +802,7 @@ class BindInstance(service.Service):
             "changing resolv.conf to point to ourselves",
             self.setup_resolv_conf
         )
+        self.step("disable chroot for bind", self.__disable_chroot)
         self.start_creation()
 
     def start_named(self):
@@ -1200,6 +1201,11 @@ class BindInstance(service.Service):
             # we have to re-initialize it because resolv.conf has changed
             dnsutil.reset_default_resolver()
 
+    def __disable_chroot(self):
+        result = ipautil.run(['control', 'bind-chroot'], capture_output=True)
+        self.sstore.backup_state('control', 'bind-chroot', result.output)
+        ipautil.run(['control', 'bind-chroot', 'disabled'])
+
     def __generate_rndc_key(self):
         installutils.check_entropy()
         ipautil.run([paths.GENERATE_RNDC_KEY])
@@ -1386,6 +1392,10 @@ class BindInstance(service.Service):
 
         self.disable()
         self.stop()
+
+        value = self.sstore.restore_state('control', 'bind-chroot')
+        if value is not None:
+            ipautil.run(['control', 'bind-chroot', value])
 
         self.named_conflict.unmask()
 
