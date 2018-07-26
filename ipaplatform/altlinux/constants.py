@@ -27,6 +27,24 @@ class ALTLinuxConstantsNamespace(BaseConstantsNamespace):
     NAMED_OPTIONS_VAR = "EXTRAOPTIONS"
     # quote used for daemon options
     NTPD_OPTS_QUOTE = '"'
+    HTTPD_IPA_MODULES = [
+        "ssl",
+        "auth_gssapi",
+        "rewrite",
+        "filter",
+        "deflate",
+        "headers",
+        "authn_core",
+        "authz_user",
+        "expires",
+        "lookup_identity",
+        "session",
+        "session_cookie",
+        "proxy_ajp",
+        "proxy_http",
+        "proxy",
+        "reqtimeout",
+    ]
     SECURE_NFS_VAR = None
 
 

@@ -1849,6 +1849,7 @@ def upgrade_configuration():
     update_ipa_http_wsgi_conf(http)
     update_http_keytab(http)
     http.configure_gssproxy()
+    http.configure_httpd_mods()
     http.start()
 
     uninstall_selfsign(ds, http)
