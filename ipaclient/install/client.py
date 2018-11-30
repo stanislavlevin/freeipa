@@ -3411,6 +3411,9 @@ def uninstall(options):
         if e.returncode != CLIENT_NOT_CONFIGURED:
             logger.error(
                 "Unconfigured automount client failed: %s", str(e))
+    except FileNotFoundError:
+        # ALT: IPA_CLIENT_AUTOMOUNT script is packaged in its own RPM subpackage
+        pass
     finally:
         statestore.delete_state('installation', 'automount')
 
