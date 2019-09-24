@@ -232,7 +232,8 @@ def fix_apache_semaphores(master):
     systemd_available = master.transport.file_exists(paths.SYSTEMCTL)
 
     if systemd_available:
-        master.run_command(['systemctl', 'stop', 'httpd'], raiseonerr=False)
+        httpd_name = master.knownservices["httpd"].systemd_name
+        master.run_command(['systemctl', 'stop', httpd_name], raiseonerr=False)
     else:
         master.run_command([paths.SBIN_SERVICE, 'httpd', 'stop'],
                            raiseonerr=False)
