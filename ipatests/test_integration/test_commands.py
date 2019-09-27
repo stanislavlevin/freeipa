@@ -555,8 +555,14 @@ class TestIPACommand(IntegrationTest):
         """
         An update file meant to ensure a more sane default was
         overriding any customization done to the order.
+
+        See for details:
+        https://pagure.io/freeipa/issue/6610
         """
-        maporder = "unconfined_u:s0-s0:c0.c1023"
+        # new order
+        maporder = "foo_u:s0"
+        # SELinux user map default user must be in order list
+        maporder += f"${self.master.constants.SELINUX_USERMAP_DEFAULT}"
 
         # set a new default
         tasks.kinit_admin(self.master)
