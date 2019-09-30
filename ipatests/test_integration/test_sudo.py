@@ -158,6 +158,12 @@ class TestSudo(IntegrationTest):
     @pytest.mark.skip_if_container(
         "any", reason="NISDOMAIN cannot be set in containerized environment"
     )
+    @pytest.mark.skip_if_hostplatform(
+        "clients",
+        hostindex=0,
+        platform="altlinux",
+        reason="NISDOMAIN has not been set on altlinux",
+     )
     def test_nisdomainname(self):
         result = self.client.run_command('nisdomainname')
         assert self.client.domain.name in result.stdout_text
