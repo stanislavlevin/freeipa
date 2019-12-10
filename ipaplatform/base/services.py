@@ -55,6 +55,7 @@ wellknownservices = [
     'ipa-dnskeysyncd', 'ipa-otpd', 'ipa-ods-exporter',
     'systemd-resolved', 'unbound', 'dnsconfd',
     'nfs_client',
+    'nfs-server',
 ]
 
 # The common ports for these services. This is used to wait for the
