@@ -8,6 +8,7 @@ azure_tests = []
 
 SKIP_IN_AZURE_LIST = [
     "test_integration/test_authselect.py",  # requires external DNS
+    "test_integration/test_advise.py",  # Fedora and RHEL specific
 ]
 
 EXTRA_AZURE_LIST = []
