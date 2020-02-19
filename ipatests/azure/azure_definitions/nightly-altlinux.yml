@@ -1,0 +1,535 @@
+default_resources:
+  server:
+    mem_limit: "2000m"
+    memswap_limit: "2700m"
+  replica:
+    mem_limit: "1800m"
+    memswap_limit: "2500m"
+  client:
+    mem_limit: "512m"
+    memswap_limit: "1000m"
+
+vms:
+- vm_jobs:
+  - container_job: nfs
+    containers:
+      clients: 3
+    tests:
+    - test_integration/test_nfs.py
+
+  - container_job: ntp_options_common
+    tests:
+    - test_integration/test_ntp_options.py::TestNTPoptionsCommon
+    containers:
+      replicas: 1
+      clients: 1
+
+- vm_jobs:
+  - container_job: otp
+    tests:
+    - test_integration/test_otp.py
+
+- vm_jobs:
+  - container_job: ntp_options_chrony
+    tests:
+    - test_integration/test_ntp_options.py::TestNTPoptions
+    args: '-k chrony'
+    containers:
+      replicas: 1
+      clients: 1
+
+  - container_job: ntp_options_ntpd
+    tests:
+    - test_integration/test_ntp_options.py::TestNTPoptions
+    args: '-k "ntpd and not openntpd"'
+    containers:
+      replicas: 1
+      clients: 1
+
+  - container_job: ntp_options_openntpd
+    tests:
+    - test_integration/test_ntp_options.py::TestNTPoptions
+    args: '-k openntpd'
+    containers:
+      replicas: 1
+      clients: 1
+
+  - container_job: ntp_nooptions
+    tests:
+    - test_integration/test_ntp_options.py::TestNTPMissingOptionsAndNTPs
+
+- vm_jobs:
+  - container_job: vault
+    tests:
+    - test_integration/test_vault.py
+    containers:
+      replicas: 1
+
+  - container_job: user_permissions
+    tests:
+    - test_integration/test_user_permissions.py
+    containers:
+      clients: 1
+
+- vm_jobs:
+  - container_job: automember
+    tests:
+    - test_integration/test_automember.py
+
+  - container_job: idviews_TestRulesWithServicePrincipals
+    tests:
+    - test_integration/test_idviews.py::TestRulesWithServicePrincipals
+
+- vm_jobs:
+  - container_job: idviews_TestIDViews
+    tests:
+    - test_integration/test_idviews.py::TestIDViews
+    containers:
+      clients: 1
+
+- vm_jobs:
+  - container_job: server_del
+    tests:
+    - test_integration/test_server_del.py
+    containers:
+      replicas: 2
+      clients: 1
+      # resources:
+      #   server:
+      #     mem_limit: "2300m"
+      #     memswap_limit: "3100m"
+
+- vm_jobs:
+  - container_job: dns_locations
+    tests:
+    - test_integration/test_dns_locations.py
+    containers:
+      replicas: 2
+      # resources:
+      #   server:
+      #     mem_limit: "2300m"
+      #     memswap_limit: "3100m"
+
+  - container_job: pkinit_manage
+    tests:
+    - test_integration/test_pkinit_manage.py
+    containers:
+      replicas: 1
+
+- vm_jobs:
+  - container_job: crlgen_manage
+    tests:
+    - test_integration/test_crlgen_manage.py
+    containers:
+      replicas: 1
+
+  - container_job: ca_custom_sdn
+    tests:
+    - test_integration/test_ca_custom_sdn.py
+
+- vm_jobs:
+  - container_job: krbtpolicy
+    tests:
+    - test_integration/test_krbtpolicy.py
+
+  - container_job: backup_and_restore_TestBackupAndRestore
+    tests:
+    - test_integration/test_backup_and_restore.py::TestBackupAndRestore
+
+- vm_jobs:
+  - container_job: epn
+    tests:
+    - test_integration/test_epn.py
+    containers:
+      clients: 1
+
+  - container_job: ipahealthcheck_TestIpaHealthCheckWithoutDNS
+    tests:
+    - test_integration/test_ipahealthcheck.py::TestIpaHealthCheckWithoutDNS
+    containers:
+      replicas: 1
+
+  - container_job: ipahealthcheck_TestIpaHealthCheckWithExternalCA
+    tests:
+    - test_integration/test_ipahealthcheck.py::TestIpaHealthCheckWithExternalCA
+    containers:
+      replicas: 1
+
+- vm_jobs:
+  # test_ipa_healthcheck_no_errors requires at least 20% of free space
+  - container_job: ipahealthcheck_TestIpaHealthCheck
+    tests:
+    - test_integration/test_ipahealthcheck.py::TestIpaHealthCheck
+    containers:
+      replicas: 1
+      clients: 1
+      # resources:
+      #   server:
+      #     mem_limit: "2400m"
+      #     memswap_limit: "3200m"
+
+- vm_jobs:
+  - container_job: TestReplicaInstallWithExistingEnty
+    tests:
+    - test_integration/test_replica_promotion.py::TestReplicaInstallWithExistingEntry
+    containers:
+      replicas: 1
+
+  - container_job: acme
+    tests:
+    - test_integration/test_acme.py
+    containers:
+      replicas: 1
+      clients: 1
+
+- vm_jobs:
+  - container_job: caless_TestServerInstall
+    tests:
+    - test_integration/test_caless.py::TestServerInstall
+
+  - container_job: caless_TestReplicaInstall
+    tests:
+    - test_integration/test_caless.py::TestReplicaInstall
+    containers:
+      replicas: 1
+      # resources:
+      #   server:
+      #     mem_limit: "2300m"
+      #     memswap_limit: "3100m"
+
+  - container_job: caless_TestClientInstall
+    tests:
+    - test_integration/test_caless.py::TestClientInstall
+    containers:
+      clients: 1
+
+- vm_jobs:
+  - container_job: caless_TestIPACommands
+    tests:
+    - test_integration/test_caless.py::TestIPACommands
+
+- vm_jobs:
+  - container_job: caless_TestCertInstall
+    tests:
+    - test_integration/test_caless.py::TestCertInstall
+
+  - container_job: caless_TestPKINIT
+    tests:
+    - test_integration/test_caless.py::TestPKINIT
+    containers:
+      replicas: 1
+
+  - container_job: caless_TestServerReplicaCALessToCAFull
+    tests:
+    - test_integration/test_caless.py::TestServerReplicaCALessToCAFull
+    containers:
+      replicas: 1
+
+- vm_jobs:
+  - container_job: caless_TestReplicaCALessToCAFull
+    tests:
+    - test_integration/test_caless.py::TestReplicaCALessToCAFull
+    containers:
+      replicas: 1
+
+  - container_job: caless_TestServerCALessToExternalCA
+    tests:
+    - test_integration/test_caless.py::TestServerCALessToExternalCA
+
+  - container_job: cli_TestIPANotConfigured
+    # requires nothing
+    tests:
+    - test_integration/test_cli_ipa_not_configured.py::TestIPANotConfigured
+
+  - container_job: customized_ds_config_install
+    tests:
+    - test_integration/test_customized_ds_config_install.py
+    containers:
+      replicas: 1
+    # requires external dns
+    args: '-k "not test_customized_ds_install_replica"'
+
+- vm_jobs:
+  - container_job: dns
+    tests:
+    - test_integration/test_dns.py
+
+  - container_job: dnssec
+    tests:
+    - test_integration/test_dnssec.py
+    containers:
+      replicas: 2
+
+- vm_jobs:
+  - container_job: TestExternalCAInvalidCert
+    tests:
+    - test_integration/test_external_ca.py::TestExternalCAInvalidCert
+    - test_integration/test_external_ca.py::TestExternalCAInvalidIntermediate
+
+  - container_job: TestExternalCAdirsrvStop
+    tests:
+    - test_integration/test_external_ca.py::TestExternalCAdirsrvStop
+
+  - container_job: TestMultipleExternalCA
+    tests:
+    - test_integration/test_external_ca.py::TestMultipleExternalCA
+
+#   - container_job: TestADTrustInstall
+#     tests:
+#     - test_integration/test_installation.py::TestADTrustInstall
+#     containers:
+#       replicas: 2
+
+- vm_jobs:
+  - container_job: TestADTrustInstallWithDNS_KRA_ADTrust
+    tests:
+    - test_integration/test_installation.py::TestADTrustInstallWithDNS_KRA_ADTrust
+    containers:
+      replicas: 2
+
+  - container_job: TestInstallCA
+    tests:
+    - test_integration/test_installation.py::TestInstallCA
+    containers:
+      replicas: 2
+    # requires external dns
+    args: '-k "not test_replica_ca_install_with_no_host_dns and not test_replica_ca_install_with_skip_schema_check"'
+
+  - container_job: TestInstallMasterDNS
+    tests:
+    - test_integration/test_installation.py::TestInstallMasterDNS
+
+- vm_jobs:
+  - container_job: TestInstallMasterDNSRepeatedly
+    tests:
+    - test_integration/test_installation.py::TestInstallMasterDNSRepeatedly
+
+  - container_job: TestInstallMasterKRA
+    tests:
+    - test_integration/test_installation.py::TestInstallMasterKRA
+
+  - container_job: TestInstallMasterReplica
+    tests:
+    - test_integration/test_installation.py::TestInstallMasterReplica
+    containers:
+      replicas: 1
+
+- vm_jobs:
+  - container_job: TestInstallMasterReservedIPasForwarder
+    tests:
+    - test_integration/test_installation.py::TestInstallMasterReservedIPasForwarder
+
+  - container_job: TestInstallReplicaAgainstSpecificServer
+    tests:
+    - test_integration/test_installation.py::TestInstallReplicaAgainstSpecificServer
+    containers:
+      replicas: 2
+
+  - container_job: installation_client
+    tests:
+    - test_integration/test_installation_client.py
+    containers:
+      clients: 1
+
+  - container_job: pki_config_override
+    tests:
+    - test_integration/test_pki_config_override.py
+
+- vm_jobs:
+  - container_job: pwpolicy
+    tests:
+    - test_integration/test_pwpolicy.py
+    containers:
+      replicas: 1
+
+- vm_jobs:
+  - container_job: uninstallation
+    tests:
+    - test_integration/test_uninstallation.py
+    containers:
+      replicas: 1
+    # requires external DNS
+    args: '-k "not test_uninstall_client_invalid_hostname and not test_install_uninstall_replica"'
+
+- vm_jobs:
+  - container_job: ipa_cert_fix
+    containers:
+      replicas: 1
+    tests:
+    - test_integration/test_ipa_cert_fix.py
+    # requires external DNS
+    args: '-k "not TestCertFixReplica"'
+
+- vm_jobs:
+  - container_job: replication_layouts_TestStarTopologyWithoutCA
+    tests:
+    - test_integration/test_replication_layouts.py::TestStarTopologyWithoutCA
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: replication_layouts_TestCompleteTopologyWithCA
+    tests:
+    - test_integration/test_replication_layouts.py::TestCompleteTopologyWithCA
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: replication_layouts_TestCompleteTopologyWithCAKRA
+    tests:
+    - test_integration/test_replication_layouts.py::TestCompleteTopologyWithCAKRA
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: replication_layouts_TestCompleteTopologyWithoutCA
+    tests:
+    - test_integration/test_replication_layouts.py::TestCompleteTopologyWithoutCA
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: replication_layouts_TestLineTopologyWithCA
+    tests:
+    - test_integration/test_replication_layouts.py::TestLineTopologyWithCA
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: replication_layouts_TestLineTopologyWithCAKRA
+    tests:
+    - test_integration/test_replication_layouts.py::TestLineTopologyWithCAKRA
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: replication_layouts_TestLineTopologyWithoutCA
+    tests:
+    - test_integration/test_replication_layouts.py::TestLineTopologyWithoutCA
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: replication_layouts_TestStarTopologyWithCA
+    tests:
+    - test_integration/test_replication_layouts.py::TestStarTopologyWithCA
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: replication_layouts_TestStarTopologyWithCAKRA
+    tests:
+    - test_integration/test_replication_layouts.py::TestStarTopologyWithCAKRA
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: topology_TestCASpecificRUVs
+    tests:
+    - test_integration/test_topology.py::TestCASpecificRUVs
+    containers:
+      replicas: 2
+
+- vm_jobs:
+  - container_job: topology_TestTopologyOptions
+    tests:
+    - test_integration/test_topology.py::TestTopologyOptions
+    containers:
+      replicas: 2
+
+- vm_jobs:
+  - container_job: replica_promotion_TestHiddenReplicaKRA
+    tests:
+    - test_integration/test_replica_promotion.py::TestHiddenReplicaKRA
+    containers:
+      replicas: 2
+
+- vm_jobs:
+  - container_job: replica_promotion_TestHiddenReplicaPromotion
+    tests:
+    - test_integration/test_replica_promotion.py::TestHiddenReplicaPromotion
+    containers:
+      replicas: 2
+
+- vm_jobs:
+  - container_job: replica_promotion_TestProhibitReplicaUninstallation
+    tests:
+    - test_integration/test_replica_promotion.py::TestProhibitReplicaUninstallation
+    containers:
+      replicas: 2
+
+- vm_jobs:
+  - container_job: replica_promotion_TestRenewalMaster
+    tests:
+    - test_integration/test_replica_promotion.py::TestRenewalMaster
+    containers:
+      replicas: 1
+
+  - container_job: replica_promotion_TestReplicaInForwardZone
+    tests:
+    - test_integration/test_replica_promotion.py::TestReplicaInForwardZone
+    containers:
+      replicas: 1
+
+- vm_jobs:
+  - container_job: replica_promotion_TestReplicaInstallCustodia
+    tests:
+    - test_integration/test_replica_promotion.py::TestReplicaInstallCustodia
+    containers:
+      replicas: 2
+
+- vm_jobs:
+  - container_job: replica_promotion_TestReplicaPromotionLevel1
+    tests:
+    - test_integration/test_replica_promotion.py::TestReplicaPromotionLevel1
+    containers:
+      replicas: 1
+
+  - container_job: replica_promotion_TestUnprivilegedUserPermissions
+    tests:
+    - test_integration/test_replica_promotion.py::TestUnprivilegedUserPermissions
+    containers:
+      replicas: 1
+
+  - container_job: replica_promotion_TestWrongClientDomain
+    tests:
+    - test_integration/test_replica_promotion.py::TestWrongClientDomain
+    containers:
+      replicas: 1
+
+- vm_jobs:
+  - container_job: installation_TestInstallWithCA_DNS1
+    tests:
+    - test_integration/test_installation.py::TestInstallWithCA_DNS1
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: installation_TestInstallWithCA_DNS2
+    tests:
+    - test_integration/test_installation.py::TestInstallWithCA_DNS2
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: installation_TestInstallWithCA_DNS3
+    tests:
+    - test_integration/test_installation.py::TestInstallWithCA_DNS3
+
+  - container_job: installation_TestInstallWithCA_DNS4
+    tests:
+    - test_integration/test_installation.py::TestInstallWithCA_DNS4
+
+- vm_jobs:
+  - container_job: installation_TestInstallWithCA_KRA_DNS1
+    tests:
+    - test_integration/test_installation.py::TestInstallWithCA_KRA_DNS1
+    containers:
+      replicas: 3
+
+- vm_jobs:
+  - container_job: installation_TestInstallWithCA_KRA_DNS2
+    tests:
+    - test_integration/test_installation.py::TestInstallWithCA_KRA_DNS2
+    containers:
+      replicas: 3
