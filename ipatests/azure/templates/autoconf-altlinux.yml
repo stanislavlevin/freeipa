@@ -1,0 +1,12 @@
+parameters:
+    options: ''
+
+steps:
+- script: |
+    set -e
+    echo "Running autoconf generator"
+    ./autogen.sh \
+        ${{ parameters.options }} \
+        --with-password-quality-lib=no \
+
+  displayName: Configure the project
