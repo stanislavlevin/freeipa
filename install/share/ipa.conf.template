@@ -182,8 +182,18 @@ Alias /ipa/crl "$CRL_PUBLISH_PATH"
 
 #  List explicitly only the fonts we want to serve
 Alias /ipa/ui/fonts/open-sans "${FONTS_OPENSANS_DIR}"
+<Directory "${FONTS_OPENSANS_DIR}">
+  SetHandler None
+  AllowOverride None
+  Satisfy Any
+  Require all granted
+  ExpiresActive On
+  ExpiresDefault "access plus 1 year"
+</Directory>
+
+
 Alias /ipa/ui/fonts/fontawesome "${FONTS_FONTAWESOME_DIR}"
-<Directory "${FONTS_DIR}">
+<Directory "${FONTS_FONTAWESOME_DIR}">
   SetHandler None
   AllowOverride None
   Satisfy Any
