@@ -3193,6 +3193,7 @@ def _install(options, tdict):
         tasks.modify_nsswitch_pam_stack(
             sssd=options.sssd,
             mkhomedir=options.mkhomedir,
+            fstore=fstore,
             statestore=statestore,
             sudo=options.conf_sudo,
             subid=options.subid
