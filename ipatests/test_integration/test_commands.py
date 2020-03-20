@@ -1026,6 +1026,11 @@ class TestIPACommand(IntegrationTest):
     @pytest.mark.skip_if_platform(
         "debian", reason="Crypto policy is not supported on Debian"
     )
+    @pytest.mark.skip_if_hostplatform(
+        "master",
+        platform="altlinux",
+        reason="Crypto policy is not supported on altlinux",
+     )
     def test_enabled_tls_protocols(self):
         """Check Apache has same TLS versions enabled as crypto policy
 
