@@ -3042,6 +3042,13 @@ def install_packages(host, pkgs):
         install_cmd = ['/usr/bin/dnf', 'install', '-y']
     elif platform in {'debian', 'ubuntu'}:
         install_cmd = ['apt-get', 'install', '-y']
+    elif platform in ("altlinux",):
+        host.run_command(["apt-get", "update"])
+        install_cmd = ["apt-get", "install", "-y"]
+
+        # alt's apt fails to install packages like '*package':
+        # E: Regex compilation error - Invalid preceding regular expression
+        pkgs = list(map(lambda x: re.sub(r"^\*ipa-", ".*ipa-", x), pkgs))
     else:
         raise ValueError('install_packages: unknown platform %s' % platform)
     host.run_command(install_cmd + pkgs)
@@ -3057,6 +3064,12 @@ def reinstall_packages(host, pkgs):
         install_cmd = ['/usr/bin/dnf', 'reinstall', '-y']
     elif platform in {'debian', 'ubuntu'}:
         install_cmd = ['apt-get', '--reinstall', 'install', '-y']
+    elif platform in {'altlinux'}:
+        host.run_command(["apt-get", "update"])
+        install_cmd = ['apt-get', '--reinstall', 'install', '-y']
+        # alt's apt fails to install packages like '*package':
+        # E: Regex compilation error - Invalid preceding regular expression
+        pkgs = list(map(lambda x: re.sub(r"^\*ipa-", ".*ipa-", x), pkgs))
     else:
         raise ValueError('install_packages: unknown platform %s' % platform)
     host.run_command(install_cmd + pkgs)
@@ -3089,10 +3102,10 @@ def uninstall_packages(host, pkgs, nodeps=False):
     :param nodeps: ignore dependencies (dangerous!).
     """
     platform = get_platform(host)
-    if platform not in {"rhel", "fedora", "debian", "ubuntu"}:
+    if platform not in {"rhel", "fedora", "debian", "ubuntu", "altlinux"}:
         raise ValueError(f"uninstall_packages: unknown platform {platform}")
     if nodeps:
-        if platform in {"rhel", "fedora"}:
+        if platform in {"rhel", "fedora", "altlinux"}:
             cmd = ["rpm", "-e", "--nodeps"]
         elif platform in {"debian", "ubuntu"}:
             cmd = ["dpkg", "-P", "--force-depends"]
@@ -3104,6 +3117,12 @@ def uninstall_packages(host, pkgs, nodeps=False):
             cmd = ["/usr/bin/dnf", "remove", "-y"]
         elif platform in {"debian", "ubuntu"}:
             cmd = ["apt-get", "remove", "-y"]
+        elif platform in {"altlinux"}:
+            host.run_command(["apt-get", "update"])
+            cmd = ["apt-get", "remove", "-y"]
+            # alt's apt fails to install packages like '*package':
+            # E: Regex compilation error - Invalid preceding regular expression
+            pkgs = list(map(lambda x: re.sub(r"^\*ipa-", ".*ipa-", x), pkgs))
         host.run_command(cmd + pkgs, raiseonerr=False)
 
 
@@ -3453,7 +3472,7 @@ def run_ssh_cmd(
 
 def is_package_installed(host, pkg):
     platform = get_platform(host)
-    if platform in {'rhel', 'fedora'}:
+    if platform in {'rhel', 'fedora', 'altlinux'}:
         result = host.run_command(
             ['rpm', '-q', pkg], raiseonerr=False
         )
