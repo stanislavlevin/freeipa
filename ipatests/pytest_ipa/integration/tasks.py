@@ -2479,6 +2479,9 @@ def install_packages(host, pkgs):
         install_cmd = ['/usr/bin/dnf', 'install', '-y']
     elif platform in {'debian', 'ubuntu'}:
         install_cmd = ['apt-get', 'install', '-y']
+    elif platform in ("altlinux",):
+        host.run_command(["apt-get", "update"])
+        install_cmd = ["apt-get", "install", "-y"]
     else:
         raise ValueError('install_packages: unknown platform %s' % platform)
     host.run_command(install_cmd + pkgs)
@@ -2516,7 +2519,7 @@ def uninstall_packages(host, pkgs, nodeps=False):
     :param nodeps: ignore dependencies (dangerous!).
     """
     platform = get_platform(host)
-    if platform not in {"rhel", "fedora", "debian", "ubuntu"}:
+    if platform not in {"rhel", "fedora", "debian", "ubuntu", "altlinux"}:
         raise ValueError(f"uninstall_packages: unknown platform {platform}")
     if nodeps:
         if platform in {"rhel", "fedora"}:
@@ -2530,6 +2533,9 @@ def uninstall_packages(host, pkgs, nodeps=False):
         if platform in {"rhel", "fedora"}:
             cmd = ["/usr/bin/dnf", "remove", "-y"]
         elif platform in {"debian", "ubuntu"}:
+            cmd = ["apt-get", "remove", "-y"]
+        elif platform in {"altlinux"}:
+            host.run_command(["apt-get", "update"])
             cmd = ["apt-get", "remove", "-y"]
         host.run_command(cmd + pkgs, raiseonerr=False)
 
@@ -2844,7 +2850,7 @@ def run_ssh_cmd(
 
 def is_package_installed(host, pkg):
     platform = get_platform(host)
-    if platform in {'rhel', 'fedora'}:
+    if platform in {'rhel', 'fedora', 'altlinux'}:
         result = host.run_command(
             ['rpm', '-q', pkg], raiseonerr=False
         )
