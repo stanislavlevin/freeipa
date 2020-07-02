@@ -298,7 +298,7 @@ class BaseBackupAndRestoreWithDNS(IntegrationTest):
                                      '--uninstall',
                                      '-U'])
 
-            tasks.uninstall_packages(self.master, ['*ipa-server-dns'])
+            tasks.uninstall_packages(self.master, ['freeipa-server-dns'])
 
             dirman_password = self.master.config.dirman_password
             result = self.master.run_command(
@@ -307,7 +307,7 @@ class BaseBackupAndRestoreWithDNS(IntegrationTest):
                 raiseonerr=False)
             assert 'Please install the package' in result.stderr_text
 
-            tasks.install_packages(self.master, ['*ipa-server-dns'])
+            tasks.install_packages(self.master, ['freeipa-server-dns'])
             if reinstall:
                 tasks.install_master(self.master, setup_dns=True)
             self.master.run_command(['ipa-restore', backup_path],
@@ -890,7 +890,7 @@ class TestBackupAndRestoreTrust(IntegrationTest):
 
         Test for bug https://pagure.io/freeipa/issue/7630.
         """
-        tasks.install_packages(self.master, ['*ipa-server-trust-ad'])
+        tasks.install_packages(self.master, ['freeipa-server-trust-ad'])
         self.master.run_command(['ipa-adtrust-install', '-U',
                                  '--enable-compat', '--netbios-name', 'IPA',
                                  '-a', self.master.config.admin_password,
@@ -903,7 +903,7 @@ class TestBackupAndRestoreTrust(IntegrationTest):
                                      '--uninstall',
                                      '-U'])
 
-            tasks.uninstall_packages(self.master, ['*ipa-server-trust-ad'])
+            tasks.uninstall_packages(self.master, ['freeipa-server-trust-ad'])
 
             dirman_password = self.master.config.dirman_password
             result = self.master.run_command(
@@ -912,7 +912,7 @@ class TestBackupAndRestoreTrust(IntegrationTest):
                 raiseonerr=False)
             assert 'Please install the package' in result.stderr_text
 
-            tasks.install_packages(self.master, ['*ipa-server-trust-ad'])
+            tasks.install_packages(self.master, ['freeipa-server-trust-ad'])
             self.master.run_command(['ipa-restore', backup_path],
                                     stdin_text=dirman_password + '\nyes')
 
@@ -1036,10 +1036,10 @@ class TestBackupRoles(IntegrationTest):
         """
 
         # install AD Trust packages on replica first
-        tasks.install_packages(self.replicas[0], ['*ipa-server-trust-ad'])
+        tasks.install_packages(self.replicas[0], ['freeipa-server-trust-ad'])
         self._check_rolecheck_backup_success(self.replicas[0])
         self._check_rolecheck_backup_success(self.master)
-        tasks.install_packages(self.master, ['*ipa-server-trust-ad'])
+        tasks.install_packages(self.master, ['freeipa-server-trust-ad'])
 
         # make replicas[0] become Trust Controller
         self.replicas[0].run_command([
