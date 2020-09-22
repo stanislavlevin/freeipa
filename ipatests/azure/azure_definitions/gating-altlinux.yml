@@ -96,6 +96,7 @@ vms:
       replicas: 1
       clients: 1
 
+- vm_jobs:
   - container_job: ServerReplicaCALessToCAFull
     tests:
     - test_integration/test_caless.py::TestServerReplicaCALessToCAFull
