@@ -427,7 +427,7 @@ class TestIpaAdTrustInstall(IntegrationTest):
             "Must be root to setup AD trusts on server"
         )
         try:
-            tasks.create_active_user(self.master, user, pwd)
+            tasks.create_active_user(self.master, user, pwd, mkhomedir=True)
             tasks.run_command_as_user(
                 self.master, user, cmd
             )
