@@ -1113,8 +1113,10 @@ class TestInstallMaster(IntegrationTest):
             [paths.IPA_CUSTODIA_CHECK, self.master.hostname]
         )
 
-    @pytest.mark.skipif(
-        paths.SEMODULE is None, reason="test requires semodule command"
+    @pytest.mark.skip_if_host(
+        "master",
+        condition_cb=lambda host: not host.is_selinux_enabled,
+        reason="requires enabled selinux mode",
     )
     def test_ipa_selinux_policy(self):
         # check that freeipa-selinux's policy module is loaded and
