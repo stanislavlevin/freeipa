@@ -2508,8 +2508,8 @@ def remote_ini_file(host, filename):
 
 
 def is_selinux_enabled(host):
-    res = host.run_command('selinuxenabled', ok_returncode=(0, 1))
-    return res.returncode == 0
+    """compat function, TODO: remove later"""
+    return host.is_selinux_enabled
 
 
 def get_logsize(host, logfile):
