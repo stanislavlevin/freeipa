@@ -2463,6 +2463,8 @@ def remote_ini_file(host, filename):
 
 
 def is_selinux_enabled(host):
+    if not host.transport.file_exists(paths.SELINUXENABLED):
+        return False
     res = host.run_command('selinuxenabled', ok_returncode=(0, 1))
     return res.returncode == 0
 
