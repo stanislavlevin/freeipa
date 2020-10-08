@@ -44,7 +44,7 @@
 
 Name: freeipa
 Version: 4.8.6
-Release: alt2
+Release: alt2.p9
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1016,6 +1016,9 @@ fi
 %python3_sitelibdir/ipaplatform-*-nspkg.pth
 
 %changelog
+* Thu Oct 08 2020 Anton V. Boyarshinov <boyarsh@altlinux.org> 4.8.6-alt2.p9
+- Don't require SELinux
+
 * Fri Jun 05 2020 Stanislav Levin <slev@altlinux.org> 4.8.6-alt2
 - Applied upstream fixes.
 
