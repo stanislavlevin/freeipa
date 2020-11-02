@@ -53,7 +53,14 @@ from ipaplatform import services
 from ipaplatform.constants import constants
 from ipaplatform.paths import paths
 from ipaplatform.tasks import tasks
-from ipapython import certdb, kernel_keyring, ipaldap, ipautil, ntpmethods
+from ipapython import (
+    certdb,
+    kernel_keyring,
+    ipaldap,
+    ipautil,
+    dnsutil,
+    ntpmethods,
+)
 from ipapython.ntpmethods import TIME_SERVER, SERVICE_API
 from ipapython.admintool import ScriptError
 from ipapython.dn import DN
@@ -1441,7 +1448,7 @@ def verify_dns_update(fqdn, ips):
         logger.debug('DNS resolver: Query: %s IN %s',
                      fqdn, dns.rdatatype.to_text(record_type))
         try:
-            answers = dns.resolver.query(fqdn, record_type)
+            answers = dnsutil.resolve(fqdn, record_type)
         except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
             logger.debug('DNS resolver: No record.')
         except dns.resolver.NoNameservers:
@@ -1461,10 +1468,9 @@ def verify_dns_update(fqdn, ips):
     missing_reverse = [str(ip) for ip in ips]
     for ip in ips:
         ip_str = str(ip)
-        addr = dns.reversename.from_address(ip_str)
-        logger.debug('DNS resolver: Query: %s IN PTR', addr)
+        logger.debug('DNS resolver: Query: %s IN PTR', ip_str)
         try:
-            answers = dns.resolver.query(addr, dns.rdatatype.PTR)
+            answers = dnsutil.resolve_address(ip_str)
         except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
             logger.debug('DNS resolver: No record.')
         except dns.resolver.NoNameservers:

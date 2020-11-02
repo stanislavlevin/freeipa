@@ -49,6 +49,7 @@ from cryptography.hazmat.backends import default_backend
 
 from ipapython import certdb
 from ipapython import ipautil
+from ipapython.dnsutil import DNSResolver
 from ipaplatform.paths import paths
 from ipaplatform.services import knownservices
 from ipapython.dn import DN
@@ -79,7 +80,8 @@ def check_arguments_are(slice, instanceof):
     def wrapper(func):
         def wrapped(*args, **kwargs):
             for i in args[slice[0]:slice[1]]:
-                assert isinstance(i, instanceof), "Wrong type: %s: %s" % (i, type(i))
+                assert isinstance(i, instanceof), "Wrong type: %s: %s" % (
+                    i, type(i))
             return func(*args, **kwargs)
         return wrapped
     return wrapper
@@ -87,9 +89,10 @@ def check_arguments_are(slice, instanceof):
 
 def prepare_reverse_zone(host, ip):
     zone = get_reverse_zone_default(ip)
-    result = host.run_command(["ipa",
-                      "dnszone-add",
-                      zone], raiseonerr=False)
+    result = host.run_command(
+        ["ipa", "dnszone-add", zone, '--skip-overlap-check'],
+        raiseonerr=False
+    )
     if result.returncode > 0:
         logger.warning("%s", result.stderr_text)
     return zone, result.returncode
@@ -192,8 +195,10 @@ def fix_apache_semaphores(master):
         master.run_command([paths.SBIN_SERVICE, 'httpd', 'stop'],
                            raiseonerr=False)
 
-    master.run_command('for line in `ipcs -s | grep apache | cut -d " " -f 2`; '
-                       'do ipcrm -s $line; done', raiseonerr=False)
+    master.run_command(
+        'for line in `ipcs -s | grep apache ''| cut -d " " -f 2`; '
+        'do ipcrm -s $line; done', raiseonerr=False
+    )
 
 
 def unapply_fixes(host):
@@ -1004,10 +1009,13 @@ def create_segment(master, leftnode, rightnode, suffix=DOMAIN_SUFFIX_NAME):
     lefthost = leftnode.hostname
     righthost = rightnode.hostname
     segment_name = "%s-to-%s" % (lefthost, righthost)
-    result = master.run_command(["ipa", "topologysegment-add", suffix,
-                                 segment_name,
-                                 "--leftnode=%s" % lefthost,
-                                 "--rightnode=%s" % righthost], raiseonerr=False)
+    result = master.run_command(
+        ["ipa", "topologysegment-add", suffix,
+         segment_name,
+         "--leftnode=%s" % lefthost,
+         "--rightnode=%s" % righthost],
+        raiseonerr=False
+    )
     if result.returncode == 0:
         return {'leftnode': lefthost,
                 'rightnode': righthost,
@@ -1052,6 +1060,8 @@ def _topo(name):
         topologies[name] = func
         return func
     return add_topo
+
+
 topologies = collections.OrderedDict()
 
 
@@ -1427,7 +1437,7 @@ def resolve_record(nameserver, query, rtype="SOA", retry=True, timeout=100):
     :timeout: max period of time while method will try to resolve query
      (requires retry=True)
     """
-    res = dns.resolver.Resolver()
+    res = DNSResolver()
     res.nameservers = [nameserver]
     res.lifetime = 10  # wait max 10 seconds for reply
 
@@ -1435,7 +1445,7 @@ def resolve_record(nameserver, query, rtype="SOA", retry=True, timeout=100):
 
     while time.time() < wait_until:
         try:
-            ans = res.query(query, rtype)
+            ans = res.resolve(query, rtype)
             return ans
         except dns.exception.DNSException:
             if not retry:
@@ -1503,7 +1513,8 @@ def ipa_restore(master, backup_path):
                         backup_path])
 
 
-def install_kra(host, domain_level=None, first_instance=False, raiseonerr=True):
+def install_kra(host, domain_level=None,
+                first_instance=False, raiseonerr=True):
     if domain_level is None:
         domain_level = domainlevel(host)
     check_domain_level(domain_level)
@@ -1685,7 +1696,7 @@ def restart_named(*args):
 
 
 def run_repeatedly(host, command, assert_zero_rc=True, test=None,
-                timeout=30, **kwargs):
+                   timeout=30, **kwargs):
     """
     Runs command on host repeatedly until it's finished successfully (returns
     0 exit code and its stdout passes the test function).
@@ -2034,10 +2045,7 @@ class KerberosKeyCopier:
             princ = self.host_princ_template.format(master=self.host.hostname,
                                                     realm=self.realm)
         result = self.host.run_command(
-            [paths.KLIST, "-eK", "-k", keytab],
-            log_stdout=False, raiseonerr=False)
-        if result.returncode != 0:
-            return None
+            [paths.KLIST, "-eK", "-k", keytab], log_stdout=False)
 
         keys_to_sync = []
         for l in result.stdout_text.splitlines():
@@ -2064,11 +2072,25 @@ class KerberosKeyCopier:
                     kvno=keyentry.kvno, etype=keyentry.etype,
                     key=keyentry.key[2:])
 
-        result = self.host.run_command(
-            [paths.KTUTIL], stdin_text=stdin,
-            raiseonerr=False, log_stdout=False)
+        def get_keytab_mtime():
+            """Get keytab file mtime.
 
-        return result.returncode == 0
+            Returns mtime with sub-second precision as a string with format
+            "2020-08-25 14:35:05.980503425 +0200" or None if file does not
+            exist.
+            """
+            if self.host.transport.file_exists(keytab):
+                return self.host.run_command(
+                    ['stat', '-c', '%y', keytab]).stdout_text.strip()
+            return None
+
+        mtime_before = get_keytab_mtime()
+
+        self.host.run_command([paths.KTUTIL], stdin_text=stdin,
+                              log_stdout=False)
+        if mtime_before == get_keytab_mtime():
+            raise Exception('{} did not update keytab file "{}"'.format(
+                paths.KTUTIL, keytab))
 
     def copy_keys(self, origin, destination, principal=None, replacement=None):
         def sync_keys(origkeys, destkeys):
@@ -2083,23 +2105,23 @@ class KerberosKeyCopier:
                             destkey.etype == origkey.etype]):
                         if any([destkey.key != origkey.key,
                                 destkey.kvno != origkey.kvno]):
-                            copied = self.copy_key(destination, origkey)
+                            self.copy_key(destination, origkey)
+                            copied = True
                             break
                         uptodate = True
                 if not (copied or uptodate):
-                    copied = self.copy_key(destination, origkey)
-            return copied or uptodate
+                    self.copy_key(destination, origkey)
 
         if not self.host.transport.file_exists(origin):
-            return False
+            raise ValueError('File "{}" does not exist'.format(origin))
         origkeys = self.extract_key_refs(origin, princ=principal)
         if self.host.transport.file_exists(destination):
             destkeys = self.extract_key_refs(destination)
             if any([origkeys is None, destkeys is None]):
-                logger.warning('Either %s or %s are missing or unreadable',
-                               origin, destination)
-                return False
-            return sync_keys(origkeys, destkeys)
+                raise Exception(
+                    'Either {} or {} are missing or unreadable'.format(
+                        origin, destination))
+            sync_keys(origkeys, destkeys)
         else:
             for origkey in origkeys:
                 if origkey.principal in replacement:
@@ -2107,9 +2129,7 @@ class KerberosKeyCopier:
                         [origkey.kvno, replacement.get(origkey.principal),
                          origkey.etype, origkey.key])
                     origkey = newkey
-                if not self.copy_key(destination, origkey):
-                    return False
-            return True
+                self.copy_key(destination, origkey)
 
 
 class FileBackup:

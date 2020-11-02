@@ -30,9 +30,9 @@ import shutil
 import sys
 import time
 
-import dns.resolver
 import ldap
 import six
+from dns.exception import DNSException
 
 from ipaserver.dns_data_management import (
     IPASystemRecords,
@@ -51,6 +51,7 @@ from ipapython.admintool import ScriptError
 import ipalib
 from ipalib import api, errors
 from ipalib.constants import IPA_CA_RECORD
+from ipalib.install import dnsforwarders
 from ipaplatform import services
 from ipaplatform.tasks import tasks
 from ipaplatform.constants import constants
@@ -320,10 +321,15 @@ def read_reverse_zone(default, ip_address, allow_zone_overlap=False):
 def get_auto_reverse_zones(ip_addresses, allow_zone_overlap=False):
     auto_zones = []
     for ip in ip_addresses:
-        if ipautil.reverse_record_exists(ip):
+        try:
+            dnsutil.resolve_address(str(ip))
+        except DNSException:
+            pass
+        else:
             # PTR exist there is no reason to create reverse zone
             logger.info("Reverse record for IP address %s already exists", ip)
             continue
+
         default_reverse = get_reverse_zone_default(ip)
         if not allow_zone_overlap:
             try:
@@ -768,8 +774,10 @@ class BindInstance(service.Service):
         # self.step("restarting named", self.__start)
 
         self.step("configuring named to start on boot", self.__enable)
-        self.step("changing resolv.conf to point to ourselves",
-                  self.__setup_resolv_conf)
+        self.step(
+            "changing resolv.conf to point to ourselves",
+            self.setup_resolv_conf
+        )
         self.step("disable chroot for bind", self.__disable_chroot)
         self.start_creation()
 
@@ -1125,9 +1133,10 @@ class BindInstance(service.Service):
 
         sysupgrade.set_upgrade_state('dns', 'server_config_to_ldap', True)
 
-    def __setup_resolv_conf(self):
+    def setup_resolv_conf(self):
         searchdomains = [self.domain]
         nameservers = []
+        resolve1_enabled = dnsforwarders.detect_resolve1_resolv_conf()
 
         for ip_address in self.ip_addresses:
             if ip_address.version == 4:
@@ -1137,14 +1146,15 @@ class BindInstance(service.Service):
 
         try:
             tasks.configure_dns_resolver(
-                nameservers, searchdomains, fstore=self.fstore
+                nameservers, searchdomains,
+                resolve1_enabled=resolve1_enabled, fstore=self.fstore
             )
         except IOError as e:
             logger.error('Could not update DNS config: %s', e)
         else:
             # python DNS might have global resolver cached in this variable
             # we have to re-initialize it because resolv.conf has changed
-            dns.resolver.reset_default_resolver()
+            dnsutil.reset_default_resolver()
 
     def __disable_chroot(self):
         result = ipautil.run(['control', 'bind-chroot'], capture_output=True)

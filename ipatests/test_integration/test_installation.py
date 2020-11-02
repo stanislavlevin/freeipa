@@ -21,6 +21,7 @@ from cryptography import x509 as crypto_x509
 
 from ipalib import x509
 from ipalib.constants import DOMAIN_LEVEL_0
+from ipalib.sysrestore import SYSRESTORE_STATEFILE, SYSRESTORE_INDEXFILE
 from ipapython.dn import DN
 from ipaplatform.constants import constants
 from ipaplatform.osinfo import osinfo
@@ -238,7 +239,22 @@ class TestInstallCA(IntegrationTest):
 
     @classmethod
     def install(cls, mh):
+        cls.master.put_file_contents(
+            os.path.join(paths.IPA_CCACHES, 'foo'),
+            'somerandomstring'
+        )
+        cls.master.run_command(
+            ['mkdir', os.path.join(paths.IPA_CCACHES, 'bar')]
+        )
         tasks.install_master(cls.master, setup_dns=False)
+
+    def test_ccaches_cleanup(self):
+        """
+        The IPA ccaches directory is cleaned up on install. Verify
+        that the file we created is now gone.
+        """
+        assert os.path.exists(os.path.join(paths.IPA_CCACHES, 'foo')) is False
+        assert os.path.exists(os.path.join(paths.IPA_CCACHES, 'bar')) is False
 
     def test_replica_ca_install_with_no_host_dns(self):
         """
@@ -356,6 +372,117 @@ class TestInstallCA(IntegrationTest):
         assert mode == "644"
         assert owner == "root"
         assert group == "root"
+
+    def test_cert_install_with_IPA_issued_cert(self):
+        """
+        Test replacing an IPA-issued server cert
+
+        ipa-server-certinstall can replace the web and LDAP certs.
+        A slightly different code path is taken when the replacement
+        certs are issued by IPA. Exercise that path by replacing the
+        web cert with itself.
+        """
+        self.master.run_command(['cp', '-p', paths.HTTPD_CERT_FILE, '/tmp'])
+        self.master.run_command(['cp', '-p', paths.HTTPD_KEY_FILE, '/tmp'])
+
+        passwd = self.master.get_file_contents(
+            paths.HTTPD_PASSWD_FILE_FMT.format(host=self.master.hostname)
+        )
+        self.master.run_command([
+            'ipa-server-certinstall',
+            '-p', self.master.config.dirman_password,
+            '-w',
+            '--pin', passwd,
+            '/tmp/httpd.crt',
+            '/tmp/httpd.key',
+        ])
+
+    def test_is_ipa_configured(self):
+        """Verify that the old and new methods of is_ipa_installed works
+
+           If there is an installation section then it is the status.
+
+           If not then it will fall back to looking for configured
+           services and files and use that for determination.
+        """
+        def set_installation_state(host, state):
+            """
+            Update the complete value in the installation section
+            """
+            host.run_command(
+                ['python3', '-c',
+                 'from ipalib.install import sysrestore; '
+                 'from ipaplatform.paths import paths;'
+                 'sstore = sysrestore.StateFile(paths.SYSRESTORE); '
+                 'sstore.backup_state("installation", "complete", '
+                 '{state})'.format(state=state)])
+
+        def get_installation_state(host):
+            """
+            Retrieve the installation state from new install method
+            """
+            result = host.run_command(
+                ['python3', '-c',
+                 'from ipalib.install import sysrestore; '
+                 'from ipaplatform.paths import paths;'
+                 'sstore = sysrestore.StateFile(paths.SYSRESTORE); '
+                 'print(sstore.get_state("installation", "complete"))'])
+            return result.stdout_text.strip()  # a string
+
+        # This comes from freeipa.spec and is used to determine whether
+        # an upgrade is required.
+        cmd = ['python3', '-c',
+               'import sys; from ipalib import facts; sys.exit(0 '
+               'if facts.is_ipa_configured() else 1);']
+
+        # This will use the new method since this is a fresh install,
+        # verify that it is true.
+        self.master.run_command(cmd)
+        assert get_installation_state(self.master) == 'True'
+
+        # Set complete to False which should cause the command to fail
+        # This tests the state of a failed or in-process installation.
+        set_installation_state(self.master, False)
+        result = self.master.run_command(cmd, raiseonerr=False)
+        assert result.returncode == 1
+        set_installation_state(self.master, True)
+
+        # Tweak sysrestore.state to drop installation section
+        self.master.run_command(
+            ['sed','-i', r's/\[installation\]/\[badinstallation\]/',
+             os.path.join(paths.SYSRESTORE, SYSRESTORE_STATEFILE)])
+
+        # Re-run installation check and it should fall back to old method
+        # and be successful.
+        self.master.run_command(cmd)
+        assert get_installation_state(self.master) == 'None'
+
+        # Restore installation section.
+        self.master.run_command(
+            ['sed','-i', r's/\[badinstallation\]/\[installation\]/',
+             os.path.join(paths.SYSRESTORE, SYSRESTORE_STATEFILE)])
+
+        # Uninstall and confirm that the old method reports correctly
+        # on uninstalled servers. It will exercise the old method since
+        # there is no state.
+        tasks.uninstall_master(self.master)
+
+        # ensure there is no stale state
+        result = self.master.run_command(r'test -f {}'.format(
+            os.path.join(paths.SYSRESTORE, SYSRESTORE_STATEFILE)),
+            raiseonerr=False
+        )
+        assert result.returncode == 1
+        result = self.master.run_command(r'test -f {}'.format(
+            os.path.join(paths.SYSRESTORE, SYSRESTORE_INDEXFILE)),
+            raiseonerr=False
+        )
+        assert result.returncode == 1
+
+        # Now run is_ipa_configured() and it should be False
+        result = self.master.run_command(cmd, raiseonerr=False)
+        assert result.returncode == 1
+
 
 class TestInstallWithCA_KRA1(InstallTestBase1):
 
@@ -844,6 +971,25 @@ class TestInstallMaster(IntegrationTest):
             scope="base"
         )
         assert "nsslapd-enable-upgrade-hash: off" in result.stdout_text
+
+    def test_ldbm_tuning(self):
+        # check db-locks in new cn=bdb subentry (1.4.3+)
+        result = tasks.ldapsearch_dm(
+            self.master,
+            "cn=bdb,cn=config,cn=ldbm database,cn=plugins,cn=config",
+            ["nsslapd-db-locks"],
+            scope="base"
+        )
+        assert "nsslapd-db-locks: 50000" in result.stdout_text
+
+        # no db-locks configuration in old global entry
+        result = tasks.ldapsearch_dm(
+            self.master,
+            "cn=config,cn=ldbm database,cn=plugins,cn=config",
+            ["nsslapd-db-locks"],
+            scope="base"
+        )
+        assert "nsslapd-db-locks" not in result.stdout_text
 
     def test_admin_root_alias_CVE_2020_10747(self):
         # Test for CVE-2020-10747 fix

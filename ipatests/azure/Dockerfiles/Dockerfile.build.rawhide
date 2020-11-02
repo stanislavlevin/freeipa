@@ -1,4 +1,6 @@
-FROM fedora:32
+# replace with 'fedora:rawhide' on fix:
+# https://bugzilla.redhat.com/show_bug.cgi?id=1869612
+FROM registry.fedoraproject.org/fedora:rawhide
 MAINTAINER [FreeIPA Developers freeipa-devel@lists.fedorahosted.org]
 ENV container=docker LANG=en_US.utf8 LANGUAGE=en_US.utf8 LC_ALL=en_US.utf8
 

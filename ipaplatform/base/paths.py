@@ -32,6 +32,7 @@ class BasePathNamespace:
     LS = "/bin/ls"
     SYSTEMCTL = "/bin/systemctl"
     SYSTEMD_DETECT_VIRT = "/usr/bin/systemd-detect-virt"
+    SYSTEMD_TMPFILES = "/usr/bin/systemd-tmpfiles"
     TAR = "/bin/tar"
     PACKAGE_MANAGER = "/usr/bin/rpm"
     AUTOFS_LDAP_AUTH_CONF = "/etc/autofs_ldap_auth.conf"
@@ -386,6 +387,7 @@ class BasePathNamespace:
     CERTMONGER = '/usr/sbin/certmonger'
     NETWORK_MANAGER_CONFIG_DIR = '/etc/NetworkManager/conf.d'
     NETWORK_MANAGER_IPA_CONF = '/etc/NetworkManager/conf.d/zzz-ipa.conf'
+    SYSTEMD_RESOLVED_IPA_CONF = '/etc/systemd/resolved.conf.d/zzz-ipa.conf'
     IPA_CUSTODIA_CONF_DIR = '/etc/ipa/custodia'
     IPA_CUSTODIA_CONF = '/etc/ipa/custodia/custodia.conf'
     IPA_CUSTODIA_KEYS = '/etc/ipa/custodia/server.keys'
