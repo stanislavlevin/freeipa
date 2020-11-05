@@ -48,6 +48,7 @@ class ALTLinuxPathNamespace(BasePathNamespace):
     SYSTEMD_SYSTEM_HTTPD_IPA_CONF = (
         "/etc/systemd/system/httpd2.service.d/ipa.conf"
     )
+    SYSTEMD_TMPFILES = "/sbin/systemd-tmpfiles"
     HTTPD = "/usr/sbin/httpd2"
     VAR_LOG_HTTPD_DIR = "/var/log/httpd2"
     VAR_LOG_HTTPD_ERROR = "/var/log/httpd2/error_log"
