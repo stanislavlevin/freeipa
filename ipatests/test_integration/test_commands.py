@@ -48,6 +48,7 @@ ENABLED_SERVICE = u'enabledService'
 HIDDEN_SERVICE = u'hiddenService'
 
 DIRSRV_SLEEP = 5
+SSH_JOURNAL_DELAY = 5
 
 isrgrootx1 = (
     b'-----BEGIN CERTIFICATE-----\n'
@@ -664,6 +665,8 @@ class TestIPACommand(IntegrationTest):
             auth_method="key", private_key_path=first_priv_key_path
         )
 
+        # sshd doesn't write its logs to journal immediately
+        time.sleep(SSH_JOURNAL_DELAY)
         journal_cmd = ['journalctl', '--since=today', '-u', 'sshd']
         result = self.master.run_command(journal_cmd)
         output = result.stdout_text
@@ -1236,6 +1239,8 @@ class TestIPACommand(IntegrationTest):
         finally:
             pam_sshd_backup.restore()
 
+        # sshd doesn't write its logs to journal immediately
+        time.sleep(SSH_JOURNAL_DELAY)
         result = self.master.run_command(['journalctl',
                                           '-u', 'sshd',
                                           '--since={}'.format(since)])
