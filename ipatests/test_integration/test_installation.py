@@ -972,6 +972,24 @@ class TestInstallMaster(IntegrationTest):
         )
         assert "nsslapd-enable-upgrade-hash: off" in result.stdout_text
 
+    def test_ds_loglevel(self):
+        result = tasks.ldapsearch_dm(
+            self.master,
+            "cn=config",
+            ldap_args=["nsslapd-errorlog-level"],
+            scope="base"
+        )
+        assert "nsslapd-errorlog-level: 8192" in result.stdout_text
+
+    def test_ds_flush_logs(self):
+        result = tasks.ldapsearch_dm(
+            self.master,
+            "cn=config",
+            ldap_args=["nsslapd-accesslog-logbuffering"],
+            scope="base"
+        )
+        assert "nsslapd-accesslog-logbuffering: off" in result.stdout_text
+
     def test_ldbm_tuning(self):
         # check db-locks in new cn=bdb subentry (1.4.3+)
         result = tasks.ldapsearch_dm(
