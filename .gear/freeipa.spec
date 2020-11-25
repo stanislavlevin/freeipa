@@ -44,7 +44,7 @@
 
 Name: freeipa
 Version: 4.8.6
-Release: alt2.p9
+Release: alt3.c9
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -422,6 +422,7 @@ Requires: python3-module-qrcode
 Requires: python3-module-requests
 Requires: python3-module-sss-murmur
 Requires: python3-module-yubico
+Obsoletes: python-module-freeipa
 %py3_provides ipaplatform
 %py3_provides ipaplatform.constants
 %py3_provides ipaplatform.osinfo
@@ -1016,6 +1017,9 @@ fi
 %python3_sitelibdir/ipaplatform-*-nspkg.pth
 
 %changelog
+* Wed Nov 25 2020 Anton V. Boyarshinov <boyarsh@altlinux.org> 4.8.6-alt3.c9
+- add obsoletes to python-module-freeipa to help apt update freeipa-client
+
 * Thu Oct 08 2020 Anton V. Boyarshinov <boyarsh@altlinux.org> 4.8.6-alt2.p9
 - Don't require SELinux
 
