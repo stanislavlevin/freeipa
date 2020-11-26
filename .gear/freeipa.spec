@@ -423,6 +423,7 @@ Requires: python3-module-requests
 Requires: python3-module-sss-murmur
 Requires: python3-module-yubico
 Obsoletes: python-module-freeipa
+Provides: python-module-freeipa
 %py3_provides ipaplatform
 %py3_provides ipaplatform.constants
 %py3_provides ipaplatform.osinfo
