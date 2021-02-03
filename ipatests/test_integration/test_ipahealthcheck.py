@@ -5,7 +5,7 @@
 Tests to verify that the ipa-healthcheck scenarios
 """
 
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 from configparser import RawConfigParser, NoOptionError
 from datetime import datetime, timedelta, timezone
@@ -158,6 +158,21 @@ TOMCAT_CONFIG_FILES = (
     paths.CA_CS_CFG_PATH,
 )
 
+
+def excludes_freespace_check(host, threshold=25):
+    """
+    if host's free space is less than threshold
+    configure ipahealthcheck to skip run of FileSystemSpaceCheck check
+    """
+    path = "/"
+    cmd = ["stat", "-f", "--format=%a\n%b", path]
+    result = host.run_command(cmd)
+
+    free_blocks, total_blocks = result.stdout_text.rstrip().splitlines()
+    if int(int(free_blocks) * 100 / int(total_blocks)) < threshold:
+        set_excludes(host, "check", "FileSystemSpaceCheck")
+
+
 def run_healthcheck(host, source=None, check=None, output_type="json",
                     failures_only=False, config=None):
     """
@@ -296,6 +311,8 @@ class TestIpaHealthCheck(IntegrationTest):
         succesfully on IPA master.
         """
         tasks.install_packages(self.master, HEALTHCHECK_PKG)
+        # CI may not have enough free space
+        excludes_freespace_check(self.master)
 
     def test_ipa_healthcheck_install_on_replica(self):
         """
@@ -303,6 +320,8 @@ class TestIpaHealthCheck(IntegrationTest):
         succesfully on IPA replica.
         """
         tasks.install_packages(self.replicas[0], HEALTHCHECK_PKG)
+        # CI may not have enough free space
+        excludes_freespace_check(self.replicas[0])
 
     def test_running_ipahealthcheck_ipaclient(self):
         """
