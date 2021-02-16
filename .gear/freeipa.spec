@@ -816,7 +816,6 @@ fi
 %_sbindir/ipa-acme-manage
 %_libexecdir/certmonger/dogtag-ipa-ca-renew-agent-submit
 %_libexecdir/certmonger/ipa-server-guard
-%dir %_libexecdir/ipa
 %_libexecdir/ipa/ipa-ccache-sweeper
 %_libexecdir/ipa/ipa-custodia
 %_libexecdir/ipa/ipa-custodia-check
@@ -995,6 +994,8 @@ fi
 %_sbindir/ipa-rmkeytab
 %_sbindir/ipa-join
 %_bindir/ipa
+%dir %_libexecdir/ipa/acme
+%_libexecdir/ipa/acme/certbot-dns-ipa
 %config %_sysconfdir/bash_completion.d
 %config %_sysconfdir/sysconfig/certmonger
 %_mandir/man1/ipa.1*
@@ -1049,6 +1050,7 @@ fi
 %files common -f ipa.lang
 %doc COPYING README.md Contributors.txt
 %dir %_datadir/ipa
+%dir %_libexecdir/ipa
 
 %files -n python3-module-freeipa
 %python3_sitelibdir/ipapython/
