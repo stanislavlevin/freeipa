@@ -533,6 +533,14 @@ export PYTHON=%__python3
 %install
 %makeinstall_std
 
+%if_without only_client
+# don't package ipasphinx for now
+rm -r \
+    %buildroot%python3_sitelibdir_noarch/ipasphinx \
+    %buildroot%python3_sitelibdir_noarch/ipasphinx-%version-py%_python3_version.egg-info \
+    %nil
+%endif
+
 # remove files which are useful only for make uninstall
 find %buildroot -wholename '*/site-packages/*/install_files.txt' -exec rm {} \;
 
