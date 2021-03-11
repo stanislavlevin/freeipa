@@ -3294,6 +3294,29 @@ def get_package_version(host, pkgname):
                 "get_package_version: "
                 "pkgname package is not installed"
             )
+    elif platform in ("altlinux",):
+        """
+        version is reported twice if the above command is used:
+
+        $ rpm -qa --qf "%{VERSION}" *ipa-healthcheck
+        0.170.17
+
+        $ rpm -qa *ipa-healthcheck
+        python3-module-freeipa-healthcheck-0.17-alt1.x86_64
+        freeipa-healthcheck-0.17-alt1.x86_64
+
+        For ALT the first reported version is returned.
+        """
+        cmd = host.run_command(
+            ("rpm", "-qa", "--qf", "%{VERSION}\n", pkgname),
+        )
+        get_package_version = cmd.stdout_text
+        if not get_package_version:
+            raise ValueError(
+                "get_package_version: "
+                f"{pkgname} package is not installed"
+            )
+        get_package_version = get_package_version.splitlines()[0]
     else:
         raise ValueError(
             "get_package_version: unknown platform %s" % platform
@@ -3316,6 +3339,29 @@ def get_package_version_and_release(host, pkgname):
                 "get_package_version: "
                 "pkgname package is not installed"
             )
+    elif platform in ("altlinux",):
+        """
+        version-release is reported twice if the above command is used:
+
+        $ rpm -qa --qf %{VERSION}-%{RELEASE} *ipa-healthcheck
+        0.19-alt10.19-alt1
+
+        $ rpm -qa *ipa-healthcheck
+        python3-module-freeipa-healthcheck-0.19-alt1.x86_64
+        freeipa-healthcheck-0.19-alt1.x86_64
+
+        For ALT the first reported version-release is returned.
+        """
+        cmd = host.run_command(
+            ("rpm", "-qa", "--qf", "%{VERSION}-%{RELEASE}\n", pkgname),
+        )
+        get_package_version = cmd.stdout_text
+        if not get_package_version:
+            raise ValueError(
+                "get_package_version: "
+                f"{pkgname} package is not installed"
+            )
+        get_package_version = get_package_version.splitlines()[0]
     else:
         raise ValueError(
             "get_package_version: unknown platform %s" % platform
