@@ -2679,6 +2679,16 @@ def get_package_version(host, pkgname):
                 "get_package_version: "
                 "pkgname package is not installed"
             )
+    elif platform in ("altlinux",):
+        cmd = host.run_command(
+            ["rpm", "-q", "--qf", "%{VERSION}", pkgname]
+        )
+        get_package_version = cmd.stdout_text
+        if not get_package_version:
+            raise ValueError(
+                "get_package_version: "
+                "pkgname package is not installed"
+            )
     else:
         raise ValueError(
             "get_package_version: unknown platform %s" % platform
@@ -2692,7 +2702,12 @@ def get_openldap_client_version(host):
 
 
 def get_healthcheck_version(host):
-    return get_package_version(host, '*ipa-healthcheck')
+    platform = get_platform(host)
+    if platform in ("altlinux"):
+        healthcheck_pkg = "freeipa-healthcheck"
+    else:
+        healthcheck_pkg = "*ipa-healthcheck"
+    return get_package_version(host, healthcheck_pkg)
 
 
 def wait_for_ipa_to_start(host, timeout=60):
