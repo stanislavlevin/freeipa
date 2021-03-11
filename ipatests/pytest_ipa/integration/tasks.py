@@ -2672,7 +2672,7 @@ def get_package_version(host, pkgname):
     Get package version on remote host
     """
     platform = get_platform(host)
-    if platform in ("rhel", "fedora"):
+    if platform in ("rhel", "fedora", "altlinux"):
         cmd = host.run_command(
             ["rpm", "-qa", "--qf", "%{VERSION}", pkgname]
         )
