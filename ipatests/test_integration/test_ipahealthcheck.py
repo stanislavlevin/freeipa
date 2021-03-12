@@ -1271,10 +1271,15 @@ class TestIpaHealthCheck(IntegrationTest):
         """
         instance = realm_to_serverid(self.master.domain.realm)
         cmd = ["systemctl", "restart", "dirsrv@{}".format(instance)]
-        # The crypto policy must be set to LEGACY otherwise 389ds
-        # combines crypto policy amd minSSLVersion and removes
-        # TLS1.0 on fedora>=33 as the DEFAULT policy forbids TLS1.0
-        self.master.run_command(['update-crypto-policies', '--set', 'LEGACY'])
+
+        platform = tasks.get_platform(self.master)
+        if platform not in ("altlinux",):
+            # The crypto policy must be set to LEGACY otherwise 389ds
+            # combines crypto policy amd minSSLVersion and removes
+            # TLS1.0 on fedora>=33 as the DEFAULT policy forbids TLS1.0
+            self.master.run_command(
+                ['update-crypto-policies', '--set', 'LEGACY']
+            )
         self.master.run_command(
             [
                 "dsconf",
@@ -1286,7 +1291,10 @@ class TestIpaHealthCheck(IntegrationTest):
         )
         self.master.run_command(cmd)
         yield
-        self.master.run_command(['update-crypto-policies', '--set', 'DEFAULT'])
+        if platform not in ("altlinux",):
+            self.master.run_command(
+                ['update-crypto-policies', '--set', 'DEFAULT']
+            )
         self.master.run_command(
             [
                 "dsconf",
