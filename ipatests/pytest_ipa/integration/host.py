@@ -86,12 +86,18 @@ class Host(pytest_multihost.host.Host):
         )
         self._fips_mode = None
         self._userspace_fips = False
-        self.resolver = resolver(self)
         self._paths = None
         self._osinfo = None
         self._constants = None
         self._knownservices = None
         self._tasks = None
+        self._resolver = None
+
+    @property
+    def resolver(self):
+        if self._resolver is None:
+            self._resolver = resolver(self)
+        return self._resolver
 
     @property
     def paths(self):
