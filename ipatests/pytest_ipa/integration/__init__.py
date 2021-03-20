@@ -380,6 +380,58 @@ def integration_logs(class_integration_logs, request):
     collect_test_logs(request.node, method_logs, request.config)
 
 
+def process_hostmarkers(mh, request):
+    for mark in request.node.iter_markers():
+        if mark.name in {
+            "skip_if_hostplatform",
+            "skip_if_hostcontainer",
+            "skip_if_host",
+        }:
+            nodeid = request.node.nodeid
+
+            hostattr = mark.kwargs.get("host")
+            if hostattr is None:
+                hostattr = mark.args[0]
+
+            if hostattr == "master":
+                host = mh.master
+            else:
+                pattern = r"(?P<role>(clients|replicas))\[(?P<index>\d+)\]$"
+                m = re.match(pattern, hostattr)
+                if m is None:
+                    raise ValueError(f"Unsupported host definition: {hostattr}")
+                host = getattr(mh, m.group("role"))[int(m.group("index"))]
+
+            reason = mark.kwargs["reason"]
+
+            if mark.name == "skip_if_hostplatform":
+                platform = mark.kwargs["platform"]
+                if platform in host.osinfo.platform_ids:
+                    pytest.skip(
+                        f"{nodeid}: {host.hostname}: {platform}: {reason}"
+                    )
+            elif mark.name == "skip_if_hostcontainer":
+                host_container = host.osinfo.container
+                if host_container is not None:
+                    container = mark.kwargs["container"]
+                    if container in ["any", host_container]:
+                        pytest.skip(
+                            f"{nodeid}: {host.hostname}({host_container}): "
+                            f"{container}: {reason}"
+                        )
+            elif mark.name == "skip_if_host":
+                condition_cb = mark.kwargs["condition_cb"]
+                if condition_cb(host):
+                    pytest.skip(f"{nodeid}: {host.hostname}: {reason}")
+            else:
+                raise ValueError(f"Unsupported Pytest marker '{mark.name}'")
+
+
+@pytest.fixture
+def host_markers(mh, request):
+    process_hostmarkers(mh, request)
+
+
 @pytest.fixture(scope='class')
 def mh(request, class_integration_logs):
     """IPA's multihost fixture object
@@ -436,6 +488,9 @@ def mh(request, class_integration_logs):
         mh.ad_treedomains = []
         for domain in ad_domains:
             mh.ad_treedomains.extend(domain.hosts_by_role('ad_treedomain'))
+
+    # handle pytest marks which perform host checks *before* install
+    process_hostmarkers(mh, request)
 
     cls.logs_to_collect = class_integration_logs.class_logs
 
