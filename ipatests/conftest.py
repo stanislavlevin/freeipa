@@ -53,6 +53,29 @@ MARKERS = [
      '(ID and ID_LIKE)'),
     ('skip_if_container(type, reason): Skip test on container '
      '("any" or specific type)'),
+    # markers only for integration tests
+    (
+        "skip_if_hostplatform("
+        "host attribute name within IntegrationTest, "
+        "platform name, "
+        "reason): "
+        "Skip integration test on remote platform (ID and ID_LIKE)"
+    ),
+    (
+        "skip_if_hostcontainer("
+        "host attribute name within IntegrationTest, "
+        "container type, "
+        "reason): "
+        "Skip integration test on remote container ('any' or specific type)"
+    ),
+    (
+        "skip_if_host("
+        "host attribute name within IntegrationTest, "
+        "condition callback, "
+        "reason): "
+        "Skip integration test on remote host based on condition callback "
+        "result"
+    ),
 ]
 
 
@@ -148,6 +171,7 @@ def pytest_cmdline_main(config):
         print('sys.version: {}'.format(sys.version))
 
 
+@pytest.hookimpl(wrapper=True)
 def pytest_runtest_setup(item):
     if isinstance(item, pytest.Function):
         if item.get_closest_marker('skip_ipaclient_unittest'):
@@ -173,6 +197,66 @@ def pytest_runtest_setup(item):
                 if container in ('any', osinfo.container):
                     pytest.skip(
                         f"Skip test on '{container}' container type: {reason}")
+
+    res = yield
+
+    # process host markers after mh fixture setup, which adds host attributes
+    # master, replicas, clients, etc.
+
+    # process only own_markers to avoid double checking with class level
+    # markers handled by mh fixture
+    for mark in item.own_markers:
+        if mark.name in {
+            "skip_if_hostplatform",
+            "skip_if_hostcontainer",
+            "skip_if_host",
+        }:
+            process_hostmarker(
+                mark, pytest_nodeid=item.nodeid, pytest_cls=item.cls
+            )
+
+    return res
+
+
+def process_hostmarker(pytest_mark, pytest_nodeid, pytest_cls):
+    tests_dir = pytest_nodeid.split(os.sep, 1)[0]
+    if tests_dir not in {"test_integration"}:
+        raise ValueError(
+            f"Marker '{pytest_mark.name}' is intended only for "
+            f"integration tests and can't be applied for '{tests_dir}'"
+        )
+    # mh setup was skipped, e.g. ipa-run-tests --setup-plan
+    if getattr(pytest_cls, "domain", None) is None:
+        return
+
+    hostattr = pytest_mark.kwargs.get("host")
+    if hostattr is None:
+        hostattr = pytest_mark.args[0]
+
+    host = getattr(pytest_cls, hostattr)
+    reason = pytest_mark.kwargs["reason"]
+
+    if pytest_mark.name == "skip_if_hostplatform":
+        platform = pytest_mark.kwargs["platform"]
+        if platform in host.osinfo.platform_ids:
+            pytest.skip(
+                f"{pytest_nodeid}: {host.hostname}: {platform}: {reason}"
+            )
+    elif pytest_mark.name == "skip_if_hostcontainer":
+        host_container = host.osinfo.container
+        if host_container is not None:
+            container = pytest_mark.kwargs["container"]
+            if container in ["any", host_container]:
+                pytest.skip(
+                    f"{pytest_nodeid}: {host.hostname}({host_container}): "
+                    f"{container}: {reason}"
+                )
+    elif pytest_mark.name == "skip_if_host":
+        condition_cb = pytest_mark.kwargs["condition_cb"]
+        if condition_cb(host):
+            pytest.skip(f"{pytest_nodeid}: {host.hostname}: {reason}")
+    else:
+        raise ValueError(f"Unsupported Pytest marker '{pytest_mark.name}'")
 
 
 @pytest.fixture

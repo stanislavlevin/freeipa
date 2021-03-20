@@ -36,6 +36,7 @@ from pytest_multihost import make_multihost_fixture
 from ipapython import ipautil
 from ipaplatform.paths import paths
 from ipaplatform.constants import constants
+from ipatests.conftest import process_hostmarker
 from . import fips
 from .config import Config
 from .env_config import get_global_config
@@ -380,6 +381,18 @@ def integration_logs(class_integration_logs, request):
     collect_test_logs(request.node, method_logs, request.config)
 
 
+def process_hostmarkers(request):
+    for mark in request.node.iter_markers():
+        if mark.name in {
+            "skip_if_hostplatform",
+            "skip_if_hostcontainer",
+            "skip_if_host",
+        }:
+            process_hostmarker(
+                mark, pytest_nodeid=request.node.nodeid, pytest_cls=request.cls
+            )
+
+
 @pytest.fixture(scope='class')
 def mh(request, class_integration_logs):
     """IPA's multihost fixture object
@@ -437,6 +450,11 @@ def mh(request, class_integration_logs):
         for domain in ad_domains:
             mh.ad_treedomains.extend(domain.hosts_by_role('ad_treedomain'))
 
+    add_compat_attrs(cls, mh)
+
+    # handle pytest marks which perform host checks *before* install
+    process_hostmarkers(request)
+
     cls.logs_to_collect = class_integration_logs.class_logs
 
     if logger.isEnabledFor(logging.INFO):
@@ -449,7 +467,6 @@ def mh(request, class_integration_logs):
         logger.info('Preparing host %s', host.hostname)
         tasks.prepare_host(host)
 
-    add_compat_attrs(cls, mh)
 
     def fin():
         del_compat_attrs(cls)
@@ -480,7 +497,11 @@ def add_compat_attrs(cls, mh):
     cls.domain = mh.domain
     cls.master = mh.master
     cls.replicas = mh.replicas
+    for num, replica in enumerate(mh.replicas):
+        setattr(cls, f"replica{num}", replica)
     cls.clients = mh.clients
+    for num, client in enumerate(mh.clients):
+        setattr(cls, f"client{num}", client)
     cls.ad_domains = mh.config.ad_domains
     if cls.ad_domains:
         cls.ads = mh.ads
