@@ -53,6 +53,51 @@ MARKERS = [
      '(ID and ID_LIKE)'),
     ('skip_if_container(type, reason): Skip test on container '
      '("any" or specific type)'),
+    # markers only for integration tests
+    (
+        "skip_if_hostplatform("
+        "host attribute name within IntegrationTest, "
+        "platform name, "
+        "reason): "
+        "Skip integration test on remote platform (ID and ID_LIKE).\n"
+        "Examples:\n"
+        "@pytest.mark.skip_if_hostplatform("
+        "'master', platform='foo', reason='bar')\n"
+        "@pytest.mark.skip_if_hostplatform("
+        "'clients[0]', platform='foo', reason='bar')"
+    ),
+    (
+        "skip_if_hostcontainer("
+        "host attribute name within IntegrationTest, "
+        "container type, "
+        "reason): "
+        "Skip integration test on remote container ('any' or specific type).\n"
+        "Examples:\n"
+        "@pytest.mark.skip_if_hostcontainer("
+        "'master', container='any', reason='bar')\n"
+        "@pytest.mark.skip_if_hostcontainer("
+        "'clients[0]', container='any', reason='bar')"
+    ),
+    (
+        "skip_if_host("
+        "host attribute name within IntegrationTest, "
+        "condition callback, "
+        "reason): "
+        "Skip integration test on remote host based on condition callback "
+        "result.\n"
+        "Examples:\n"
+        "@pytest.mark.skip_if_host(\n"
+        "    'master',\n"
+        "    condition_cb=lambda host: not host.is_fips_mode,\n"
+        "    reason='requires enabled fips mode',\n"
+        ")\n"
+        "@pytest.mark.skip_if_host(\n"
+        "    'clients[0]',\n"
+        "    condition_cb=lambda host: not host.is_fips_mode,\n"
+        "    reason='requires enabled fips mode',\n"
+        ")"
+
+    ),
 ]
 
 
