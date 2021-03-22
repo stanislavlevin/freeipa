@@ -35,6 +35,7 @@ if __name__ == '__main__':
             "ipatests",
             "ipatests.pytest_ipa",
             "ipatests.pytest_ipa.integration",
+            "ipatests.pytest_ipa.integration.host_ipaplatform",
             "ipatests.test_cmdline",
             "ipatests.test_custodia",
             "ipatests.test_install",
