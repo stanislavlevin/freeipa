@@ -143,7 +143,7 @@ class InnerClassMeta(type):
         else:
             deleter(obj)
 
-    def __bind(cls, obj_type):
+    def __bind(cls, obj_type):  # pylint: disable=unused-private-member, #4763
         try:
             outer_class = cls.__dict__['__outer_class__']
             name = cls.__dict__['__outer_name__']

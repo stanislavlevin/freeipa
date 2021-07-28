@@ -1001,7 +1001,6 @@ class DsInstance(service.Service):
         self._ldap_mod("replica-prevent-time-skew.ldif", self.sub_dict)
 
     def __setup_s4u2proxy(self):
-
         def __add_principal(last_cn, principal, self):
             dn = DN(('cn', last_cn), ('cn', 's4u2proxy'),
                     ('cn', 'etc'), self.suffix)
