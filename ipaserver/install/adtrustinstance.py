@@ -527,7 +527,7 @@ class ADTRUSTInstance(service.Service):
         try:
             current = api.Backend.ldap2.get_entry(targets_dn)
             members = current.get('memberPrincipal', [])
-            if not(self.principal in members):
+            if self.principal not in members:
                 current["memberPrincipal"] = members + [self.principal]
                 api.Backend.ldap2.update_entry(current)
             else:
