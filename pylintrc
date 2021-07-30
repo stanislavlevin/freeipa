@@ -8,6 +8,11 @@ persistent=no
 #        DuplicateSectionError for the IPA section
 #load-plugins=pylint_plugins
 
+# Return non-zero exit code if any of these messages/categories are detected,
+# even if score is above --fail-under value. Syntax same as enable. Messages
+# specified are enabled, while categories only check already-enabled messages.
+fail-on=useless-suppression,
+
 # Use multiple processes to speed up Pylint.
 jobs=0
 
@@ -28,10 +33,18 @@ valid-metaclass-classmethod-first-arg=cls
 
 enable=
     all,
-    python3
+    python3,
+    useless-suppression,
 
 disable=
-    I,
+    bad-inline-option,
+    c-extension-no-member,
+    deprecated-pragma,
+    file-ignored,
+    locally-disabled,
+    raw-checker-failed,
+    suppressed-message,
+    use-symbolic-message-instead,
     duplicate-code,
     interface-not-implemented,
     no-self-use,
