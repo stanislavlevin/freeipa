@@ -397,7 +397,10 @@ class IPACertificate:
             for value in values:
                 match_san.append(('DNS', value))
 
-        ssl.match_hostname(match_cert, DNSName(hostname).ToASCII())
+        # deprecated since Python3.7 (our supported Python is 3.6)
+        ssl.match_hostname(  # pylint: disable=deprecated-method
+            match_cert, DNSName(hostname).ToASCII()
+        )
 
 
 def load_pem_x509_certificate(data):
