@@ -37,7 +37,6 @@ except ImportError:
     from xml.etree import ElementTree as etree
 import SSSDConfig
 
-# pylint: disable=import-error
 from six.moves.urllib.parse import urlsplit
 
 # pylint: enable=import-error

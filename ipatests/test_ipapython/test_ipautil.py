@@ -185,7 +185,6 @@ class TestCIDict:
         assert ("key2", "val2") in items_set
         assert ("KEY3", "VAL3") in items_set
         # pylint: disable=dict-iter-method
-        # pylint: disable=dict-keys-not-iterating, dict-values-not-iterating
         assert list(self.cidict.items()) == list(self.cidict.iteritems()) == list(zip(
             self.cidict.keys(), self.cidict.values()))
 

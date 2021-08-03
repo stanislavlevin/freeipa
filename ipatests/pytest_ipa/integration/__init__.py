@@ -147,7 +147,7 @@ def collect_test_logs(node, logs_dict, test_config, suffix=''):
         beakerlib_plugin=test_config.pluginmanager.getplugin('BeakerLibPlugin'),
     )
 
-    hosts = logs_dict.keys()  # pylint: disable=dict-keys-not-iterating
+    hosts = logs_dict.keys()
     collect_systemd_journal(name, hosts, logfile_dir)
 
 

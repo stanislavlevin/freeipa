@@ -657,8 +657,7 @@ class permission(baseldap.LDAPObject):
         acientry, acistring = self._get_aci_entry_and_string(
             permission_entry, old_name, notfound_ok=True)
 
-        # (pylint thinks `acientry` is just a dict, but it's an LDAPEntry)
-        acidn = acientry.dn  # pylint: disable=E1103
+        acidn = acientry.dn
 
         if acistring is not None:
             logger.debug('Removing ACI %r from %s', acistring, acidn)
@@ -745,8 +744,7 @@ class permission(baseldap.LDAPObject):
             target_entry = entry
 
         # The DN of old permissions is always basedn
-        # (pylint thinks `base` is just a dict, but it's an LDAPEntry)
-        assert base.dn == self.api.env.basedn, base  # pylint: disable=E1103
+        assert base.dn == self.api.env.basedn, base
 
         aci = ACI(acistring)
 

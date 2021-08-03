@@ -890,7 +890,7 @@ def _enable_warnings(error=False):
     import warnings
 
     # get reference to Py_BytesWarningFlag from Python CAPI
-    byteswarnings = ctypes.c_int.in_dll(  # pylint: disable=no-member
+    byteswarnings = ctypes.c_int.in_dll(
         ctypes.pythonapi, 'Py_BytesWarningFlag')
 
     if byteswarnings.value >= 2:
@@ -936,9 +936,11 @@ class API(plugable.API):
     @property
     def packages(self):
         if self.env.in_server:
-            # pylint: disable=import-error,ipa-forbidden-import
+            # pylint: disable=ipa-forbidden-import
+            # pylint: disable=import-error,useless-suppression
             import ipaserver.plugins
-            # pylint: enable=import-error,ipa-forbidden-import
+            # pylint: enable=import-error,useless-suppression
+            # pylint: enable=ipa-forbidden-import
             result = (
                 ipaserver.plugins,
             )
@@ -951,9 +953,11 @@ class API(plugable.API):
             )
 
         if self.env.context in ('installer', 'updates'):
-            # pylint: disable=import-error,ipa-forbidden-import
+            # pylint: disable=ipa-forbidden-import
+            # pylint: disable=import-error,useless-suppression
             import ipaserver.install.plugins
-            # pylint: enable=import-error,ipa-forbidden-import
+            # pylint: enable=import-error,useless-suppression
+            # pylint: enable=ipa-forbidden-import
             result += (ipaserver.install.plugins,)
 
         return result

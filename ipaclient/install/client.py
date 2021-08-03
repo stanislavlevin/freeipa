@@ -3663,7 +3663,7 @@ def init(installer):
     root_logger = logging.getLogger()
     for handler in root_logger.handlers:
         if (isinstance(handler, logging.StreamHandler) and
-                handler.stream is sys.stderr):  # pylint: disable=no-member
+                handler.stream is sys.stderr):
             installer.debug = handler.level == logging.DEBUG
             break
     else:
@@ -3745,7 +3745,6 @@ class ClientInstallInterface(hostname_.HostNameInstallInterface,
     force_join = enroll_only(force_join)
 
     ntp_servers = knob(
-        # pylint: disable=invalid-sequence-index
         typing.List[str], None,
         description="ntp server to use. This option can be used multiple "
                     "times",

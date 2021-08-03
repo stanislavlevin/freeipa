@@ -267,12 +267,12 @@ class CustodiaPluginMeta(abc.ABCMeta):
             args = inspect.getargspec(ncls.__init__).args
             # pylint: enable=deprecated-method
         else:
-            sig = inspect.signature(ncls.__init__)  # pylint: disable=no-member
+            sig = inspect.signature(ncls.__init__)
             args = list(sig.parameters)
 
         if args[1:3] != ['config', 'section']:
             # old-style plugin class
-            ncls._options = None  # pylint: disable=protected-access
+            ncls._options = None
             return ncls
 
         # new-style plugin class
@@ -288,7 +288,7 @@ class CustodiaPluginMeta(abc.ABCMeta):
             value.name = name
             options.append(value)
 
-        ncls._options = tuple(options)  # pylint: disable=protected-access
+        ncls._options = tuple(options)
         return ncls
 
 
@@ -315,7 +315,6 @@ class CustodiaPlugin:
         if section is not None and self._options is not None:
             # new style configuration
             opt = OptionHandler(config, section)
-            # pylint: disable=not-an-iterable
             for option in self._options:
                 value = opt.get(option)
                 # special case for store
@@ -359,9 +358,7 @@ class CustodiaPlugin:
             raise ValueError(
                 "'{}' references non-existing store '{}'".format(
                     self.section, self.store_name))
-        # pylint: disable=attribute-defined-outside-init
         self.store = store_plugin
-        # pylint: enable=attribute-defined-outside-init
         store_plugin.finalize_init(config, cfgparser, context=self)
 
     def finalize_init(self, config, cfgparser, context=None):

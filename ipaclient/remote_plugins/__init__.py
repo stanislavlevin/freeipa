@@ -110,9 +110,11 @@ class ServerInfo(MutableMapping):
 
 def get_package(api):
     if api.env.in_tree:
-        # pylint: disable=import-error,ipa-forbidden-import
+        # pylint: disable=ipa-forbidden-import
+        # pylint: disable=import-error,useless-suppression
         from ipaserver import plugins
-        # pylint: enable=import-error,ipa-forbidden-import
+        # pylint: enable=import-error,useless-suppression
+        # pylint: enable=ipa-forbidden-import
     else:
         try:
             plugins = api._remote_plugins

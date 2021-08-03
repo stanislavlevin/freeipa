@@ -162,7 +162,7 @@ class DNSName(dns.name.Name):
     def __init__(self, labels, origin=None):
         try:
             if isinstance(labels, str):
-                #pylint: disable=E1101
+                # pylint: disable=no-member,useless-suppression
                 labels = dns.name.from_text(unicode(labels), origin).labels
             elif isinstance(labels, dns.name.Name):
                 labels = labels.labels

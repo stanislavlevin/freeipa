@@ -129,7 +129,6 @@ class HTTPSHandler(urllib.request.HTTPSHandler):
         return create_https_connection(host, **tmp)
 
     def https_open(self, req):
-        # pylint: disable=no-member
         return self.do_open(self.__inner, req)
 
 @register()
@@ -157,7 +156,6 @@ class otptoken_sync(Local):
         assert segments[0] == 'https' # Ensure encryption.
         segments[2] = segments[2].replace('/xml', '/session/sync_token')
         # urlunparse *can* take one argument
-        # pylint: disable=too-many-function-args
         sync_uri = urllib.parse.urlunparse(segments)
 
         # Prepare the query.
@@ -170,7 +168,6 @@ class otptoken_sync(Local):
         query = query.encode('utf-8')
 
         # Sync the token.
-        # pylint: disable=E1101
         handler = HTTPSHandler(
             cafile=api.env.tls_ca_cert,
             tls_version_min=api.env.tls_version_min,

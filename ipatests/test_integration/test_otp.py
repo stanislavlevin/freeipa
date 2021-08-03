@@ -275,7 +275,7 @@ class TestOTPToken(IntegrationTest):
         This requires paramiko until the 2-prompt sshpass RFE is
         fulfilled: https://sourceforge.net/p/sshpass/feature-requests/5/
         """
-        if self.master.is_fips_mode:  # pylint: disable=no-member
+        if self.master.is_fips_mode:
             pytest.skip("paramiko is not compatible with FIPS mode")
 
         master = self.master
