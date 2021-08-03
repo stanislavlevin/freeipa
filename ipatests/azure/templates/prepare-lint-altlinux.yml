@@ -1,0 +1,8 @@
+steps:
+- script: |
+    set -e
+    sudo apt-get -y install python3-module-pip
+    # too old PIP in P9
+    python3 -m pip install --user --upgrade pip
+    python3 -m pip install --user --constraint .wheelconstraints.in --ignore-installed pylint
+  displayName: Install Lint dependencies
