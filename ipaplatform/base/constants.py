@@ -130,6 +130,7 @@ class BaseConstantsNamespace:
     NTPD_OPTS_QUOTE = "\""
     ODS_USER = User("ods")
     ODS_GROUP = Group("ods")
+    PASSWORD_QUALITY_LIB = "libpwquality"
     # nfsd init variable used to enable kerberized NFS
     SECURE_NFS_VAR = "SECURE_NFS"
     SELINUX_BOOLEAN_ADTRUST = {
