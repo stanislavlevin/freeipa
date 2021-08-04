@@ -525,6 +525,7 @@ export PYTHON=%__python3
 %configure --with-vendor-suffix=-%release \
 %if_without only_client
            --enable-server \
+           --with-password-quality-lib=no \
            --with-ipatests \
 %else
            --disable-server \
