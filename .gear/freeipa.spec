@@ -183,7 +183,8 @@ Requires: pki-kra >= %pki_version
 Requires: pki-acme >= %pki_version
 Requires: certmonger >= %certmonger_version
 Requires: 389-ds-base >= %ds_version
-Requires: openssl
+# https://pagure.io/freeipa/issue/8632
+Requires: openssl > 1.1.1j
 Requires: softhsm
 Requires: libp11-kit
 Requires: gzip
