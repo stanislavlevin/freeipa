@@ -34,6 +34,7 @@ from ipalib import _
 from ipalib.plugable import Registry
 from ipalib.request import context
 from ipapython.dn import DN
+from ipaplatform.constants import constants as platformconstants
 
 import six
 
@@ -364,6 +365,9 @@ class pwpolicy(LDAPObject):
             doc=_('Period for which lockout is enforced (seconds)'),
             minvalue=0,
         ),
+    )
+
+    pwquality_lib_params = (
         Int(
             'ipapwdmaxrepeat?',
             cli_name='maxrepeat',
@@ -397,6 +401,9 @@ class pwpolicy(LDAPObject):
             default=False,
         ),
     )
+
+    if platformconstants.PASSWORD_QUALITY_LIB is not None:
+        takes_params += pwquality_lib_params
 
     def get_dn(self, *keys, **options):
         if keys[-1] is not None:
