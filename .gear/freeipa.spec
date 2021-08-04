@@ -124,7 +124,6 @@ BuildRequires: nss-utils
 
 BuildRequires: python3-module-augeas
 BuildRequires: python3-module-cryptography
-BuildRequires: python3-module-custodia
 BuildRequires: python3-module-dateutil
 BuildRequires: python3-module-dbus
 BuildRequires: python3-module-dns
