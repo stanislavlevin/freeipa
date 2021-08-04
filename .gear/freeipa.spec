@@ -122,6 +122,8 @@ BuildRequires: softhsm
 BuildRequires: jsl
 BuildRequires: nss-utils
 
+BuildRequires: python3-modules-sqlite3
+
 BuildRequires: python3-module-augeas
 BuildRequires: python3-module-cryptography
 BuildRequires: python3-module-dateutil
