@@ -49,8 +49,8 @@
 %define libp11_version 0.4.10-alt2
 
 Name: freeipa
-Version: 4.8.9
-Release: alt5
+Version: 4.9.6
+Release: alt1
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1087,6 +1087,9 @@ fi
 %python3_sitelibdir/ipaplatform-*.egg-info/
 
 %changelog
+* Wed Aug 04 2021 Stanislav Levin <slev@altlinux.org> 4.9.6-alt1
+- 4.8.9 -> 4.9.6.
+
 * Fri Jul 02 2021 Stanislav Levin <slev@altlinux.org> 4.8.9-alt5
 - Improved error message for missing supported NTP (closes: #40343).
 
