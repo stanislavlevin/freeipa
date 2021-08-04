@@ -46,6 +46,7 @@ class ALTLinuxConstantsNamespace(BaseConstantsNamespace):
         "proxy",
         "reqtimeout",
     ]
+    PASSWORD_QUALITY_LIB = None
     SELINUX_MCS_MAX = 15
     SELINUX_MLS_MAX = 3
     SELINUX_USER_REGEX = r"^[a-zA-Z][a-zA-Z0-9_\.]*$"
