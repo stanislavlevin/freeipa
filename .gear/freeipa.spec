@@ -274,6 +274,7 @@ Requires: bind-dyndb-ldap >= %bind_dyndb_ldap_version
 Requires: bind >= %bind_version
 Requires: bind-utils >= %bind_version
 Requires: opendnssec
+Requires: libp11
 
 %description server-dns
 IPA integrated DNS server with support for automatic DNSSEC signing.
