@@ -1253,8 +1253,10 @@ class TestInstallMaster(IntegrationTest):
                 e.sendline(self.master.config.admin_password)
                 e.expect_exact('NetBIOS domain name [{}]: '.format(netbios))
                 e.sendline(netbios)
-                e.expect_exact('Do you want to configure chrony with '
-                               'NTP server or pool address? [no]: ')
+                e.expect(
+                    "Do you want to configure .* with NTP server or pool "
+                    r"address\? \[no\]: "
+                )
                 e.sendline('no')
                 e.expect_exact('Continue to configure the system '
                                'with these values? [no]: ')
@@ -1486,8 +1488,10 @@ class TestInstallMasterDNS(IntegrationTest):
             e.sendline('no')  # irrelevant for this test
             e.expect_exact('NetBIOS domain name [{}]: '.format(netbios))
             e.sendline(netbios)
-            e.expect_exact('Do you want to configure chrony with NTP '
-                           'server or pool address? [no]: ')
+            e.expect(
+                "Do you want to configure .* with NTP server or pool "
+                r"address\? \[no\]: "
+            )
             e.sendline('no')  # irrelevant for this test
             e.expect_exact('Continue to configure the system with these '
                            'values? [no]: ')
