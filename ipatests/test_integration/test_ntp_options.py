@@ -472,8 +472,8 @@ class TestNTPoptions(NTPoptionsBase):
 
         server_input = (
             "\n" +
-            "\n"
             "IPA\n"
+            "\n"
             "Yes"
         )
 
