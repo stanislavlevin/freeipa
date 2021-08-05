@@ -1,6 +1,22 @@
+default_resources:
+  server:
+    mem_limit: "2200m"
+    memswap_limit: "3000m"
+  replica:
+    mem_limit: "2200m"
+    memswap_limit: "3000m"
+  client:
+    mem_limit: "512m"
+    memswap_limit: "1000m"
+
 vms:
 - vm_jobs:
   - container_job: InstallMaster
+    containers:
+      resources:
+        server:
+          mem_limit: "3200m"
+          memswap_limit: "4800m"
     tests:
     - test_integration/test_installation.py::TestInstallMaster
 
@@ -14,6 +30,13 @@ vms:
     containers:
       replicas: 1
       clients: 1
+      resources:
+        replica:
+          mem_limit: "2200m"
+          memswap_limit: "3300m"
+        client:
+          mem_limit: "768m"
+          memswap_limit: "1024m"
     tests:
     - test_integration/test_forced_client_reenrollment.py
 
@@ -21,21 +44,24 @@ vms:
     tests:
     - test_integration/test_external_ca.py::TestExternalCAInstall
 
-  - container_job: membermanager
-    tests:
-    - test_integration/test_membermanager.py
-
 - vm_jobs:
-  # DNSSEC support is in progress on ALT
-  # - container_job: InstallDNSSECFirst
-  #   containers:
-  #     replicas: 1
-  #   tests:
-  #   - test_integration/test_dnssec.py::TestInstallDNSSECFirst
+  - container_job: InstallDNSSECFirst
+    containers:
+      replicas: 1
+      resources:
+        replica:
+          mem_limit: "2400m"
+          memswap_limit: "3500m"
+    tests:
+    - test_integration/test_dnssec.py::TestInstallDNSSECFirst
 
   - container_job: simple_replication
     containers:
       replicas: 1
+      resources:
+        replica:
+          mem_limit: "2400m"
+          memswap_limit: "3500m"
     tests:
     - test_integration/test_simple_replication.py
 
@@ -51,17 +77,14 @@ vms:
     tests:
     - test_integration/test_external_ca.py::TestExternalCAProfileScenarios
 
-  # requires external DNS configuration, this is not set up yet
-  # - container_job: authselect
-  #   containers:
-  #     clients: 1
-  #   tests:
-  #   - test_integration/test_authselect.py
-
 - vm_jobs:
   - container_job: sudo
     containers:
       clients: 1
+      resources:
+        server:
+          mem_limit: "2600m"
+          memswap_limit: "3900m"
     tests:
     - test_integration/test_sudo.py
 
@@ -69,6 +92,13 @@ vms:
     containers:
       replicas: 1
       clients: 1
+      resources:
+        replica:
+          mem_limit: "2200m"
+          memswap_limit: "3300m"
+        client:
+          mem_limit: "768m"
+          memswap_limit: "1024m"
     tests:
     - test_integration/test_external_ca.py::TestExternalCA
 
@@ -78,23 +108,34 @@ vms:
     - test_integration/test_topologies.py
     - test_integration/test_testconfig.py
 
-  - container_job: external_ca_SelfExternalSelf
-    tests:
-    - test_integration/test_external_ca.py::TestSelfExternalSelf
-
   - container_job: external_ca_ExternalCAConstraints
     containers:
       clients: 1
+      resources:
+        client:
+          mem_limit: "768m"
+          memswap_limit: "1024m"
     tests:
     - test_integration/test_external_ca.py::TestExternalCAConstraints
 
 - vm_jobs:
   - container_job: commands
-    tests:
-    - test_integration/test_commands.py
     containers:
       replicas: 1
       clients: 1
+      resources:
+        server:
+          mem_limit: "3500m"
+          memswap_limit: "4000m"
+        client:
+          mem_limit: "768m"
+          memswap_limit: "1024m"
+    tests:
+    - test_integration/test_commands.py
+
+  - container_job: membermanager
+    tests:
+    - test_integration/test_membermanager.py
 
 - vm_jobs:
   - container_job: ServerReplicaCALessToCAFull
@@ -109,24 +150,6 @@ vms:
     tests:
     - test_integration/test_replica_promotion.py::TestSubCAkeyReplication
 
-  - container_job: nfs
-    containers:
-      clients: 3
-    tests:
-    - test_integration/test_nfs.py
-
-- vm_jobs:
-  - container_job: ntp_options_common
-    tests:
-    - test_integration/test_ntp_options.py::TestNTPoptionsCommon
-    containers:
-      replicas: 1
-      clients: 1
-
-  - container_job: otp
-    tests:
-    - test_integration/test_otp.py
-
   - container_job: adtrust_install
     tests:
     - test_integration/test_adtrust_install.py
@@ -134,13 +157,15 @@ vms:
       replicas: 1
 
 - vm_jobs:
-  - container_job: ntp_options_chrony
-    tests:
-    - test_integration/test_ntp_options.py::TestNTPoptions
-    args: '-k chrony'
+  - container_job: advise
     containers:
-      replicas: 1
       clients: 1
+      resources:
+        client:
+          mem_limit: "768m"
+          memswap_limit: "1024m"
+    tests:
+    - test_integration/test_advise.py
 
   - container_job: cert
     tests:
@@ -148,129 +173,30 @@ vms:
     containers:
       replicas: 1
       clients: 1
+      resources:
+        replica:
+          mem_limit: "2300m"
+          memswap_limit: "3300m"
+
+  - container_job: external_ca_SelfExternalSelf
+    tests:
+    - test_integration/test_external_ca.py::TestSelfExternalSelf
 
 - vm_jobs:
-  - container_job: ntp_options_ntpd
-    tests:
-    - test_integration/test_ntp_options.py::TestNTPoptions
-    args: '-k "ntpd and not openntpd"'
-    containers:
-      replicas: 1
-      clients: 1
-
   - container_job: upgrade
+    containers:
+      resources:
+        server:
+          mem_limit: "2200m"
+          memswap_limit: "3300m"
     tests:
     - test_integration/test_upgrade.py
 
-  - container_job: http_kdc_proxy
-    tests:
-    - test_integration/test_http_kdc_proxy.py
-    containers:
-      clients: 1
 
-  - container_job: ntp_nooptions
-    tests:
-    - test_integration/test_ntp_options.py::TestNTPMissingOptionsAndNTPs
-
-- vm_jobs:
-  - container_job: ntp_options_openntpd
-    tests:
-    - test_integration/test_ntp_options.py::TestNTPoptions
-    args: '-k openntpd'
-    containers:
-      replicas: 1
-      clients: 1
-
-  - container_job: vault
-    tests:
-    - test_integration/test_vault.py
-    containers:
-      replicas: 1
-
-- vm_jobs:
-  - container_job: server_del
-    tests:
-    - test_integration/test_server_del.py
-    containers:
-      replicas: 2
-      clients: 1
-
-  - container_job: idviews_TestRulesWithServicePrincipals
-    tests:
-    - test_integration/test_idviews.py::TestRulesWithServicePrincipals
-
-  - container_job: idviews_TestIDViews
-    tests:
-    - test_integration/test_idviews.py::TestIDViews
-    containers:
-      clients: 1
-
-- vm_jobs:
-  - container_job: backup_and_restore_TestBackupAndRestore
-    tests:
-    - test_integration/test_backup_and_restore.py::TestBackupAndRestore
-
-  - container_job: user_permissions
-    tests:
-    - test_integration/test_user_permissions.py
-    containers:
-      clients: 1
-
-  - container_job: dns_locations
-    tests:
-    - test_integration/test_dns_locations.py
-    containers:
-      replicas: 2
-
-- vm_jobs:
-  - container_job: pkinit_manage
-    tests:
-    - test_integration/test_pkinit_manage.py
-    containers:
-      replicas: 1
-
-  - container_job: automember
-    tests:
-    - test_integration/test_automember.py
-
-  - container_job: crlgen_manage
-    tests:
-    - test_integration/test_crlgen_manage.py
-    containers:
-      replicas: 1
-
-  - container_job: ca_custom_sdn
-    tests:
-    - test_integration/test_ca_custom_sdn.py
-
-- vm_jobs:
-  - container_job: krbtpolicy
-    tests:
-    - test_integration/test_krbtpolicy.py
-
-  - container_job: epn
-    tests:
-    - test_integration/test_epn.py
-    containers:
-      clients: 1
-
-- vm_jobs:
-  # test_ipa_healthcheck_no_errors requires at least 20% of free space
-  - container_job: ipahealthcheck_TestIpaHealthCheck
-    tests:
-    - test_integration/test_ipahealthcheck.py::TestIpaHealthCheck
-    containers:
-      replicas: 1
-
-- vm_jobs:
-  - container_job: ipahealthcheck_TestIpaHealthCheckWithoutDNS
-    tests:
-    - test_integration/test_ipahealthcheck.py::TestIpaHealthCheckWithoutDNS
-    containers:
-      replicas: 1
-
-  - container_job: ipahealthcheck_TestIpaHealthCheckWithExternalCA
-    tests:
-    - test_integration/test_ipahealthcheck.py::TestIpaHealthCheckWithExternalCA
-    containers:
-      replicas: 1
+  # requires external DNS configuration, this is not set up yet
+  # - container_job: authselect
+  #   containers:
+  #     clients: 1
+  #   tests:
+  #   - test_integration/test_authselect.py
+  #
