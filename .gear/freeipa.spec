@@ -483,6 +483,7 @@ Requires: python3-module-sssdconfig >= %sssd_version
 Requires: openssh-clients
 Requires: sshpass
 Requires: iptables
+Requires: drill
 # Tests have a huge amount useless Provides
 %set_findprov_skiplist %python3_sitelibdir/ipatests/*
 
