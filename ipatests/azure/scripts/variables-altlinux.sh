@@ -9,3 +9,9 @@ HTTPD_BASEDIR='/etc/httpd2'
 HTTPD_ALIASDIR="${HTTPD_BASEDIR}/conf"
 BIND_BASEDIR='/var/lib/bind'
 BIND_DATADIR="${BIND_BASEDIR}/data"
+BIND_SYSTEMD_NAME='bind.service'
+BIND_LOGGING_OPTIONS_CONF='/etc/bind/ipa-logging-ext.conf'
+
+function installed_packages() {
+    rpm -qa | sort
+}
