@@ -19,13 +19,9 @@
 import time
 import re
 
-import six
 import gssapi
 
 from ipalib import errors
-
-if six.PY3:
-    unicode = str
 
 #-------------------------------------------------------------------------------
 
@@ -38,6 +34,12 @@ KRB5KRB_AP_ERR_TKT_EXPIRED      = 2529638944 # Ticket expired
 KRB5_FCC_PERM                   = 2529639106 # Credentials cache permissions incorrect
 KRB5_CC_FORMAT                  = 2529639111 # Bad format in credentials cache
 KRB5_REALM_CANT_RESOLVE         = 2529639132 # Cannot resolve network address for KDC in requested realm
+
+# mechglue/gss_plugin.c: #define MAP_ERROR_BASE 0x04200000
+GSSPROXY_MAP_ERROR_BASE = 69206016
+
+# GSSProxy error codes
+GSSPROXY_KRB5_FCC_NOFILE = GSSPROXY_MAP_ERROR_BASE + KRB5_FCC_NOFILE
 
 krb_ticket_expiration_threshold = 60*5 # number of seconds to accmodate clock skew
 krb5_time_fmt = '%m/%d/%y %H:%M:%S'
@@ -143,12 +145,24 @@ def get_credentials(name=None, ccache_name=None):
     store = None
     if ccache_name:
         store = {'ccache': ccache_name}
-    try:
-        return gssapi.Credentials(usage='initiate', name=name, store=store)
-    except gssapi.exceptions.GSSError as e:
-        if e.min_code == KRB5_FCC_NOFILE:  # pylint: disable=no-member
-            raise ValueError('"%s", ccache="%s"' % (e, ccache_name))
-        raise
+    """
+    https://datatracker.ietf.org/doc/html/rfc2744.html#section-5.2
+    gss_acquire_cred:
+        If credential acquisition is time-consuming for a mechanism, the
+    mechanism may choose to delay the actual acquisition until the
+    credential is required (e.g. by gss_init_sec_context or
+    gss_accept_sec_context). Such mechanism-specific implementation
+    decisions should be invisible to the calling application; thus a call
+    of gss_inquire_cred immediately following the call of
+    gss_acquire_cred must return valid credential data, and may therefore
+    incur the overhead of a deferred credential acquisition.
+
+    So, as gssapi.Credentials() calls only gss_acquire_cred it is not
+    guaranteed to have valid(not expired) returned creds and all the
+    callers of this function have to deal with GSSAPI exceptions by
+    themselves, for example, to handle ExpiredCredentialsError.
+    """
+    return gssapi.Credentials(usage="initiate", name=name, store=store)
 
 def get_principal(ccache_name=None):
     '''
@@ -166,9 +180,9 @@ def get_principal(ccache_name=None):
     '''
     try:
         creds = get_credentials(ccache_name=ccache_name)
-        return unicode(creds.name)
+        return str(creds.name)
     except gssapi.exceptions.GSSError as e:
-        raise errors.CCacheError(message=unicode(e))
+        raise errors.CCacheError(message=str(e))
 
 def get_credentials_if_valid(name=None, ccache_name=None):
     '''
@@ -191,8 +205,6 @@ def get_credentials_if_valid(name=None, ccache_name=None):
         creds = get_credentials(name=name, ccache_name=ccache_name)
         if creds.lifetime > 0:
             return creds
-        return None
-    except gssapi.exceptions.ExpiredCredentialsError:
-        return None
     except gssapi.exceptions.GSSError:
         return None
+    return None

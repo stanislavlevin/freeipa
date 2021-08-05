@@ -22,6 +22,7 @@ from __future__ import absolute_import
 import base64
 import logging
 import time
+import typing
 
 import ldap
 import os
@@ -29,7 +30,6 @@ import shutil
 import traceback
 import dbus
 import re
-import pwd
 import lxml.etree
 
 from configparser import DEFAULTSECT, ConfigParser, RawConfigParser
@@ -61,6 +61,16 @@ logger = logging.getLogger(__name__)
 
 INTERNAL_TOKEN = "internal"
 
+OU_GROUPS_DN = DN(('ou', 'groups'), ('o', 'ipaca'))
+
+
+def _person_dn(uid):
+    return DN(('uid', uid), ('ou', 'people'), ('o', 'ipaca'))
+
+
+def _group_dn(group):
+    return DN(('cn', group), OU_GROUPS_DN)
+
 
 def get_security_domain():
     """
@@ -74,7 +84,7 @@ def get_security_domain():
         cert_paths=paths.IPA_CA_CRT
     )
     domain_client = pki.system.SecurityDomainClient(connection)
-    info = domain_client.get_security_domain_info()
+    info = domain_client.get_domain_info()
     return info
 
 
@@ -87,7 +97,7 @@ def is_installing_replica(sys_type):
     """
     info = get_security_domain()
     try:
-        sys_list = info.systems[sys_type]
+        sys_list = info.subsystems[sys_type]
         return len(sys_list.hosts) > 0
     except KeyError:
         return False
@@ -117,8 +127,6 @@ class DogtagInstance(service.Service):
         """Look up token name for nickname."""
         return self.token_names.get(nickname, self.token_name)
 
-    ipaca_groups = DN(('ou', 'groups'), ('o', 'ipaca'))
-    ipaca_people = DN(('ou', 'people'), ('o', 'ipaca'))
     groups_aci = (
         b'(targetfilter="(objectClass=groupOfUniqueNames)")'
         b'(targetattr="cn || description || objectclass || uniquemember")'
@@ -147,9 +155,7 @@ class DogtagInstance(service.Service):
 
         self.basedn = None
         self.admin_user = "admin"
-        self.admin_dn = DN(
-            ('uid', self.admin_user), self.ipaca_people
-        )
+        self.admin_dn = _person_dn(self.admin_user)
         self.admin_groups = None
         self.tmp_agent_db = None
         self.subsystem = subsystem
@@ -171,8 +177,14 @@ class DogtagInstance(service.Service):
 
         Returns True/False
         """
-        return os.path.exists(os.path.join(
-            paths.VAR_LIB_PKI_TOMCAT_DIR, self.subsystem.lower()))
+        try:
+            result = ipautil.run(
+                ['pki-server', 'subsystem-show', self.subsystem.lower()],
+                capture_output=True)
+            # parse the command output
+            return 'Enabled: True' in result.output
+        except ipautil.CalledProcessError:
+            return False
 
     def spawn_instance(self, cfg_file, nolog_list=()):
         """
@@ -181,6 +193,10 @@ class DogtagInstance(service.Service):
         parameters.
         """
         subsystem = self.subsystem
+        spawn_env = os.environ.copy()
+        timeout = str(api.env.startup_timeout)
+        spawn_env["PKISPAWN_STARTUP_TIMEOUT_SECONDS"] = timeout
+
         args = [paths.PKISPAWN,
                 "-s", subsystem,
                 "-f", cfg_file,
@@ -192,7 +208,7 @@ class DogtagInstance(service.Service):
                 cfg_file, ipautil.nolog_replace(f.read(), nolog_list))
 
         try:
-            ipautil.run(args, nolog=nolog_list)
+            ipautil.run(args, nolog=nolog_list, env=spawn_env)
         except ipautil.CalledProcessError as e:
             self.handle_setup_error(e)
 
@@ -282,7 +298,7 @@ class DogtagInstance(service.Service):
             logger.critical("failed to uninstall %s instance %s",
                             self.subsystem, e)
 
-    def __is_newer_tomcat_version(self, default=None):
+    def _is_newer_tomcat_version(self, default=None):
         try:
             result = ipautil.run([paths.BIN_TOMCAT, "version"],
                                  capture_output=True)
@@ -314,53 +330,84 @@ class DogtagInstance(service.Service):
         if len(connectors) == 0:
             return
 
-        # AJP protocol is at version 1.3. Assume there is only one as
-        # Dogtag only provisions one.
-        connector = connectors[0]
+        # Whether or not we should rewrite the tomcat server.xml file with
+        # our changes.
+        rewrite = False
 
         # Detect tomcat version and choose the right option name
         # pre-9.0.31.0 uses 'requiredSecret'
         # 9.0.31.0 or later uses 'secret'
         secretattr = 'requiredSecret'
         oldattr = 'requiredSecret'
-        if self.__is_newer_tomcat_version('9.0.31.0'):
+        if self._is_newer_tomcat_version('9.0.31.0'):
             secretattr = 'secret'
 
-        rewrite = True
-        if secretattr in connector.attrib:
-            # secret is already in place
-            # Perhaps, we need to synchronize it with Apache configuration
-            self.ajp_secret = connector.attrib[secretattr]
-            rewrite = False
-        else:
-            if oldattr in connector.attrib:
+        # AJP protocol is at version 1.3. With IPv4/IPv6 split, there might
+        # be multiple AJP adapters; update them all.
+        #
+        # First, iterate through all adapters and see if any of them have a
+        # secret value set.
+        for connector in connectors:
+            if secretattr in connector.attrib or oldattr in connector.attrib:
+                # secret is already in place
+                #
+                # Perhaps, we need to synchronize it with Apache configuration
+                # or other AJP connector entries. Save it so we know we've
+                # found at least one. Because in our next loop we update the
+                # config value if incorrect, it is safe to overwrite
+                # self.ajp_adapter -- in the worst case, we'll create an
+                # entirely new value if this element happened to have an
+                # empty secret value. Plus, IPA is in charge of managing the
+                # value for the httpd side of the AJP connection as well
+                # which needs to happen after this call.
+                #
+                # The first secret found wins.
+                self.ajp_secret = connector.attrib.get(secretattr) or \
+                    connector.attrib.get(oldattr)
+                break
+
+        # If no secret value was detected, create a single unique value.
+        if not self.ajp_secret:
+            # Generate password, don't use special chars to not break XML.
+            self.ajp_secret = ipautil.ipa_generate_password(special=None)
+
+        # Finally, iterate through them all again, upgrading adapter attribute
+        # and setting the secret value if missing or incorrect.
+        for connector in connectors:
+            if oldattr != secretattr and oldattr in connector.attrib:
                 # Sufficiently new Dogtag versions (10.9.0-a2) handle the
                 # upgrade for us; we need only to ensure that we're not both
                 # attempting to upgrade server.xml at the same time.
                 # Hopefully this is guaranteed for us.
-                self.ajp_secret = connector.attrib[oldattr]
                 connector.attrib[secretattr] = self.ajp_secret
                 del connector.attrib[oldattr]
-            else:
-                # Generate password, don't use special chars to not break XML.
+                rewrite = True
+            if (secretattr not in connector.attrib
+                    or connector.attrib[secretattr] != self.ajp_secret):
+                # We hit this either when:
                 #
-                # If we hit this case, pkispawn was run on an older Dogtag
-                # version and we're stuck migrating, choosing a password
-                # ourselves. Dogtag can't generate one randomly because a
-                # Dogtag administrator might've configured AJP and might
-                # not be using IPA.
+                #   1. pkispawn was run on an older Dogtag version, or
+                #   2. there were multiple AJP adapters with mismatched
+                #      secrets.
                 #
                 # Newer Dogtag versions will generate a random password
-                # during pkispawn.
-                self.ajp_secret = ipautil.ipa_generate_password(special=None)
+                # during pkispawn. In the former scenario, it is always
+                # safe to change the AJP secret value. In the latter
+                # scenario we should always ensure the AJP connector is
+                # the one we use use with httpd, as we don't officially
+                # support multiple AJP adapters for non-IPA uses.
+                #
+                # In new Dogtag versions, Dogtag deploys separate IPv4 and
+                # IPv6 localhost adapters, which we should ensure have the
+                # same AJP secret for httpd's use.
                 connector.attrib[secretattr] = self.ajp_secret
+                rewrite = True
 
         if rewrite:
-            pent = pwd.getpwnam(constants.PKI_USER)
             with open(paths.PKI_TOMCAT_SERVER_XML, "wb") as fd:
                 server_xml.write(fd, pretty_print=True, encoding="utf-8")
                 os.fchmod(fd.fileno(), 0o660)
-                os.fchown(fd.fileno(), pent.pw_uid, pent.pw_gid)
+                self.service_user.chown(fd.fileno())
 
     def http_proxy(self):
         """ Update the http proxy file  """
@@ -380,7 +427,8 @@ class DogtagInstance(service.Service):
             fd.write(template)
             os.fchmod(fd.fileno(), 0o640)
 
-    def configure_certmonger_renewal_helpers(self):
+    @staticmethod
+    def configure_certmonger_renewal_helpers():
         """
         Create a new CA type for certmonger that will retrieve updated
         certificates from the dogtag master server.
@@ -441,7 +489,7 @@ class DogtagInstance(service.Service):
                 logger.error(
                     "certmonger failed to start tracking certificate: %s", e)
 
-    def stop_tracking_certificates(self, stop_certmonger=True):
+    def stop_tracking_certificates(self):
         """
         Stop tracking our certificates. Called on uninstall.  Also called
         during upgrade to fix discrepancies.
@@ -464,9 +512,6 @@ class DogtagInstance(service.Service):
             except RuntimeError as e:
                 logger.error(
                     "certmonger failed to stop tracking certificate: %s", e)
-
-        if stop_certmonger:
-            cmonger.stop()
 
     def update_cert_cs_cfg(self, directive, cert):
         """
@@ -511,13 +556,15 @@ class DogtagInstance(service.Service):
         return admin_cert
 
     def handle_setup_error(self, e):
-        logger.critical("Failed to configure %s instance: %s",
-                        self.subsystem, e)
+        logger.critical("Failed to configure %s instance",
+                        self.subsystem)
         logger.critical("See the installation logs and the following "
                         "files/directories for more information:")
         logger.critical("  %s", paths.TOMCAT_TOPLEVEL_DIR)
 
-        raise RuntimeError("%s configuration failed." % self.subsystem)
+        raise RuntimeError(
+            "%s configuration failed." % self.subsystem
+        ) from None
 
     def add_ipaca_aci(self):
         """Add ACI to allow ipaca users to read their own group information
@@ -526,7 +573,7 @@ class DogtagInstance(service.Service):
         setup_admin() method needs the permission to wait, until all group
         information has been replicated.
         """
-        dn = self.ipaca_groups
+        dn = OU_GROUPS_DN
         mod = [(ldap.MOD_ADD, 'aci', [self.groups_aci])]
         try:
             api.Backend.ldap2.modify_s(dn, mod)
@@ -535,44 +582,144 @@ class DogtagInstance(service.Service):
         else:
             logger.debug("Added ACI to read groups to %s", dn)
 
-    def setup_admin(self):
-        self.admin_user = "admin-%s" % self.fqdn
-        self.admin_password = ipautil.ipa_generate_password()
-        self.admin_dn = DN(
-            ('uid', self.admin_user), self.ipaca_people
+    @staticmethod
+    def ensure_group(group: str, desc: str) -> None:
+        """Create the group if it does not exist."""
+        dn = _group_dn(group)
+        entry = api.Backend.ldap2.make_entry(
+            dn,
+            objectclass=["top", "groupOfUniqueNames"],
+            cn=[group],
+            description=[desc],
         )
-        # remove user if left-over exists
         try:
-            api.Backend.ldap2.delete_entry(self.admin_dn)
-        except errors.NotFound:
+            api.Backend.ldap2.add_entry(entry)
+        except errors.DuplicateEntry:
             pass
 
+    @staticmethod
+    def create_user(
+        uid: str,
+        cn: str,
+        sn: str,
+        user_type: str,
+        groups: typing.Collection[str],
+        force: bool,
+    ) -> typing.Optional[str]:
+        """
+        Create the user entry with a random password, and add the user to
+        the given groups.
+
+        If such a user entry already exists, ``force`` determines whether the
+        existing entry is replaced, or if the operation fails.
+
+        **Does not wait for replication**.  This should be done by caller,
+        if necessary.
+
+        Return the password if entry was created, otherwise ``None``.
+
+        """
+        user_types = {'adminType', 'agentType'}
+        if user_type not in user_types:
+            raise ValueError(f"user_type must be in {user_types}")
+
+        # if entry already exists, delete (force=True) or fail
+        dn = _person_dn(uid)
+        try:
+            api.Backend.ldap2.get_entry(dn, ['uid'])
+        except errors.NotFound:
+            pass
+        else:
+            if force:
+                api.Backend.ldap2.delete_entry(dn)
+            else:
+                return None
+
         # add user
+        password = ipautil.ipa_generate_password()
         entry = api.Backend.ldap2.make_entry(
-            self.admin_dn,
-            objectclass=["top", "person", "organizationalPerson",
-                         "inetOrgPerson", "cmsuser"],
-            uid=[self.admin_user],
-            cn=[self.admin_user],
-            sn=[self.admin_user],
-            usertype=['adminType'],
-            mail=['root@localhost'],
-            userPassword=[self.admin_password],
-            userstate=['1']
+            dn,
+            objectclass=[
+                "top", "person", "organizationalPerson",
+                "inetOrgPerson", "cmsuser",
+            ],
+            uid=[uid],
+            cn=[cn],
+            sn=[sn],
+            usertype=[user_type],
+            userPassword=[password],
+            userstate=['1'],
         )
         api.Backend.ldap2.add_entry(entry)
 
-        wait_groups = []
-        for group in self.admin_groups:
-            group_dn = DN(('cn', group), self.ipaca_groups)
-            mod = [(ldap.MOD_ADD, 'uniqueMember', [self.admin_dn])]
+        # add to groups
+        for group in groups:
+            mod = [(ldap.MOD_ADD, 'uniqueMember', [dn])]
             try:
-                api.Backend.ldap2.modify_s(group_dn, mod)
+                api.Backend.ldap2.modify_s(_group_dn(group), mod)
             except ldap.TYPE_OR_VALUE_EXISTS:
-                # already there
-                return None
-            else:
-                wait_groups.append(group_dn)
+                pass  # already there, somehow
+
+        return password
+
+    @staticmethod
+    def delete_user(uid: str) -> bool:
+        """
+        Delete the user, removing group memberships along the way.
+
+        Return True if user was deleted or False if user entry
+        did not exist.
+
+        """
+        dn = _person_dn(uid)
+
+        if not api.Backend.ldap2.isconnected():
+            api.Backend.ldap2.connect()
+
+        # remove group memberships
+        try:
+            entries = api.Backend.ldap2.get_entries(
+                OU_GROUPS_DN, filter=f'(uniqueMember={dn})')
+        except errors.EmptyResult:
+            entries = []
+        except errors.NotFound:
+            # basedn not found; Dogtag is probably not installed.
+            # Let's ignore this and keep going.
+            entries = []
+
+        for entry in entries:
+            # remove the uniquemember value
+            entry['uniquemember'] = [
+                v for v in entry['uniquemember']
+                if DN(v) != dn
+            ]
+            api.Backend.ldap2.update_entry(entry)
+
+        # delete user entry
+        try:
+            api.Backend.ldap2.delete_entry(dn)
+        except errors.NotFound:
+            return False
+        else:
+            return True
+
+    def setup_admin(self):
+        self.admin_user = "admin-%s" % self.fqdn
+        self.admin_password = ipautil.ipa_generate_password()
+        self.admin_dn = _person_dn(self.admin_user)
+
+        result = self.create_user(
+            uid=self.admin_user,
+            cn=self.admin_user,
+            sn=self.admin_user,
+            user_type='adminType',
+            groups=self.admin_groups,
+            force=True,
+        )
+        if result is None:
+            return None  # something went wrong
+        else:
+            self.admin_password = result
 
         # Now wait until the other server gets replicated this data
         master_conn = ipaldap.LDAPClient.from_hostname_secure(
@@ -607,7 +754,7 @@ class DogtagInstance(service.Service):
             )
 
         # wait for group membership
-        for group_dn in wait_groups:
+        for group_dn in (_group_dn(group) for group in self.admin_groups):
             replication.wait_for_entry(
                 master_conn,
                 group_dn,
@@ -616,19 +763,8 @@ class DogtagInstance(service.Service):
                 attrvalue=self.admin_dn
             )
 
-    def __remove_admin_from_group(self, group):
-        dn = DN(('cn', group), self.ipaca_groups)
-        mod = [(ldap.MOD_DELETE, 'uniqueMember', self.admin_dn)]
-        try:
-            api.Backend.ldap2.modify_s(dn, mod)
-        except ldap.NO_SUCH_ATTRIBUTE:
-            # already removed
-            pass
-
     def teardown_admin(self):
-        for group in self.admin_groups:
-            self.__remove_admin_from_group(group)
-        api.Backend.ldap2.delete_entry(self.admin_dn)
+        self.delete_user(self.admin_user)
 
     def backup_config(self):
         """

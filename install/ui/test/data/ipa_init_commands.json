@@ -8689,7 +8689,7 @@
                   "label" : "Clock offset",
                   "confirm" : true,
                   "alwaysask" : false,
-                  "doc" : "TOTP token / FreeIPA server time difference",
+                  "doc" : "TOTP token / IPA server time difference",
                   "deprecated" : false,
                   "flags" : [
                      "no_update"
@@ -29875,7 +29875,7 @@
                   "primary_key" : false,
                   "alwaysask" : false,
                   "deprecated" : false,
-                  "doc" : "TOTP token / FreeIPA server time difference",
+                  "doc" : "TOTP token / IPA server time difference",
                   "flags" : [
                      "no_update"
                   ],
@@ -63113,11 +63113,11 @@
                   "flags" : [
                      "no_create"
                   ],
-                  "doc" : "SID blacklist incoming",
+                  "doc" : "SID blocklist incoming",
                   "deprecated" : false,
                   "alwaysask" : false,
                   "confirm" : true,
-                  "label" : "SID blacklist incoming",
+                  "label" : "SID blocklist incoming",
                   "cli_name" : "sid_blacklist_incoming",
                   "attribute" : true,
                   "name" : "ipantsidblacklistincoming",
@@ -63134,10 +63134,10 @@
                },
                {
                   "attribute" : true,
-                  "label" : "SID blacklist outgoing",
+                  "label" : "SID blocklist outgoing",
                   "confirm" : true,
                   "cli_name" : "sid_blacklist_outgoing",
-                  "doc" : "SID blacklist outgoing",
+                  "doc" : "SID blocklist outgoing",
                   "deprecated" : false,
                   "alwaysask" : false,
                   "query" : true,
@@ -91347,10 +91347,10 @@
                   "noextrawhitespace" : true,
                   "attribute" : true,
                   "confirm" : true,
-                  "label" : "SID blacklist incoming",
+                  "label" : "SID blocklist incoming",
                   "cli_name" : "sid_blacklist_incoming",
                   "deprecated" : false,
-                  "doc" : "SID blacklist incoming",
+                  "doc" : "SID blocklist incoming",
                   "alwaysask" : false,
                   "sortorder" : 2,
                   "query" : false,
@@ -91362,9 +91362,9 @@
                   "attribute" : true,
                   "cli_name" : "sid_blacklist_outgoing",
                   "confirm" : true,
-                  "label" : "SID blacklist outgoing",
+                  "label" : "SID blocklist outgoing",
                   "alwaysask" : false,
-                  "doc" : "SID blacklist outgoing",
+                  "doc" : "SID blocklist outgoing",
                   "deprecated" : false,
                   "flags" : [
                      "no_create"

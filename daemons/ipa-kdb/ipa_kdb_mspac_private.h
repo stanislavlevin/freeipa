@@ -41,14 +41,19 @@ struct ipadb_adtrusts {
     char *flat_name;
     char *domain_sid;
     struct dom_sid domsid;
-    struct dom_sid *sid_blacklist_incoming;
-    int len_sid_blacklist_incoming;
-    struct dom_sid *sid_blacklist_outgoing;
-    int len_sid_blacklist_outgoing;
+    struct dom_sid *sid_blocklist_incoming;
+    int len_sid_blocklist_incoming;
+    struct dom_sid *sid_blocklist_outgoing;
+    int len_sid_blocklist_outgoing;
     struct ipadb_adtrusts *parent;
     char *parent_name;
     char **upn_suffixes;
+    size_t *upn_suffixes_len;
 };
 
 int string_to_sid(const char *str, struct dom_sid *sid);
 char *dom_sid_string(TALLOC_CTX *memctx, const struct dom_sid *dom_sid);
+krb5_error_code filter_logon_info(krb5_context context, TALLOC_CTX *memctx,
+                                  krb5_data realm, struct PAC_LOGON_INFO_CTR *info);
+void get_authz_data_types(krb5_context context, krb5_db_entry *entry,
+                          bool *_with_pac, bool *_with_pad);

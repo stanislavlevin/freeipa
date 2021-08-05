@@ -28,16 +28,6 @@
  * During TGS request search by ipaKrbPrincipalName (case-insensitive)
  * and krbPrincipalName (case-sensitive)
  */
-#define PRINC_TGS_SEARCH_FILTER "(&(|(objectclass=krbprincipalaux)" \
-                                    "(objectclass=krbprincipal)" \
-                                    "(objectclass=ipakrbprincipal))" \
-                                    "(|(ipakrbprincipalalias=%s)" \
-                                      "(krbprincipalname:caseIgnoreIA5Match:=%s)))"
-
-#define PRINC_SEARCH_FILTER "(&(|(objectclass=krbprincipalaux)" \
-                                "(objectclass=krbprincipal))" \
-                              "(krbprincipalname=%s))"
-
 #define PRINC_TGS_SEARCH_FILTER_EXTRA "(&(|(objectclass=krbprincipalaux)" \
                                           "(objectclass=krbprincipal)" \
                                           "(objectclass=ipakrbprincipal))" \
@@ -49,6 +39,13 @@
                                       "(objectclass=krbprincipal))" \
                                     "(krbprincipalname=%s)" \
                                     "%s)"
+
+#define PRINC_TGS_SEARCH_FILTER_WILD_EXTRA "(&(|(objectclass=krbprincipalaux)" \
+                                               "(objectclass=krbprincipal)" \
+                                               "(objectclass=ipakrbprincipal))" \
+                                             "(|(ipakrbprincipalalias=*)" \
+                                               "(krbprincipalname=*))" \
+                                             "%s)"
 static char *std_principal_attrs[] = {
     "krbPrincipalName",
     "krbCanonicalName",
@@ -74,6 +71,7 @@ static char *std_principal_attrs[] = {
     "krbMaxRenewableAge",
 
     /* IPA SPECIFIC ATTRIBUTES */
+    "uid",
     "nsaccountlock",
     "passwordHistory",
     IPA_KRB_AUTHZ_DATA_ATTR,
@@ -335,6 +333,11 @@ static enum ipadb_user_auth ipadb_get_user_auth(struct ipadb_context *ipactx,
     if (gcfg != NULL)
         gua = gcfg->user_auth;
 
+    /* lcontext == NULL means ipadb_get_global_config() failed to load
+     * global config and cleared the ipactx */
+    if (ipactx->lcontext == NULL)
+        return IPADB_USER_AUTH_NONE;
+
     /* Get the user's user_auth settings if not disabled. */
     if ((gua & IPADB_USER_AUTH_DISABLED) == 0)
         ipadb_parse_user_auth(ipactx->lcontext, lentry, &ua);
@@ -491,7 +494,7 @@ static krb5_error_code ipadb_get_ldap_auth_ind(krb5_context kcontext,
     l = len;
     for (i = 0; i < count; i++) {
         ret = snprintf(ap, l, "%s ", authinds[i]);
-        if (ret <= 0 || ret > l) {
+        if (ret <= 0 || ret > (int) l) {
             ret = ENOMEM;
             goto cleanup;
         }
@@ -589,6 +592,7 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
     krb5_kvno mkvno = 0;
     char **restrlist;
     char *restring;
+    char *uidstring;
     char **authz_data_list;
     krb5_timestamp restime;
     bool resbool;
@@ -608,8 +612,16 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
         free(entry);
         return KRB5_KDB_DBNOTINITED;
     }
-    lcontext = ipactx->lcontext;
-    if (!lcontext) {
+
+    entry->magic = KRB5_KDB_MAGIC_NUMBER;
+    entry->len = KRB5_KDB_V1_BASE_LENGTH;
+
+    /* Get User Auth configuration. */
+    ua = ipadb_get_user_auth(ipactx, lentry);
+
+    /* ipadb_get_user_auth() calls into ipadb_get_global_config()
+     * and that might fail, causing lcontext to become NULL */
+    if (!ipactx->lcontext) {
         krb5_klog_syslog(LOG_INFO,
                          "No LDAP connection in ipadb_parse_ldap_entry(); retrying...\n");
         ret = ipadb_get_connection(ipactx);
@@ -621,11 +633,10 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
         }
     }
 
-    entry->magic = KRB5_KDB_MAGIC_NUMBER;
-    entry->len = KRB5_KDB_V1_BASE_LENGTH;
-
-    /* Get User Auth configuration. */
-    ua = ipadb_get_user_auth(ipactx, lentry);
+    /* If any code below would result in invalidating ipactx->lcontext,
+     * lcontext must be updated with the new ipactx->lcontext value.
+     * We rely on the fact that none of LDAP-parsing helpers does it. */
+    lcontext = ipactx->lcontext;
 
     /* ignore mask for now */
 
@@ -839,6 +850,13 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
     }
     if (ret == 0) {
         ied->ipa_user = true;
+        ret = ipadb_ldap_attr_to_str(lcontext, lentry,
+                                     "uid", &uidstring);
+        if (ret != 0 && ret != ENOENT) {
+            kerr = ret;
+            goto done;
+        }
+        ied->user = uidstring;
     }
 
     /* check if it has the krbTicketPolicyAux objectclass */
@@ -897,7 +915,7 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
             goto done;
         }
 
-        ied->last_pwd_change = restime;
+        ied->last_pwd_change = krb5_ts2tt(restime);
     }
 
     ret = ipadb_ldap_attr_to_krb5_timestamp(lcontext, lentry,
@@ -913,7 +931,7 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
             goto done;
         }
 
-        ied->last_admin_unlock = restime;
+        ied->last_admin_unlock = krb5_ts2tt(restime);
     }
 
     ret = ipadb_ldap_attr_to_strlist(lcontext, lentry,
@@ -966,6 +984,7 @@ ipadb_fetch_principals_with_extra_filter(struct ipadb_context *ipactx,
     krb5_error_code kerr;
     char *src_filter = NULL, *esc_original_princ = NULL;
     int ret;
+    int len = 0;
 
     if (!ipactx->lcontext) {
         ret = ipadb_get_connection(ipactx);
@@ -983,25 +1002,27 @@ ipadb_fetch_principals_with_extra_filter(struct ipadb_context *ipactx,
         goto done;
     }
 
+    len = strlen(esc_original_princ);
+
     /* Starting in DAL 8.0, aliases are always okay. */
 #ifdef KRB5_KDB_FLAG_ALIAS_OK
     if (!(flags & KRB5_KDB_FLAG_ALIAS_OK)) {
-        if (filter == NULL) {
-            ret = asprintf(&src_filter, PRINC_SEARCH_FILTER,
-                           esc_original_princ);
-        } else {
-            ret = asprintf(&src_filter, PRINC_SEARCH_FILTER_EXTRA,
-                           esc_original_princ, filter);
-        }
+        ret = asprintf(&src_filter, PRINC_SEARCH_FILTER_EXTRA,
+                       esc_original_princ,
+                       filter ? filter : "");
     } else
 #endif
     {
-        if (filter == NULL) {
-            ret = asprintf(&src_filter, PRINC_TGS_SEARCH_FILTER,
-                           esc_original_princ, esc_original_princ);
+        /* In case we've got a principal name as '*', we don't need to specify
+         * the principal itself, use pre-defined filter for a wild-card search.
+         */
+        if ((len == 1) && (esc_original_princ[0] == '*')) {
+            ret = asprintf(&src_filter, PRINC_TGS_SEARCH_FILTER_WILD_EXTRA,
+                           filter ? filter : "");
         } else {
             ret = asprintf(&src_filter, PRINC_TGS_SEARCH_FILTER_EXTRA,
-                           esc_original_princ, esc_original_princ, filter);
+                           esc_original_princ, esc_original_princ,
+                           filter ? filter : "");
         }
     }
 
@@ -1536,6 +1557,7 @@ void ipadb_free_principal_e_data(krb5_context kcontext, krb5_octet *e_data)
     if (ied->magic == IPA_E_DATA_MAGIC) {
 	ldap_memfree(ied->entry_dn);
 	free(ied->passwd);
+	free(ied->user);
 	free(ied->pw_policy_dn);
 	for (i = 0; ied->pw_history && ied->pw_history[i]; i++) {
 	    free(ied->pw_history[i]);
@@ -1765,7 +1787,7 @@ static krb5_error_code ipadb_get_ldap_mod_time(struct ipadb_mods *imods,
     time_t timeval;
     char v[20];
 
-    timeval = (time_t)value;
+    timeval = krb5_ts2tt(value);
     t = gmtime_r(&timeval, &date);
     if (t == NULL) {
         return EINVAL;
@@ -2064,7 +2086,7 @@ static krb5_error_code ipadb_get_ldap_mod_auth_ind(krb5_context kcontext,
     char *s = NULL;
     size_t ai_size = 0;
     int cnt = 0;
-    int i = 0;
+    size_t i = 0;
 
     ret = krb5_dbe_get_string(kcontext, entry, "require_auth", &ais);
     if (ret) {
@@ -2445,7 +2467,7 @@ static krb5_error_code ipadb_entry_default_attrs(struct ipadb_mods *imods)
 {
     krb5_error_code kerr;
     LDAPMod *m = NULL;
-    int i;
+    size_t i;
 
     kerr = ipadb_mods_new(imods, &m);
     if (kerr) {

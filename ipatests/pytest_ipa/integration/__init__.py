@@ -28,12 +28,15 @@ import os
 import tempfile
 import shutil
 import re
+import functools
 
 import pytest
 from pytest_multihost import make_multihost_fixture
 
 from ipapython import ipautil
 from ipaplatform.paths import paths
+from ipaplatform.constants import constants
+from . import fips
 from .config import Config
 from .env_config import get_global_config
 from . import tasks
@@ -41,15 +44,19 @@ from . import tasks
 logger = logging.getLogger(__name__)
 
 CLASS_LOGFILES = [
+    # BIND logs
+    os.path.join(paths.NAMED_VAR_DIR, constants.NAMED_DATA_DIR),
     # dirsrv logs
     paths.VAR_LOG_DIRSRV,
     # IPA install logs
     paths.IPASERVER_INSTALL_LOG,
+    paths.IPASERVER_ADTRUST_INSTALL_LOG,
+    paths.IPASERVER_DNS_INSTALL_LOG,
+    paths.IPASERVER_KRA_INSTALL_LOG,
     paths.IPACLIENT_INSTALL_LOG,
     paths.IPAREPLICA_INSTALL_LOG,
     paths.IPAREPLICA_CONNCHECK_LOG,
     paths.IPAREPLICA_CA_INSTALL_LOG,
-    paths.IPASERVER_KRA_INSTALL_LOG,
     paths.IPA_CUSTODIA_AUDIT_LOG,
     paths.IPACLIENTSAMBA_INSTALL_LOG,
     paths.IPACLIENTSAMBA_UNINSTALL_LOG,
@@ -62,6 +69,8 @@ CLASS_LOGFILES = [
     # IPA backup and restore logs
     paths.IPARESTORE_LOG,
     paths.IPABACKUP_LOG,
+    # EPN log
+    paths.IPAEPN_LOG,
     # kerberos related logs
     paths.KADMIND_LOG,
     paths.KRB5KDC_LOG,
@@ -69,6 +78,12 @@ CLASS_LOGFILES = [
     paths.VAR_LOG_HTTPD_DIR,
     # dogtag logs
     paths.VAR_LOG_PKI_DIR,
+    # dogtag conf
+    paths.PKI_TOMCAT_SERVER_XML,
+    paths.PKI_TOMCAT + "/ca/CS.cfg",
+    paths.PKI_TOMCAT + "/kra/CS.cfg",
+    paths.PKI_TOMCAT_ALIAS_DIR,
+    paths.PKI_TOMCAT_ALIAS_PWDFILE_TXT,
     # selinux logs
     paths.VAR_LOG_AUDIT,
     # sssd
@@ -76,6 +91,14 @@ CLASS_LOGFILES = [
     # system
     paths.RESOLV_CONF,
     paths.HOSTS,
+    # IPA renewal lock
+    paths.IPA_RENEWAL_LOCK,
+    paths.LETS_ENCRYPT_LOG,
+    # resolvers management
+    paths.NETWORK_MANAGER_CONFIG,
+    paths.NETWORK_MANAGER_CONFIG_DIR,
+    paths.SYSTEMD_RESOLVED_CONF,
+    paths.SYSTEMD_RESOLVED_CONF_DIR,
 ]
 
 
@@ -195,8 +218,17 @@ def collect_logs(name, logs_dict, logfile_dir=None, beakerlib_plugin=None):
             tmpname = cmd.stdout_text.strip()
             # Tar up the logs on the remote server
             cmd = host.run_command(
-                ['tar', 'cJvf', tmpname, '--ignore-failed-read'] + logs,
-                log_stdout=False, raiseonerr=False)
+                [
+                    "tar",
+                    "cJvf",
+                    tmpname,
+                    "--ignore-failed-read",
+                    "--warning=no-failed-read",
+                    "--dereference",
+                ] + logs,
+                log_stdout=False,
+                raiseonerr=False,
+            )
             if cmd.returncode:
                 logger.warning('Could not collect all requested logs')
             # fetch tar file
@@ -470,3 +502,18 @@ def del_compat_attrs(cls):
         del cls.ad_subdomains
         del cls.ad_treedomains
     del cls.ad_domains
+
+
+def skip_if_fips(reason='Not supported in FIPS mode', host='master'):
+    if callable(reason):
+        raise TypeError('Invalid decorator usage, add "()"')
+
+    def decorator(test_method):
+        @functools.wraps(test_method)
+        def wrapper(instance, *args, **kwargs):
+            if fips.is_fips_enabled(getattr(instance, host)):
+                pytest.skip(reason)
+            else:
+                test_method(instance, *args, **kwargs)
+        return wrapper
+    return decorator

@@ -51,6 +51,14 @@ AC_ARG_WITH([ipatests],
     [with_ipatests=yes])
 AM_CONDITIONAL([WITH_IPATESTS], [test x"$with_ipatests" = xyes])
 
+AC_ARG_WITH([ipa_join_xml],
+    [AC_HELP_STRING([--with-ipa-join-xml], [Use XML-RPC support in ipa-join])],
+    [with_ipa_join_xml=${withval}],
+    [with_ipa_join_xml=no])
+AS_IF([test x"$with_ipa_join_xml" = xyes], [AC_DEFINE([WITH_IPA_JOIN_XML], [1],
+    [ipa-join uses XML-RPC])])
+AM_CONDITIONAL([WITH_IPA_JOIN_XML], [test x"$with_ipa_join_xml" = xyes])
+
 AM_CONDITIONAL([HAVE_GCC], [test "$ac_cv_prog_gcc" = yes])
 
 dnl ---------------------------------------------------------------------------
@@ -104,6 +112,15 @@ dnl ---------------------------------------------------------------------------
 dnl - Check for OpenSSL Crypto library
 dnl ---------------------------------------------------------------------------
 PKG_CHECK_MODULES([CRYPTO], [libcrypto])
+
+dnl ---------------------------------------------------------------------------
+dnl - Check for pwquality library
+dnl ---------------------------------------------------------------------------
+AM_COND_IF([ENABLE_SERVER], [
+	PKG_CHECK_MODULES([PWQUALITY], [pwquality],
+		[AC_DEFINE(USE_PWQUALITY,1,[Use password quality checks])]
+	)
+])
 
 dnl ---------------------------------------------------------------------------
 dnl - Check for Python 3
@@ -164,20 +181,17 @@ PKG_CHECK_MODULES([SASL], [libsasl2])
 dnl ---------------------------------------------------------------------------
 dnl - Check for XMLRPC-C
 dnl ---------------------------------------------------------------------------
-PKG_CHECK_MODULES([XMLRPC], [xmlrpc xmlrpc_client xmlrpc_util], [],
-                  [try_xmlrpc_fallback=true])
-if test x"$try_xmlrpc_fallback" = xtrue; then
-    XMLRPC_LIBS=
-    AC_CHECK_HEADER([xmlrpc-c/base.h], [],
-                    [AC_MSG_ERROR([xmlrpc-c/base.h not found])])
+AS_IF([test x"$with_ipa_join_xml" = xyes], [
+    PKG_CHECK_MODULES([XMLRPC], [xmlrpc xmlrpc_client xmlrpc_util])
+])
 
-    AC_CHECK_LIB([xmlrpc_client], [xmlrpc_client_init2],
-                 [XMLRPC_LIBS="-lxmlrpc -lxmlrpc_client -lxmlrpc_util"])
-    if test "x$XMLRPC_LIBS" = "x" ; then
-        AC_MSG_ERROR([xmlrpc-c not found])
-    fi
-    AC_SUBST(XMLRPC_LIBS)
-fi
+dnl ---------------------------------------------------------------------------
+dnl - Check for jansson and libcurl for ipa-join
+dnl ---------------------------------------------------------------------------
+AS_IF([test x"$with_ipa_join_xml" = xno], [
+    PKG_CHECK_MODULES([JANSSON], [jansson])
+    PKG_CHECK_MODULES([LIBCURL], [libcurl])
+])
 
 dnl ---------------------------------------------------------------------------
 dnl - Check for libintl
@@ -327,19 +341,33 @@ AC_ARG_WITH([ipaplatform],
 	    [IPAPLATFORM=""])
 AC_MSG_CHECKING([supported IPA platform])
 
-if test "x${IPAPLATFORM}" == "x"; then
+if test "x${IPAPLATFORM}" != "x"; then
+	if test ! -d "${srcdir}/ipaplatform/${IPAPLATFORM}"; then
+		AC_MSG_ERROR([IPA platform ${IPAPLATFORM} is not supported])
+	fi
+else
+	dnl auto-detect, read ID and ID_LIKE from /etc/os-release
 	if test -r "/etc/os-release"; then
-		IPAPLATFORM=$(. /etc/os-release; echo "$ID")
+		platform_ids=$(source /etc/os-release; echo "$ID $ID_LIKE")
 	else
 		AC_MSG_ERROR([unable to read /etc/os-release])
 	fi
-	if test "x${IPAPLATFORM}" == "x"; then
+	if test "x${platform_ids}" == "x"; then
 		AC_MSG_ERROR([unable to find ID variable in /etc/os-release])
 	fi
-fi
 
-if test ! -d "${srcdir}/ipaplatform/${IPAPLATFORM}"; then
-	AC_MSG_ERROR([IPA platform ${IPAPLATFORM} is not supported])
+	dnl find first available platform from ID and ID_LIKE
+	for platform in ${platform_ids}; do
+		if test -d "${srcdir}/ipaplatform/${platform}"; then
+			IPAPLATFORM=${platform}
+			break
+		fi
+	done
+
+	dnl Did we find a supported platform?
+	if test "x${IPAPLATFORM}" == "x"; then
+		AC_MSG_ERROR([IPA platforms ${platform_ids} are not supported])
+	fi
 fi
 
 AC_SUBST([IPAPLATFORM])
@@ -352,11 +380,6 @@ if test "x${IPAPLATFORM}" == "xdebian"; then
     ODS_GROUP="opendnssec"
     # see https://www.debian.org/doc/packaging-manuals/python-policy/ap-packaging_tools.html
     PYTHON_INSTALL_EXTRA_OPTIONS="--install-layout=deb"
-elif test "x${IPAPLATFORM}" == "xaltlinux"; then
-    KRB5KDC_SERVICE="krb5kdc.service"
-    NAMED_GROUP="named"
-    ODS_USER="_opendnssec"
-    PYTHON_INSTALL_EXTRA_OPTIONS=""
 else
     KRB5KDC_SERVICE="krb5kdc.service"
     NAMED_GROUP="named"
@@ -551,6 +574,23 @@ AS_CASE([$JSLINT],
 AC_SUBST([JSLINT])
 AM_CONDITIONAL([WITH_JSLINT], [test "x${JSLINT}" != "xno"])
 
+
+AC_ARG_ENABLE(
+    [rpmlint],
+    [AC_HELP_STRING([--enable-rpmlint], [Enable rpmlint for the rpm spec])],
+    [case "${enableval}" in
+         yes) ENABLE_RPMLINT=yes ;;
+          no) ENABLE_RPMLINT=no ;;
+           *) AC_MSG_ERROR([bad value ${enableval} for --enable-rpmlint]) ;;
+     esac],
+    [ENABLE_RPMLINT=no])
+AS_IF([test "x$ENABLE_RPMLINT" = "xyes"],
+      [AC_PATH_PROG([RPMLINT], [rpmlint])
+       AS_IF([test "x$RPMLINT" = "x"],
+             [AC_MSG_ERROR([Could not find rpmlint])])],
+)
+AM_CONDITIONAL([WITH_RPMLINT], [test "x$ENABLE_RPMLINT" = "xyes"])
+
 AM_CONDITIONAL([HAVE_UNSHARE],
     [test "x${ac_cv_func_unshare}" = "xyes" -a "x${ac_cv_func_chroot}" = "xyes"])
 
@@ -626,6 +666,7 @@ AC_CONFIG_FILES([
     ipalib/Makefile
     ipaplatform/Makefile
     ipapython/Makefile
+    ipasphinx/Makefile
     ipaserver/Makefile
     ipatests/Makefile
     ipatests/man/Makefile
@@ -647,6 +688,7 @@ echo "
                     ========================
 
         vendor version:           ${VERSION}${VENDOR_SUFFIX}
+        ipaplatform:              ipaplatform.${IPAPLATFORM}
         prefix:                   ${prefix}
         exec_prefix:              ${exec_prefix}
         libdir:                   ${libdir}
@@ -662,6 +704,7 @@ echo "
         Python:                   ${PYTHON} (${PYTHON_VERSION})
         pylint:                   ${PYLINT}
         jslint:                   ${JSLINT}
+        rpmlint:                  ${ENABLE_RPMLINT}
         LDAP libs:                ${LDAP_LIBS}
         OpenSSL crypto libs:      ${CRYPTO_LIBS}
         KRB5 libs:                ${KRB5_LIBS}
@@ -669,6 +712,7 @@ echo "
 
 AM_COND_IF([ENABLE_SERVER], [
     echo "\
+        pwquality libs:           ${PWQUALITY_LIBS}
         KRAD libs:                ${KRAD_LIBS}
         krb5rundir:               ${krb5rundir}
         systemdtmpfilesdir:       ${systemdtmpfilesdir}
@@ -684,3 +728,11 @@ AM_COND_IF([WITH_IPATESTS], [
     echo "\
         with ipatests:            no"
 ])
+AM_COND_IF([WITH_IPA_JOIN_XML], [
+    echo "\
+        ipa-join RPC mode:        XML-RPC"
+], [
+    echo "\
+        ipa-join RPC mode:        JSON-RPC"
+])
+

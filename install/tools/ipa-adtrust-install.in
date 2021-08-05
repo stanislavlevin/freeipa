@@ -50,7 +50,7 @@ if six.PY3:
 
 logger = logging.getLogger(os.path.basename(__file__))
 
-log_file_name = paths.IPASERVER_INSTALL_LOG
+log_file_name = paths.IPASERVER_ADTRUST_INSTALL_LOG
 
 
 def parse_options():
@@ -141,11 +141,11 @@ def main():
           "==============")
     print("This program will setup components needed to establish trust to "
           "AD domains for")
-    print("the FreeIPA Server.")
+    print("the IPA Server.")
     print("")
     print("This includes:")
     print("  * Configure Samba")
-    print("  * Add trust related objects to FreeIPA LDAP server")
+    print("  * Add trust related objects to IPA LDAP server")
     # TODO:
     # print "  * Add a SID to all users and Posix groups"
     print("")
@@ -161,7 +161,7 @@ def main():
     api.bootstrap(
         in_server=True,
         debug=options.debug,
-        context='install',
+        context='installer',
         confdir=paths.ETC_IPA
     )
     api.finalize()

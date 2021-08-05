@@ -29,14 +29,15 @@ import dns.dnssec
 from gssapi.exceptions import GSSError
 import six
 import systemd.daemon
-import systemd.journal
 
 import ipalib
 from ipalib.constants import SOFTHSM_DNSSEC_TOKEN_LABEL
 from ipalib.install.kinit import kinit_keytab
 from ipapython.dn import DN
+from ipapython.ipa_log_manager import standard_logging_setup
 from ipapython import ipaldap
 from ipaplatform.paths import paths
+from ipaserver import p11helper
 from ipaserver.dnssec.abshsm import sync_pkcs11_metadata, wrappingmech_name2id
 from ipaserver.dnssec.ldapkeydb import LdapKeyDB, str_hexlify
 from ipaserver.dnssec.localhsm import LocalHSM
@@ -301,7 +302,19 @@ def ldap2master_replica_keys_sync(ldapkeydb, localhsm):
                      new_key_ldap['ipk11label'],
                      str_hexlify(new_key_ldap['ipk11id']),
                      str_hexlify(new_key_ldap['ipapublickey']))
-        localhsm.import_public_key(new_key_ldap, new_key_ldap['ipapublickey'])
+        try:
+            localhsm.import_public_key(
+                new_key_ldap, new_key_ldap['ipapublickey'])
+        except p11helper.DuplicationError:
+            # we may have been called in the middle of operations
+            # disabling dnssec on the current node, while the
+            # replica key has already been disabled in localhsm but
+            # not yet in LDAP.
+            # Ignore the import error (key is already in localhsm but disabled)
+            # and log a warning
+            logger.warning("import of replica key to localhsm %s failed, "
+                           "key already present but disabled",
+                           str_hexlify(new_key_ldap['ipk11id']))
 
     # set CKA_WRAP = FALSE for all replica keys removed from LDAP
     removed_replica_keys = set(localhsm.replica_pubkeys_wrap.keys()) \
@@ -375,7 +388,18 @@ def master2ldap_master_keys_sync(ldapkeydb, localhsm):
                      str_hexlify(mkey_id), hex_set(new_replica_keys))
 
         # wrap master key with new replica keys
-        mkey_local = localhsm.find_keys(id=mkey_id).popitem()[1]
+        try:
+            mkey_local = localhsm.find_keys(id=mkey_id).popitem()[1]
+        except KeyError:
+            # The master key is present in LDAP but could not be found
+            # in the local HSM. Let's hope it's not the active key,
+            # log an error and process the next master key
+            logger.error("master key 0x%s missing in local HSM, "
+                "will not be able to add master key wrapped with "
+                "replica keys",
+                str_hexlify(mkey_id))
+            continue
+
         for replica_key_id in new_replica_keys:
             logger.info('adding master key 0x%s wrapped with replica key 0x%s',
                         str_hexlify(mkey_id), str_hexlify(replica_key_id))
@@ -650,20 +674,8 @@ def cleanup_ldap_zone(ldap, dns_dn, zone_name):
         ldap.delete_entry(ldap_key)
 
 
-# this service is usually socket-activated
-root_logger = logging.getLogger()
-root_logger.addHandler(systemd.journal.JournalHandler())
-root_logger.setLevel(level=logging.DEBUG)
-
-if len(sys.argv) > 2:
-    print(__doc__)
-    sys.exit(1)
-# program was likely invoked from console, log to it
-elif len(sys.argv) == 2:
-    console = logging.StreamHandler()
-    root_logger.addHandler(console)
-
 # IPA framework initialization
+standard_logging_setup(debug=True)
 ipalib.api.bootstrap(context='dns', confdir=paths.ETC_IPA, in_server=True)
 ipalib.api.finalize()
 

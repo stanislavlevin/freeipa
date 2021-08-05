@@ -11,8 +11,14 @@
 [service/ipa-api]
   mechs = krb5
   cred_store = keytab:$HTTP_KEYTAB
-  cred_store = client_keytab:$HTTP_KEYTAB
   allow_constrained_delegation = true
   allow_client_ccache_sync = true
   cred_usage = initiate
   euid = $IPAAPI_USER
+
+[service/ipa-sweeper]
+  mechs = krb5
+  cred_store = keytab:$HTTP_KEYTAB
+  socket = $SWEEPER_SOCKET
+  euid = $IPAAPI_USER
+  cred_usage = initiate

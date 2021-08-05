@@ -51,12 +51,13 @@ class LDAPUpdater(admintool.AdminTool):
     @classmethod
     def add_options(cls, parser):
         super(LDAPUpdater, cls).add_options(parser, debug_option=True)
-        parser.add_option("-u", '--upgrade', action="store_true",
-            dest="upgrade", default=False,
+        parser.add_option(
+            "-u", '--upgrade', action="store_true", dest="upgrade",
+            default=False,
             help="upgrade an installed server in offline mode")
-        parser.add_option("-S", '--schema-file', action="append",
-            dest="schema_files",
-            help="custom schema ldif file to use (implies -s)")
+        parser.add_option(
+            "-S", '--schema-file', action="append", dest="schema_files",
+            help="custom schema ldif file to use")
 
     @classmethod
     def get_command_class(cls, options, args):
@@ -142,10 +143,7 @@ class LDAPUpdater_NonUpgrade(LDAPUpdater):
                 options.schema_files,
                 ldapi=True) or modified
 
-        ld = LDAPUpdate(
-            sub_dict={},
-            ldapi=True)
-
+        ld = LDAPUpdate()
         if not self.files:
             self.files = ld.get_all_files(UPDATES_DIR)
 

@@ -451,9 +451,11 @@ class BaseBackupAndRestoreWithKRA(IntegrationTest):
 
             backup_path = tasks.get_backup_dir(self.master)
 
-            self.master.run_command(['ipa-server-install',
-                                     '--uninstall',
-                                     '-U'])
+            # check that no error message in uninstall log for KRA instance
+            cmd = self.master.run_command(['ipa-server-install',
+                                           '--uninstall',
+                                           '-U'])
+            assert "failed to uninstall KRA" not in cmd.stderr_text
 
             if reinstall:
                 tasks.install_master(self.master, setup_dns=True)
@@ -482,6 +484,20 @@ class TestBackupReinstallRestoreWithKRA(BaseBackupAndRestoreWithKRA):
         """backup, uninstall, reinstall, restore"""
         self._full_backup_restore_with_vault(reinstall=True)
 
+    def test_no_error_message_with_uninstall_ipa_with_kra(self):
+        """Test there is no error message in uninstall log for KRA instance
+
+        There was error message in uninstall log when IPA with KRA was
+        uninstalled. This test check that there is no error message in
+        uninstall log for kra instance.
+
+        related: https://pagure.io/freeipa/issue/8550
+        """
+        cmd = self.master.run_command(['ipa-server-install',
+                                       '--uninstall',
+                                       '-U'])
+        assert "failed to uninstall KRA" not in cmd.stderr_text
+
 
 class TestBackupAndRestoreWithReplica(IntegrationTest):
     """Regression tests for issues 7234 and 7455
@@ -506,15 +522,6 @@ class TestBackupAndRestoreWithReplica(IntegrationTest):
             domain_level = cls.master.config.domain_level
         else:
             domain_level = cls.domain_level
-        # Configure /etc/resolv.conf on each replica to use the master as DNS
-        # Otherwise ipa-replica-manage re-initialize is unable to
-        # resolve the master name
-        tasks.config_host_resolvconf_with_master_data(
-            cls.master, cls.replica1
-        )
-        tasks.config_host_resolvconf_with_master_data(
-            cls.master, cls.replica2
-        )
         # Configure only master and one replica.
         # Replica is configured without CA
         tasks.install_topo(
@@ -1021,6 +1028,13 @@ class TestBackupRoles(IntegrationTest):
             '-a', self.master.config.admin_password,
             '--add-sids'
         ])
+
+        # wait for replication to propagate the change on
+        # cn=adtrust agents,cn=sysaccounts,cn=etc,dc=ipa,dc=test
+        # as the ipa server-role-find call is using this entry to
+        # build its output
+        tasks.wait_for_replication(self.replicas[0].ldap_connect())
+
         # double-check
         assert self._ipa_replica_role_check(
             self.replicas[0].hostname, self.serverroles['ADTC']
@@ -1055,6 +1069,13 @@ class TestBackupRoles(IntegrationTest):
         self.replicas[0].run_command([
             'ipa-adtrust-install', '--add-agents'], stdin_text=cmd_input
         )
+
+        # wait for replication to propagate the change on
+        # cn=adtrust agents,cn=sysaccounts,cn=etc,dc=ipa,dc=test
+        # as the ipa server-role-find call is using this entry to
+        # build its output
+        tasks.wait_for_replication(self.replicas[0].ldap_connect())
+
         # check that master is now an AD Trust agent
         assert self._ipa_replica_role_check(
             self.master.hostname, self.serverroles['ADTA']
@@ -1072,6 +1093,13 @@ class TestBackupRoles(IntegrationTest):
             '-a', self.master.config.admin_password,
             '--add-sids'
         ])
+
+        # wait for replication to propagate the change on
+        # cn=adtrust agents,cn=sysaccounts,cn=etc,dc=ipa,dc=test
+        # as the ipa server-role-find call is using this entry to
+        # build its output
+        tasks.wait_for_replication(self.master.ldap_connect())
+
         # master and replicas[0] are both AD Trust Controllers now.
         for hostname in [self.master.hostname, self.replicas[0].hostname]:
             assert self._ipa_replica_role_check(

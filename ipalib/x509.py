@@ -63,9 +63,13 @@ if six.PY3:
 PEM = 0
 DER = 1
 
+# The first group is the whole PEM datum and the second group is
+# the base64 content (with newlines).  For findall() the result is
+# a list of 2-tuples of the PEM and base64 data.
 PEM_CERT_REGEX = re.compile(
-    b'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----',
+    b'(-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----)',
     re.DOTALL)
+
 PEM_PRIV_REGEX = re.compile(
     b'-----BEGIN(?: ENCRYPTED)?(?: (?:RSA|DSA|DH|EC))? PRIVATE KEY-----.*?'
     b'-----END(?: ENCRYPTED)?(?: (?:RSA|DSA|DH|EC))? PRIVATE KEY-----',
@@ -88,7 +92,7 @@ SAN_KRB5PRINCIPALNAME = '1.3.6.1.5.2.2'
 class IPACertificate:
     """
     A proxy class wrapping a python-cryptography certificate representation for
-    FreeIPA purposes
+    IPA purposes
     """
     def __init__(self, cert, backend=None):
         """
@@ -104,6 +108,10 @@ class IPACertificate:
         self._subject = self.__get_der_field('subject')
         self._issuer = self.__get_der_field('issuer')
         self._serial_number = self.__get_der_field('serialNumber')
+
+        if self.version.name != 'v3':
+            raise ValueError('X.509 %s is not supported' %
+                             self.version.name)
 
     def __getstate__(self):
         state = {
@@ -447,7 +455,7 @@ def load_certificate_list(data):
     Return a list of python-cryptography ``Certificate`` objects.
     """
     certs = PEM_CERT_REGEX.findall(data)
-    return [load_pem_x509_certificate(cert) for cert in certs]
+    return [load_pem_x509_certificate(cert[0]) for cert in certs]
 
 
 def load_certificate_list_from_file(filename):

@@ -34,6 +34,10 @@ char *std_pwdpolicy_attrs[] = {
     "krbpwdmaxfailure",
     "krbpwdfailurecountinterval",
     "krbpwdlockoutduration",
+    "ipapwdmaxrepeat",
+    "ipapwdmaxsequence",
+    "ipapwddictcheck",
+    "ipapwdusercheck",
 
     NULL
 };
@@ -47,6 +51,7 @@ krb5_error_code ipadb_get_ipapwd_policy(struct ipadb_context *ipactx,
     LDAPMessage *res = NULL;
     LDAPMessage *lentry;
     uint32_t result;
+    bool resbool;
     int ret;
 
     pol = calloc(1, sizeof(struct ipapwd_policy));
@@ -115,6 +120,34 @@ krb5_error_code ipadb_get_ipapwd_policy(struct ipadb_context *ipactx,
                                     "krbPwdLockoutDuration", &result);
     if (ret == 0) {
         pol->lockout_duration = result;
+    }
+
+    ret = ipadb_ldap_attr_to_uint32(ipactx->lcontext, lentry,
+                                    "ipaPwdMaxRepeat", &result);
+    if (ret == 0) {
+        pol->max_repeat = result;
+    }
+
+    ret = ipadb_ldap_attr_to_uint32(ipactx->lcontext, lentry,
+                                    "ipaPwdMaxSequence", &result);
+    if (ret == 0) {
+        pol->max_sequence = result;
+    }
+
+    ret = ipadb_ldap_attr_to_bool(ipactx->lcontext, lentry,
+                                  "ipaPwdDictCheck", &resbool);
+    if (ret == 0 && resbool == true) {
+        pol->dictcheck = 1;
+    }
+
+    ret = ipadb_ldap_attr_to_bool(ipactx->lcontext, lentry,
+                                  "ipaPwdUserCheck", &resbool);
+    if (ret == 0 && resbool == true) {
+        pol->usercheck = 1;
+    }
+
+    if (ret == 0) {
+        pol->max_sequence = result;
     }
 
     *_pol = pol;
@@ -328,13 +361,14 @@ krb5_error_code ipadb_check_policy_as(krb5_context kcontext,
     }
 
     if (ied->pol->max_fail == 0 ||
-        client->fail_auth_count < ied->pol->max_fail) {
+        client->fail_auth_count < (krb5_kvno) ied->pol->max_fail) {
         /* still within allowed failures range */
         return 0;
     }
 
     if (ied->pol->lockout_duration == 0 ||
-        client->last_failed + ied->pol->lockout_duration > kdc_time) {
+        krb5_ts_after(krb5_ts_incr(
+                client->last_failed, ied->pol->lockout_duration), kdc_time)) {
         /* ok client permanently locked, or within lockout period */
         *status = "LOCKED_OUT";
         return KRB5KDC_ERR_CLIENT_REVOKED;

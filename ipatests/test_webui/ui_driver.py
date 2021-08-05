@@ -505,6 +505,10 @@ class UI_driver:
         self.driver.get(self.get_url(entity, facet))
         self.wait_for_request(n=3, d=0.4)
 
+    def navigate_to_page(self, page):
+        self.driver.get('/'.join([self.get_base_url(), '#', 'p', page]))
+        self.wait_for_request(n=3, d=0.4)
+
     def navigate_by_menu(self, item, complete=True):
         """
         Navigate by using menu
@@ -2301,10 +2305,10 @@ class UI_driver:
         notification_type = 'div.notification-area .alert-{}'.format(type)
         # wait for a half sec for notification to appear
         self.wait(0.5)
-        is_present = self.find(notification_type, By.CSS_SELECTOR)
+        is_present = self.find(notification_type, By.CSS_SELECTOR, many=True)
         assert is_present, "Notification not present"
         if assert_text:
-            assert assert_text in is_present.text
+            assert any(map(lambda x: assert_text in x.text, is_present))
 
     def assert_last_error_dialog(self, expected_err, details=False,
                                  dialog_name='error_dialog'):

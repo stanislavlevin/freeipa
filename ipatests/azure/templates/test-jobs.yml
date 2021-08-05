@@ -8,14 +8,23 @@ steps:
     set -e
     sudo apt-get update
     sudo apt-get install -y \
+        apparmor-utils \
         parallel \
         moreutils \
         rng-tools \
         systemd-coredump \
         python3-docker
-    # ubuntu's one is too old: different API
-    python3 -m pip install docker --user
   displayName: Install Host's tests requirements
+
+- script: |
+    set -e
+    printf "AppArmor status\n"
+    sudo aa-status
+    printf "Disable AppArmor conflicting profiles\n"
+    sudo aa-disable /etc/apparmor.d/usr.sbin.chronyd
+    printf "Recheck AppArmor status\n"
+    sudo aa-status
+  displayName: Disable AppArmor conflicting profiles on Host
 
 - script: |
     set -e
@@ -54,6 +63,40 @@ steps:
   condition: succeededOrFailed()
   displayName: Host's memory statistics
 
+- script: |
+    set -eu
+    function emit_warning() {
+        printf "##vso[task.logissue type=warning]%s\n" "$1"
+    }
+
+    for memory_warn in $(find ${IPA_TESTS_ENV_WORKING_DIR}/*/ -maxdepth 1 -name memory.warnings);
+    do
+        env_name="$(basename $(dirname $memory_warn))"
+        emit_warning "Test env '$env_name' has high memory usage: $(echo '' && cat $memory_warn)"
+    done
+  condition: succeededOrFailed()
+  displayName: Check memory consumption
+
+- script: |
+    set -eu
+    HOST_JOURNAL=host_journal.log
+    HOST_JOURNAL_PATH="${IPA_TESTS_ENV_WORKING_DIR}/${HOST_JOURNAL}.tar.gz"
+    sudo journalctl -b | tee "$HOST_JOURNAL"
+
+    function emit_warning() {
+        printf "##vso[task.logissue type=warning]%s\n" "$1"
+    }
+
+    printf "AVC:\n"
+    grep 'AVC apparmor="DENIED"' "$HOST_JOURNAL" && \
+        emit_warning "There are Host's AVCs. Please, check the logs."
+    printf "SECCOMP:\n"
+    grep ' SECCOMP ' "$HOST_JOURNAL" && \
+        emit_warning "There are reported SECCOMP syscalls. Please, check the logs."
+    tar -czf "$HOST_JOURNAL_PATH" "$HOST_JOURNAL"
+  condition: succeededOrFailed()
+  displayName: Host's systemd journal
+
 - task: PublishTestResults@2
   inputs:
     testResultsFiles: 'ipa_envs/*/$(CI_RUNNER_LOGS_DIR)/nosetests.xml'
@@ -84,6 +127,11 @@ steps:
         -v "${BUILD_REPOSITORY_LOCALPATH}":"${IPA_TESTS_REPO_PATH}" \
         --name "$CONTAINER_COREDUMP" freeipa-azure-builder
     docker start "$CONTAINER_COREDUMP"
+
+    docker exec -t \
+        "$CONTAINER_COREDUMP" \
+        /bin/bash --noprofile --norc -eux \
+            "${IPA_TESTS_REPO_PATH}/${IPA_TESTS_SCRIPTS}/wait-for-systemd.sh"
 
     docker exec -t \
         --env IPA_TESTS_REPO_PATH="${IPA_TESTS_REPO_PATH}" \
@@ -117,6 +165,10 @@ steps:
     !*/*.yml
     !*/*.yaml
     !*/*.log
+    !*/systemd_boot_logs/*.log
+    !*/installed_packages/*.log
+    !*/memory.stats
+    !*.tar.gz
     EOF
     cat "$artifacts_ignore_path"
   condition: succeededOrFailed()

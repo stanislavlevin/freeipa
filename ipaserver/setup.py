@@ -23,6 +23,7 @@ Python-level packaging using setuptools
 from os.path import abspath, dirname
 import sys
 
+
 if __name__ == '__main__':
     # include ../ for ipasetup.py
     sys.path.append(dirname(dirname(abspath(__file__))))
@@ -36,6 +37,10 @@ if __name__ == '__main__':
             'ipaserver',
             'ipaserver.advise',
             'ipaserver.advise.plugins',
+            'ipaserver.custodia',
+            'ipaserver.custodia.httpd',
+            'ipaserver.custodia.message',
+            'ipaserver.custodia.server',
             'ipaserver.dnssec',
             'ipaserver.plugins',
             'ipaserver.secrets',
@@ -46,7 +51,6 @@ if __name__ == '__main__':
         ],
         install_requires=[
             "cryptography",
-            "custodia",
             "dbus-python",
             "dnspython",
             # dogtag-pki is just the client package on PyPI. ipaserver
@@ -59,6 +63,7 @@ if __name__ == '__main__':
             "jwcrypto",
             "lxml",
             "netaddr",
+            "psutil",
             "pyasn1",
             "requests",
             "six",
@@ -66,10 +71,20 @@ if __name__ == '__main__':
             "python-ldap",
         ],
         entry_points={
-            'custodia.authorizers': [
+            'ipaserver.custodia.authenticators': [
+                ('SimpleCredsAuth = '
+                 'ipaserver.custodia.httpd.authenticators:SimpleCredsAuth'),
+                ('SimpleHeaderAuth = '
+                 'custodia.httpd.authenticators:SimpleHeaderAuth'),
+            ],
+            'ipaserver.custodia.authorizers': [
                 'IPAKEMKeys = ipaserver.secrets.kem:IPAKEMKeys',
             ],
-            'custodia.stores': [
+            'ipaserver.custodia.consumers': [
+                'Secrets = ipaserver.custodia.secrets:Secrets',
+                'Root = ipaserver.custodia.root:Root',
+            ],
+            'ipaserver.custodia.stores': [
                 'IPASecStore = ipaserver.secrets.store:IPASecStore',
             ],
         },

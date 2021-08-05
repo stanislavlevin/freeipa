@@ -4,7 +4,8 @@ from ipatests.pytest_ipa.integration import tasks
 
 DIRSRV_CONFIG_MODS = """
 # https://fedorahosted.org/freeipa/ticket/4949
-dn: cn=config,cn=ldbm database,cn=plugins,cn=config
+# https://pagure.io/freeipa/issue/8515
+dn: cn=bdb,cn=config,cn=ldbm database,cn=plugins,cn=config
 changetype: modify
 replace: nsslapd-db-locks
 nsslapd-db-locks: 100000
@@ -68,4 +69,5 @@ class TestCustomDSConfigInstall(IntegrationTest):
     def test_customized_ds_install_replica(self):
         tasks.install_replica(
             self.master, self.replicas[0], setup_ca=False,
+            nameservers=None,
             extra_args=['--dirsrv-config-file', CONFIG_LDIF_PATH])

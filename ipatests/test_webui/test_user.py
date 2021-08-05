@@ -55,8 +55,6 @@ ENTRY_EXIST = 'This entry already exists'
 ACTIVE_ERR = 'active user with name "{}" already exists'
 DISABLED = 'This entry is already disabled'
 LONG_LOGIN = "invalid 'login': can be at most 32 characters"
-INV_PASSWD = ("invalid 'password': Leading and trailing spaces are "
-              "not allowed")
 
 
 @pytest.mark.tier1
@@ -88,6 +86,30 @@ class user_tasks(UI_driver):
                 ele[2].append(mail)
 
         return data
+
+    def assert_user_auth_type(self, auth_type, enabled=True):
+        """
+        Check if provided auth type is enabled or disabled for the user
+        :param auth_type: one of password, radius, otp, pkinit or hardened
+        :param enabled: check if enabled if True, check for disabled if False
+        """
+        s_checkbox = 'div[name="ipauserauthtype"] input[value="{}"]'.format(
+            auth_type)
+        checkbox = self.find(s_checkbox, By.CSS_SELECTOR, strict=True)
+        assert checkbox.is_selected() == enabled
+
+    def add_user_auth_type(self, auth_type, save=False):
+        """
+        Select user auth type
+        :param auth_type: one of password, radius, otp, pkinit or hardened
+        """
+        s_checkbox = 'div[name="ipauserauthtype"] input[value="{}"]'.format(
+            auth_type)
+        checkbox = self.find(s_checkbox, By.CSS_SELECTOR, strict=True)
+        if not checkbox.is_selected():
+            checkbox.click()
+        if save:
+            self.facet_button_click('save')
 
 
 @pytest.mark.tier1
@@ -508,21 +530,17 @@ class test_user(user_tasks):
         # click add and cancel
         self.add_record(user.ENTITY, user.DATA, dialog_btn='cancel')
 
-        # add leading space before password (should FAIL)
+        # add leading space before password (should SUCCEED)
         self.navigate_to_entity(user.ENTITY)
         self.facet_button_click('add')
         self.fill_fields(user.DATA_PASSWD_LEAD_SPACE['add'])
         self.dialog_button_click('add')
-        self.assert_last_error_dialog(INV_PASSWD)
-        self.close_all_dialogs()
 
-        # add trailing space before password (should FAIL)
+        # add trailing space before password (should SUCCEED)
         self.navigate_to_entity(user.ENTITY)
         self.facet_button_click('add')
         self.fill_fields(user.DATA_PASSWD_TRAIL_SPACE['add'])
         self.dialog_button_click('add')
-        self.assert_last_error_dialog(INV_PASSWD)
-        self.close_all_dialogs()
 
         # add user using enter
         self.add_record(user.ENTITY, user.DATA2, negative=True)
@@ -682,6 +700,31 @@ class test_user(user_tasks):
 
         # cleanup
         self.delete(user.ENTITY, [user.DATA2])
+
+    @screenshot
+    def test_enabled_by_default(self):
+        """
+        Test if valid user created in both ca and
+        caless env is enabled by default.
+
+        https://pagure.io/freeipa/issue/8203
+        """
+        self.init_app()
+
+        # check if the user is enabled
+        self.add_record(user.ENTITY, user.DATA, navigate=False)
+        self.assert_record_value(expected="Enabled",
+                                 pkeys=user.PKEY,
+                                 column="nsaccountlock")
+
+        self.navigate_to_record(user.PKEY)
+        self.assert_action_list_action("disable", visible=True, enabled=True)
+        self.assert_action_list_action("reset_password",
+                                       visible=True, enabled=True)
+
+        # add OTP authentication type and verify the change is persistent
+        self.add_user_auth_type("otp", save=True)
+        self.assert_user_auth_type("otp", enabled=True)
 
 
 @pytest.mark.tier1

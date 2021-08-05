@@ -21,6 +21,8 @@ from cryptography import x509 as crypto_x509
 
 from ipalib import x509
 from ipalib.constants import DOMAIN_LEVEL_0
+from ipalib.constants import IPA_CA_RECORD
+from ipalib.sysrestore import SYSRESTORE_STATEFILE, SYSRESTORE_INDEXFILE
 from ipapython.dn import DN
 from ipaplatform.constants import constants
 from ipaplatform.osinfo import osinfo
@@ -32,6 +34,7 @@ from ipatests.pytest_ipa.integration.env_config import get_global_config
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.test_integration.test_caless import CALessBase, ipa_certs_cleanup
 from ipaplatform import services
+from ipaserver.install import krainstance
 
 config = get_global_config()
 
@@ -39,23 +42,8 @@ config = get_global_config()
 def create_broken_resolv_conf(master):
     # Force a broken resolv.conf to simulate a bad response to
     # reverse zone lookups
-    master.run_command([
-        '/bin/mv',
-        paths.RESOLV_CONF,
-        '%s.sav' % paths.RESOLV_CONF
-    ])
-
-    contents = "# Set as broken by ipatests\nnameserver 127.0.0.2\n"
-    master.put_file_contents(paths.RESOLV_CONF, contents)
-
-
-def restore_resolv_conf(master):
-    if os.path.exists('%s.sav' % paths.RESOLV_CONF):
-        master.run_command([
-            '/bin/mv',
-            '%s.sav' % paths.RESOLV_CONF,
-            paths.RESOLV_CONF
-        ])
+    master.resolver.backup()
+    master.resolver.setup_resolver('127.0.0.2')
 
 
 def server_install_setup(func):
@@ -66,22 +54,35 @@ def server_install_setup(func):
             func(*args)
         finally:
             tasks.uninstall_master(master, clean=False)
-            restore_resolv_conf(master)
             ipa_certs_cleanup(master)
     return wrapped
+
+
+@pytest.fixture
+def server_cleanup(request):
+    """
+    Fixture to uninstall ipa server before and after the test
+    """
+    host = request.cls.master
+    tasks.uninstall_master(host)
+    yield
+    tasks.uninstall_master(host)
 
 
 class InstallTestBase1(IntegrationTest):
 
     num_replicas = 3
     topology = 'star'
+    master_with_dns = False
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=False)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns)
 
     def test_replica0_ca_less_install(self):
-        tasks.install_replica(self.master, self.replicas[0], setup_ca=False)
+        tasks.install_replica(
+            self.master, self.replicas[0], setup_ca=False,
+            nameservers='master' if self.master_with_dns else None)
 
     def test_replica0_ipa_ca_install(self):
         tasks.install_ca(self.replicas[0])
@@ -93,7 +94,9 @@ class InstallTestBase1(IntegrationTest):
         tasks.install_dns(self.replicas[0])
 
     def test_replica1_with_ca_install(self):
-        tasks.install_replica(self.master, self.replicas[1], setup_ca=True)
+        tasks.install_replica(
+            self.master, self.replicas[1], setup_ca=True,
+            nameservers='master' if self.master_with_dns else None)
 
     def test_replica1_ipa_kra_install(self):
         tasks.install_kra(self.replicas[1])
@@ -102,8 +105,9 @@ class InstallTestBase1(IntegrationTest):
         tasks.install_dns(self.replicas[1])
 
     def test_replica2_with_ca_kra_install(self):
-        tasks.install_replica(self.master, self.replicas[2], setup_ca=True,
-                              setup_kra=True)
+        tasks.install_replica(
+            self.master, self.replicas[2], setup_ca=True, setup_kra=True,
+            nameservers='master' if self.master_with_dns else None)
 
     def test_replica2_ipa_dns_install(self):
         tasks.install_dns(self.replicas[2])
@@ -113,21 +117,24 @@ class InstallTestBase2(IntegrationTest):
 
     num_replicas = 3
     topology = 'star'
+    master_with_dns = False
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=False)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns)
 
     def test_replica1_with_ca_dns_install(self):
-        tasks.install_replica(self.master, self.replicas[1], setup_ca=True,
-                              setup_dns=True)
+        tasks.install_replica(
+            self.master, self.replicas[1], setup_ca=True, setup_dns=True,
+            nameservers='master' if self.master_with_dns else None)
 
     def test_replica1_ipa_kra_install(self):
         tasks.install_kra(self.replicas[1])
 
     def test_replica2_with_dns_install(self):
-        tasks.install_replica(self.master, self.replicas[2], setup_ca=False,
-                              setup_dns=True)
+        tasks.install_replica(
+            self.master, self.replicas[2], setup_ca=False, setup_dns=True,
+            nameservers='master' if self.master_with_dns else None)
 
     def test_replica2_ipa_ca_install(self):
         tasks.install_ca(self.replicas[2])
@@ -143,20 +150,25 @@ class ADTrustInstallTestBase(IntegrationTest):
     """
     num_replicas = 2
     topology = 'star'
+    master_with_dns = False
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=False)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns)
 
     def install_replica(self, replica, **kwargs):
         tasks.install_replica(self.master, replica, setup_adtrust=True,
                               **kwargs)
 
     def test_replica0_only_adtrust(self):
-        self.install_replica(self.replicas[0], setup_ca=False)
+        self.install_replica(
+            self.replicas[0], setup_ca=False,
+            nameservers='master' if self.master_with_dns else None)
 
     def test_replica1_all_components_adtrust(self):
-        self.install_replica(self.replicas[1], setup_ca=True)
+        self.install_replica(
+            self.replicas[1], setup_ca=True,
+            nameservers='master' if self.master_with_dns else None)
 
 
 ##
@@ -164,10 +176,11 @@ class ADTrustInstallTestBase(IntegrationTest):
 ##
 
 class TestInstallWithCA1(InstallTestBase1):
+    master_with_dns = False
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=False)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns)
 
     @pytest.mark.skipif(config.domain_level == DOMAIN_LEVEL_0,
                         reason='does not work on DOMAIN_LEVEL_0 by design')
@@ -192,7 +205,7 @@ class TestInstallWithCA1(InstallTestBase1):
         ldap_conf = paths.OPENLDAP_LDAP_CONF
         base_dn = self.master.domain.basedn
         client = self.replicas[0]
-        tasks.uninstall_master(client)
+        tasks.uninstall_replica(self.master, client)
         expected_msg1 = "contains deprecated and unsupported " \
                         "entries: HOST, PORT"
         file_backup = client.get_file_contents(ldap_conf, encoding='utf-8')
@@ -213,10 +226,11 @@ class TestInstallWithCA1(InstallTestBase1):
 
 
 class TestInstallWithCA2(InstallTestBase2):
+    master_with_dns = False
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=False)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns)
 
     @pytest.mark.skipif(config.domain_level == DOMAIN_LEVEL_0,
                         reason='does not work on DOMAIN_LEVEL_0 by design')
@@ -238,7 +252,22 @@ class TestInstallCA(IntegrationTest):
 
     @classmethod
     def install(cls, mh):
+        cls.master.put_file_contents(
+            os.path.join(paths.IPA_CCACHES, 'foo'),
+            'somerandomstring'
+        )
+        cls.master.run_command(
+            ['mkdir', os.path.join(paths.IPA_CCACHES, 'bar')]
+        )
         tasks.install_master(cls.master, setup_dns=False)
+
+    def test_ccaches_cleanup(self):
+        """
+        The IPA ccaches directory is cleaned up on install. Verify
+        that the file we created is now gone.
+        """
+        assert os.path.exists(os.path.join(paths.IPA_CCACHES, 'foo')) is False
+        assert os.path.exists(os.path.join(paths.IPA_CCACHES, 'bar')) is False
 
     def test_replica_ca_install_with_no_host_dns(self):
         """
@@ -357,28 +386,144 @@ class TestInstallCA(IntegrationTest):
         assert owner == "root"
         assert group == "root"
 
+    def test_cert_install_with_IPA_issued_cert(self):
+        """
+        Test replacing an IPA-issued server cert
+
+        ipa-server-certinstall can replace the web and LDAP certs.
+        A slightly different code path is taken when the replacement
+        certs are issued by IPA. Exercise that path by replacing the
+        web cert with itself.
+        """
+        self.master.run_command(['cp', '-p', paths.HTTPD_CERT_FILE, '/tmp'])
+        self.master.run_command(['cp', '-p', paths.HTTPD_KEY_FILE, '/tmp'])
+
+        passwd = self.master.get_file_contents(
+            paths.HTTPD_PASSWD_FILE_FMT.format(host=self.master.hostname)
+        )
+        self.master.run_command([
+            'ipa-server-certinstall',
+            '-p', self.master.config.dirman_password,
+            '-w',
+            '--pin', passwd,
+            '/tmp/httpd.crt',
+            '/tmp/httpd.key',
+        ])
+
+    def test_is_ipa_configured(self):
+        """Verify that the old and new methods of is_ipa_installed works
+
+           If there is an installation section then it is the status.
+
+           If not then it will fall back to looking for configured
+           services and files and use that for determination.
+        """
+        def set_installation_state(host, state):
+            """
+            Update the complete value in the installation section
+            """
+            host.run_command(
+                ['python3', '-c',
+                 'from ipalib.install import sysrestore; '
+                 'from ipaplatform.paths import paths;'
+                 'sstore = sysrestore.StateFile(paths.SYSRESTORE); '
+                 'sstore.backup_state("installation", "complete", '
+                 '{state})'.format(state=state)])
+
+        def get_installation_state(host):
+            """
+            Retrieve the installation state from new install method
+            """
+            result = host.run_command(
+                ['python3', '-c',
+                 'from ipalib.install import sysrestore; '
+                 'from ipaplatform.paths import paths;'
+                 'sstore = sysrestore.StateFile(paths.SYSRESTORE); '
+                 'print(sstore.get_state("installation", "complete"))'])
+            return result.stdout_text.strip()  # a string
+
+        # This comes from freeipa.spec and is used to determine whether
+        # an upgrade is required.
+        cmd = ['python3', '-c',
+               'import sys; from ipalib import facts; sys.exit(0 '
+               'if facts.is_ipa_configured() else 1);']
+
+        # This will use the new method since this is a fresh install,
+        # verify that it is true.
+        self.master.run_command(cmd)
+        assert get_installation_state(self.master) == 'True'
+
+        # Set complete to False which should cause the command to fail
+        # This tests the state of a failed or in-process installation.
+        set_installation_state(self.master, False)
+        result = self.master.run_command(cmd, raiseonerr=False)
+        assert result.returncode == 1
+        set_installation_state(self.master, True)
+
+        # Tweak sysrestore.state to drop installation section
+        self.master.run_command(
+            ['sed','-i', r's/\[installation\]/\[badinstallation\]/',
+             os.path.join(paths.SYSRESTORE, SYSRESTORE_STATEFILE)])
+
+        # Re-run installation check and it should fall back to old method
+        # and be successful.
+        self.master.run_command(cmd)
+        assert get_installation_state(self.master) == 'None'
+
+        # Restore installation section.
+        self.master.run_command(
+            ['sed','-i', r's/\[badinstallation\]/\[installation\]/',
+             os.path.join(paths.SYSRESTORE, SYSRESTORE_STATEFILE)])
+
+        # Uninstall and confirm that the old method reports correctly
+        # on uninstalled servers. It will exercise the old method since
+        # there is no state.
+        tasks.uninstall_master(self.master)
+
+        # ensure there is no stale state
+        result = self.master.run_command(r'test -f {}'.format(
+            os.path.join(paths.SYSRESTORE, SYSRESTORE_STATEFILE)),
+            raiseonerr=False
+        )
+        assert result.returncode == 1
+        result = self.master.run_command(r'test -f {}'.format(
+            os.path.join(paths.SYSRESTORE, SYSRESTORE_INDEXFILE)),
+            raiseonerr=False
+        )
+        assert result.returncode == 1
+
+        # Now run is_ipa_configured() and it should be False
+        result = self.master.run_command(cmd, raiseonerr=False)
+        assert result.returncode == 1
+
+
 class TestInstallWithCA_KRA1(InstallTestBase1):
+    master_with_dns = False
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=False, setup_kra=True)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns,
+                             setup_kra=True)
 
     def test_replica0_ipa_kra_install(self):
         tasks.install_kra(self.replicas[0], first_instance=False)
 
 
 class TestInstallWithCA_KRA2(InstallTestBase2):
+    master_with_dns = False
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=False, setup_kra=True)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns,
+                             setup_kra=True)
 
 
 class TestInstallWithCA_DNS1(InstallTestBase1):
+    master_with_dns = True
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=True)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns)
 
     @pytest.mark.skipif(config.domain_level == DOMAIN_LEVEL_0,
                         reason='does not work on DOMAIN_LEVEL_0 by design')
@@ -397,10 +542,11 @@ class TestInstallWithCA_DNS1(InstallTestBase1):
 
 
 class TestInstallWithCA_DNS2(InstallTestBase2):
+    master_with_dns = True
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=True)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns)
 
     @pytest.mark.skipif(config.domain_level == DOMAIN_LEVEL_0,
                         reason='does not work on DOMAIN_LEVEL_0 by design')
@@ -472,20 +618,24 @@ class TestInstallWithCA_DNS4(CALessBase):
 
 @pytest.mark.cs_acceptance
 class TestInstallWithCA_KRA_DNS1(InstallTestBase1):
+    master_with_dns = True
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=True, setup_kra=True)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns,
+                             setup_kra=True)
 
     def test_replica0_ipa_kra_install(self):
         tasks.install_kra(self.replicas[0], first_instance=False)
 
 
 class TestInstallWithCA_KRA_DNS2(InstallTestBase2):
+    master_with_dns = True
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=True, setup_kra=True)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns,
+                             setup_kra=True)
 
 
 class TestADTrustInstall(ADTrustInstallTestBase):
@@ -503,11 +653,12 @@ class TestADTrustInstallWithDNS_KRA_ADTrust(ADTrustInstallTestBase):
     master. Additional two test cases were added to test interplay including
     KRA installer
     """
+    master_with_dns = True
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=True, setup_kra=True,
-                             setup_adtrust=True)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns,
+                             setup_kra=True, setup_adtrust=True)
 
     def test_replica1_all_components_adtrust(self):
         self.install_replica(self.replicas[1], setup_ca=True, setup_kra=True)
@@ -521,7 +672,6 @@ def get_pki_tomcatd_pid(host):
             pid = line.split()[2]
             break
     return(pid)
-
 
 def get_ipa_services_pids(host):
     ipa_services_name = [
@@ -637,7 +787,8 @@ class TestInstallMaster(IntegrationTest):
         service_start = [
             svcs for svcs in ipa_services_name if svcs not in service_stop
         ]
-        cmd = self.master.run_command(['ipactl', 'status'])
+        cmd = self.master.run_command(['ipactl', 'status'], raiseonerr=False)
+        assert cmd.returncode == 3
         for service in service_start:
             assert f"{service} Service: RUNNING" in cmd.stdout_text
         for service in service_stop:
@@ -759,6 +910,15 @@ class TestInstallMaster(IntegrationTest):
         name = f'ipa-ca.{self.master.domain.name}'
         assert crypto_x509.DNSName(name) in cert.san_general_names
 
+    def test_ipa_cert_in_store(self):
+        """
+        Test that IPA cert has been added to trust store.
+        """
+
+        assert "IPA CA" in self.master.run_command(
+            ['trust', 'list'],
+            raiseonerr=False).stdout_text
+
     def test_p11_kit_softhsm2(self):
         # check that p11-kit-proxy does not inject SoftHSM2
         result = self.master.run_command([
@@ -775,7 +935,7 @@ class TestInstallMaster(IntegrationTest):
         # installed by default and journalctl gives us all AVCs.
         result = self.master.run_command([
             "journalctl", "--full", "--grep=AVC", "--since=yesterday"
-        ])
+        ], raiseonerr=False)
         avcs = list(
             line.strip() for line in result.stdout_text.split('\n')
             if "AVC avc:" in line
@@ -845,6 +1005,25 @@ class TestInstallMaster(IntegrationTest):
         )
         assert "nsslapd-enable-upgrade-hash: off" in result.stdout_text
 
+    def test_ldbm_tuning(self):
+        # check db-locks in new cn=bdb subentry (1.4.3+)
+        result = tasks.ldapsearch_dm(
+            self.master,
+            "cn=bdb,cn=config,cn=ldbm database,cn=plugins,cn=config",
+            ["nsslapd-db-locks"],
+            scope="base"
+        )
+        assert "nsslapd-db-locks: 50000" in result.stdout_text
+
+        # no db-locks configuration in old global entry
+        result = tasks.ldapsearch_dm(
+            self.master,
+            "cn=config,cn=ldbm database,cn=plugins,cn=config",
+            ["nsslapd-db-locks"],
+            scope="base"
+        )
+        assert "nsslapd-db-locks" not in result.stdout_text
+
     def test_admin_root_alias_CVE_2020_10747(self):
         # Test for CVE-2020-10747 fix
         # https://bugzilla.redhat.com/show_bug.cgi?id=1810160
@@ -858,6 +1037,204 @@ class TestInstallMaster(IntegrationTest):
         )
         assert result.returncode != 0
         assert 'user with name "root" already exists' in result.stderr_text
+
+    def test_dirsrv_no_ssca(self):
+        # verify that lib389 installer no longer creates self-signed CA
+        result = self.master.run_command(
+            ["stat", "/etc/dirsrv/ssca"],
+            raiseonerr=False
+        )
+        assert result.returncode != 0
+
+    def test_ipa_custodia_check(self):
+        # check local key retrieval
+        self.master.run_command(
+            [paths.IPA_CUSTODIA_CHECK, self.master.hostname]
+        )
+
+    @pytest.mark.skipif(
+        paths.SEMODULE is None, reason="test requires semodule command"
+    )
+    def test_ipa_selinux_policy(self):
+        # check that freeipa-selinux's policy module is loaded and
+        # not disabled
+        result = self.master.run_command(
+            [paths.SEMODULE, "-lfull"]
+        )
+        # prio module pp [disabled]
+        # 100: default priority
+        # 200: decentralized SELinux policy priority
+        entries = {
+            tuple(line.split())
+            for line in result.stdout_text.split('\n')
+            if line.strip()
+        }
+        assert ('200', 'ipa', 'pp') in entries
+
+    def test_ipaca_no_redirect(self):
+        """Test that ipa-ca.$DOMAIN does not redirect
+
+           ipa-ca is a valid name for an IPA server. It should not
+           require a redirect.
+
+           CRL generation does not need to be enabled for this test.
+           We aren't exactly testing that a CRL can be retrieved, just
+           that the redirect doesn't happen.
+        """
+
+        def run_request(url, expected_stdout=None, expected_stderr=None):
+            result = self.master.run_command(['curl', '-s', '-v', url])
+            if expected_stdout:
+                assert expected_stdout in result.stdout_text
+            if expected_stderr:
+                assert expected_stderr in result.stderr_text
+
+        # CRL publishing on start-up is disabled so drop a file there
+        crlfile = os.path.join(paths.PKI_CA_PUBLISH_DIR, 'MasterCRL.bin')
+        self.master.put_file_contents(crlfile, 'secret')
+
+        hosts = (
+            f'{IPA_CA_RECORD}.{self.master.domain.name}',
+            self.master.hostname,
+        )
+
+        # Positive tests. Both hosts can serve these.
+        urls = (
+            'http://{host}/ipa/crl/MasterCRL.bin',
+            'http://{host}/ca/ocsp',
+            'https://{host}/ca/admin/ca/getCertChain',
+            'https://{host}/acme/',
+        )
+        for url in urls:
+            for host in hosts:
+                run_request(
+                    url.format(host=host),
+                    expected_stderr='HTTP/1.1 200'
+                )
+
+        # Negative tests. ipa-ca cannot serve these and will redirect and
+        # test that existing redirect for unencrypted still works
+        urls = (
+            'http://{host}/',
+            'http://{host}/ipa/json',
+            'http://{carecord}.{domain}/ipa/json',
+            'https://{carecord}.{domain}/ipa/json',
+            'http://{carecord}.{domain}/ipa/config/ca.crt',
+        )
+        for url in urls:
+            run_request(
+                url.format(host=self.master.hostname,
+                           domain=self.master.domain.name,
+                           carecord=IPA_CA_RECORD),
+                expected_stdout=f'href="https://{self.master.hostname}/'
+            )
+
+    def test_hostname_parameter(self, server_cleanup):
+        """
+        Test that --hostname parameter is respected in interactive mode.
+
+        https://pagure.io/freeipa/issue/2692
+        """
+        original_hostname = self.master.hostname
+        new_hostname = 'new.' + original_hostname
+        # New hostname is added into /etc/hosts as the installer
+        # is looking for it for resolution. Without it, an installation
+        # fails with `Unable to resolve host name, check /etc/hosts or DNS
+        # name resolution`.
+        hosts = self.master.get_file_contents(paths.HOSTS, encoding='utf-8')
+        new_hosts = hosts.replace(original_hostname, new_hostname)
+        self.master.put_file_contents(paths.HOSTS, new_hosts)
+        try:
+            cmd = ['ipa-server-install', '--hostname', new_hostname]
+            with self.master.spawn_expect(cmd) as e:
+                e.expect_exact('Do you want to configure integrated '
+                               'DNS (BIND)? [no]: ')
+                e.sendline('no')
+                e.expect_exact('Please confirm the domain name [{}]: '.format(
+                    original_hostname  # DN is computed from new hostname
+                ))
+                e.sendline(self.master.domain.name)
+                e.expect_exact('Please provide a realm name [{}]: '.format(
+                    self.master.domain.realm
+                ))
+                e.sendline(self.master.domain.realm)
+                e.expect_exact('Directory Manager password: ')
+                e.sendline(self.master.config.dirman_password)
+                e.expect_exact('Password (confirm): ')
+                e.sendline(self.master.config.dirman_password)
+                e.expect_exact('IPA admin password: ')
+                e.sendline(self.master.config.admin_password)
+                e.expect_exact('Password (confirm): ')
+                e.sendline(self.master.config.admin_password)
+                e.expect_exact('Do you want to configure chrony with '
+                               'NTP server or pool address? [no]: ')
+                e.sendline('no')
+                e.expect_exact('Continue to configure the system '
+                               'with these values? [no]: ')
+                e.sendline('yes')
+                e.expect_exit(ignore_remaining_output=True, timeout=720)
+            hostname = self.master.run_command([
+                'hostname', '-f']).stdout_text.strip()
+            assert hostname == new_hostname
+        finally:
+            # no need to restore the hostname as the installer
+            # does it during uninstallation
+            self.master.put_file_contents(paths.HOSTS, hosts)
+
+    def test_ad_subpackage_dependency(self, server_cleanup):
+        """
+        Test if the installer is not dependant on trust-ad package and
+        succeeds even when AD subpackage is not installed
+
+        https://pagure.io/freeipa/issue/4011
+        """
+        if osinfo.id == 'fedora':
+            package_name = 'freeipa-server-trust-ad'
+        else:
+            package_name = 'ipa-server-trust-ad'
+        reinstall = False
+        if tasks.is_package_installed(self.master, package_name):
+            tasks.uninstall_packages(self.master, [package_name])
+            reinstall = True
+        try:
+            tasks.install_master(self.master)
+        finally:
+            if reinstall:
+                tasks.install_packages(self.master, [package_name])
+
+    def test_backup_of_cs_cfg_is_created(self, server_cleanup):
+        """
+        Test that the installer backs up CS.cfg configuration before it's
+        being modified.
+
+        https://pagure.io/freeipa/issue/4166
+        """
+        bcp_location = paths.CA_CS_CFG_PATH + '.ipabkp'
+        original_cfg_content = None
+        if self.master.transport.file_exists(paths.CA_CS_CFG_PATH):
+            original_cfg_content = self.master.get_file_contents(
+                paths.CA_CS_CFG_PATH, encoding='utf-8')
+
+        time_before_install = int(self.master.run_command(
+            ['date', '+%s']).stdout_text.strip())
+        tasks.install_master(self.master)
+        ipaserver_install_log = self.master.get_file_contents(
+            paths.IPASERVER_INSTALL_LOG, encoding='utf-8')
+        assert 'backing up CS.cfg' in ipaserver_install_log
+        assert self.master.transport.file_exists(bcp_location)
+
+        cfg_mod_time = int(self.master.run_command(
+            ['stat', '-c', '%Y', paths.CA_CS_CFG_PATH]).stdout_text.strip())
+        bcp_mod_time = int(self.master.run_command(
+            ['stat', '-c', '%Y', bcp_location]).stdout_text.strip())
+
+        # check if the backup file was modified/created during the installation
+        # and before the original file was modified
+        assert time_before_install <= bcp_mod_time <= cfg_mod_time
+        bcp_cfg_content = self.master.get_file_contents(
+            paths.CA_CS_CFG_PATH + '.ipabkp', encoding='utf-8')
+        if original_cfg_content is not None:
+            assert original_cfg_content == bcp_cfg_content
 
 
 class TestInstallMasterKRA(IntegrationTest):
@@ -874,6 +1251,38 @@ class TestInstallMasterKRA(IntegrationTest):
     def test_install_dns(self):
         tasks.install_dns(self.master)
 
+    def test_kra_certs_renewal(self):
+        """
+        Test that the KRA subsystem certificates renew properly
+        """
+        kra = krainstance.KRAInstance(self.master.domain.realm)
+        for nickname in kra.tracking_reqs:
+            cert = tasks.certutil_fetch_cert(
+                self.master,
+                paths.PKI_TOMCAT_ALIAS_DIR,
+                paths.PKI_TOMCAT_ALIAS_PWDFILE_TXT,
+                nickname
+            )
+            starting_serial = int(cert.serial_number)
+            cmd_arg = [
+                'ipa-getcert', 'resubmit', '-v', '-w',
+                '-d', paths.PKI_TOMCAT_ALIAS_DIR,
+                '-n', nickname,
+            ]
+            result = self.master.run_command(cmd_arg)
+            request_id = re.findall(r'\d+', result.stdout_text)
+
+            status = tasks.wait_for_request(self.master, request_id[0], 120)
+            assert status == "MONITORING"
+
+            cert = tasks.certutil_fetch_cert(
+                self.master,
+                paths.PKI_TOMCAT_ALIAS_DIR,
+                paths.PKI_TOMCAT_ALIAS_PWDFILE_TXT,
+                nickname
+            )
+            assert starting_serial != int(cert.serial_number)
+
 
 class TestInstallMasterDNS(IntegrationTest):
 
@@ -889,6 +1298,13 @@ class TestInstallMasterDNS(IntegrationTest):
             setup_dns=True,
             extra_args=['--zonemgr', 'me@example.org'],
         )
+
+        tasks.kinit_admin(self.master)
+        result = self.master.run_command(
+            ['ipa', 'dnszone-show', self.master.domain.name]
+        ).stdout_text
+
+        assert "Administrator e-mail address: me.example.org" in result
 
     def test_server_install_lock_bind_recursion(self):
         """Test if server installer lock Bind9 recursion
@@ -916,6 +1332,60 @@ class TestInstallMasterDNS(IntegrationTest):
 
     def test_install_kra(self):
         tasks.install_kra(self.master, first_instance=True)
+
+    def test_installer_wizard_prompts_for_DNS(self, server_cleanup):
+        """
+        Installer wizard should prompt for DNS even if --setup-dns is not
+        provided as an argument.
+
+        https://pagure.io/freeipa/issue/2575
+        """
+        cmd = ['ipa-server-install']
+        with self.master.spawn_expect(cmd) as e:
+            e.expect_exact('Do you want to configure integrated '
+                           'DNS (BIND)? [no]: ')
+            e.sendline('yes')
+            e.expect_exact('Server host name [{}]: '.format(
+                self.master.hostname))
+            e.sendline(self.master.hostname)
+            e.expect_exact('Please confirm the domain name [{}]: '.format(
+                self.master.domain.name))
+            e.sendline(self.master.domain.name)
+            e.expect_exact('Please provide a realm name [{}]: '.format(
+                self.master.domain.realm
+            ))
+            e.sendline(self.master.domain.realm)
+
+            e.expect_exact('Directory Manager password: ')
+            e.sendline(self.master.config.dirman_password)
+            e.expect_exact('Password (confirm): ')
+            e.sendline(self.master.config.dirman_password)
+
+            e.expect_exact('IPA admin password: ')
+            e.sendline(self.master.config.admin_password)
+            e.expect_exact('Password (confirm): ')
+            e.sendline(self.master.config.admin_password)
+
+            e.expect_exact(
+                'Do you want to configure DNS forwarders? [yes]: ')
+            e.sendline('no')  # irrelevant for this test
+            e.expect_exact('Do you want to search for missing reverse '
+                           'zones? [yes]: ')
+            e.sendline('no')  # irrelevant for this test
+            e.expect_exact('Do you want to configure chrony with NTP '
+                           'server or pool address? [no]: ')
+            e.sendline('no')  # irrelevant for this test
+            e.expect_exact('Continue to configure the system with these '
+                           'values? [no]: ')
+            e.sendline('yes')
+            e.expect_exit(ignore_remaining_output=True, timeout=720)
+
+        tasks.kinit_admin(self.master)
+        result = self.master.run_command(
+            ['ipa', 'dnszone-show', self.master.domain.name]
+        ).stdout_text
+
+        assert 'Active zone: TRUE' in result
 
 
 class TestInstallMasterDNSRepeatedly(IntegrationTest):
@@ -1055,8 +1525,7 @@ class TestMaskInstall(IntegrationTest):
 
     related ticket: https://pagure.io/freeipa/issue/7193
     """
-
-    num_replicas = 0
+    topology = 'star'
 
     @classmethod
     def install(cls, mh):
@@ -1200,7 +1669,7 @@ class TestInstallReplicaAgainstSpecificServer(IntegrationTest):
         self.replicas[0].run_command('systemctl stop ipa-custodia.service')
 
         # check if custodia service is stopped
-        cmd = self.replicas[0].run_command('ipactl status')
+        cmd = self.replicas[0].run_command('ipactl status', raiseonerr=False)
         assert 'ipa-custodia Service: STOPPED' in cmd.stdout_text
 
         try:
@@ -1256,3 +1725,73 @@ class TestInstallReplicaAgainstSpecificServer(IntegrationTest):
                                             self.replicas[0].hostname],
                                            stdin_text=dirman_password)
         assert self.replicas[0].hostname not in cmd.stdout_text
+
+
+class TestInstallWithoutSudo(IntegrationTest):
+
+    num_clients = 1
+    num_replicas = 1
+    no_sudo_str = "The sudo binary does not seem to be present on this"
+    sudo_version_str = "Sudo version"
+
+    @classmethod
+    def install(cls, mh):
+        pass
+
+    def test_sudo_removal(self):
+        # ipa-client makes sudo depend on libsss_sudo.
+
+        # --nodeps is mandatory because dogtag uses sudo at install
+        # time until commit 49585867207922479644a03078c29548de02cd03
+        # which is scheduled to land in 10.10.
+
+        # This also means sudo+libsss_sudo cannot be uninstalled on
+        # IPA servers with a CA.
+        assert tasks.is_package_installed(self.clients[0], 'sudo')
+        assert tasks.is_package_installed(self.clients[0], 'libsss_sudo')
+        tasks.uninstall_packages(
+            self.clients[0], ['sudo', 'libsss_sudo'], nodeps=True
+        )
+
+    def test_ipa_installation_without_sudo(self):
+        # FixMe: When Dogtag 10.10 is out, test installation without sudo
+        tasks.install_master(self.master, setup_dns=True)
+
+    def test_replica_installation_without_sudo(self):
+        # FixMe: When Dogtag 10.10 is out, test replica installation
+        # without sudo and with CA
+        tasks.uninstall_packages(
+            self.replicas[0], ['sudo', 'libsss_sudo'], nodeps=True
+        )
+        # One-step install is needed.
+        # With promote=True, two-step install is done and that only captures
+        # the ipa-replica-install stdout/stderr, not ipa-client-install's.
+        result = tasks.install_replica(
+            self.master, self.replicas[0], promote=False,
+            setup_dns=True, setup_ca=False
+        )
+        assert self.no_sudo_str in result.stderr_text
+
+    def test_client_installation_without_sudo(self):
+        result = tasks.install_client(self.master, self.clients[0])
+        assert self.no_sudo_str in result.stderr_text
+
+    def test_remove_sudo_on_ipa(self):
+        tasks.uninstall_packages(
+            self.master, ['sudo', 'libsss_sudo'], nodeps=True
+        )
+        self.master.run_command(
+            ['ipactl', 'restart']
+        )
+
+    def test_install_sudo_on_client(self):
+        """ Check that installing sudo pulls libsss_sudo in"""
+        for pkg in ('sudo', 'libsss_sudo'):
+            assert tasks.is_package_installed(self.clients[0], pkg) is False
+        tasks.uninstall_client(self.clients[0])
+        tasks.install_packages(self.clients[0], ['sudo'])
+        for pkg in ('sudo', 'libsss_sudo'):
+            assert tasks.is_package_installed(self.clients[0], pkg)
+        result = tasks.install_client(self.master, self.clients[0])
+        assert self.no_sudo_str not in result.stderr_text
+        assert self.sudo_version_str not in result.stdout_text

@@ -1,9 +1,11 @@
-# Copyright (C) 2019  FreeIPA Contributors see COPYING for license
+# Copyright (C) 2019 FreeIPA Contributors see COPYING for license
 
 from __future__ import absolute_import
 
 import re
 import textwrap
+import time
+import functools
 
 import pytest
 
@@ -12,7 +14,24 @@ from ipaplatform.paths import paths
 
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.pytest_ipa.integration import tasks
+from ipatests.pytest_ipa.integration import fips
 from ipapython.dn import DN
+from collections import namedtuple
+from contextlib import contextmanager
+
+TestDataRule = namedtuple('TestDataRule',
+                          ['name', 'ruletype', 'user', 'subject'])
+
+
+def skip_in_fips_mode_due_to_issue_8715(test_method):
+    @functools.wraps(test_method)
+    def wrapper(instance):
+        if fips.is_fips_enabled(instance.master):
+            pytest.skip('Skipping in FIPS mode due to '
+                        'https://pagure.io/freeipa/issue/8715')
+        else:
+            test_method(instance)
+    return wrapper
 
 
 class BaseTestTrust(IntegrationTest):
@@ -88,7 +107,8 @@ class BaseTestTrust(IntegrationTest):
         assert expected_text in result.stdout_text
 
     def remove_trust(self, ad):
-        tasks.remove_trust_with_ad(self.master, ad.domain.name)
+        tasks.remove_trust_with_ad(self.master,
+                                   ad.domain.name, ad.hostname)
         tasks.clear_sssd_cache(self.master)
 
 
@@ -141,10 +161,11 @@ class TestTrust(BaseTestTrust):
         ad_admin = 'Administrator@%s' % self.ad_domain
         tasks.kinit_as_user(self.master, ad_admin,
                             self.master.config.ad_admin_password)
-        err_string = ('ipa: ERROR: Insufficient access: SASL(-14):'
-                      ' authorization failure: Invalid credentials')
+        err_string1 = 'ipa: ERROR: Insufficient access: '
+        err_string2 = 'Invalid credentials'
         result = self.master.run_command(['ipa', 'ping'], raiseonerr=False)
-        assert err_string in result.stderr_text
+        assert err_string1 in result.stderr_text
+        assert err_string2 in result.stderr_text
 
         tasks.kdestroy_all(self.master)
         tasks.kinit_admin(self.master)
@@ -173,6 +194,27 @@ class TestTrust(BaseTestTrust):
                             self.master.config.ad_admin_password)
         self.master.run_command(['ipa', 'user-del', ipauser], raiseonerr=False)
         tasks.kdestroy_all(self.master)
+        tasks.kinit_admin(self.master)
+
+    def test_password_login_as_aduser(self):
+        """Test if AD user can login with password to Web UI"""
+        ad_admin = 'Administrator@%s' % self.ad_domain
+
+        tasks.kdestroy_all(self.master)
+        user_and_password = ('user=%s&password=%s' %
+                             (ad_admin, self.master.config.ad_admin_password))
+        host = self.master.hostname
+        cmd_args = [
+            paths.BIN_CURL,
+            '-v',
+            '-H', 'referer:https://{}/ipa'.format(host),
+            '-H', 'Content-Type:application/x-www-form-urlencoded',
+            '-H', 'Accept:text/plain',
+            '--cacert', paths.IPA_CA_CRT,
+            '--data', user_and_password,
+            'https://{}/ipa/session/login_password'.format(host)]
+        result = self.master.run_command(cmd_args)
+        assert "Set-Cookie: ipa_session=MagBearerToken" in result.stderr_text
         tasks.kinit_admin(self.master)
 
     def test_ipauser_authentication_with_nonposix_trust(self):
@@ -223,6 +265,208 @@ class TestTrust(BaseTestTrust):
         """ Check that AD user with UPN can authenticate in IPA """
         self.master.run_command(['kinit', '-C', '-E', self.upn_principal],
                                 stdin_text=self.upn_password)
+
+    @contextmanager
+    def check_sudorules_for(self, object_type, object_name,
+                            testuser, expected):
+        """Verify trusted domain objects can be added to sudorules"""
+
+        # Create a SUDO rule that allows test user
+        # to run any command on any host as root without password
+        # and check that it is indeed possible to do so with sudo -l
+        hbacrule = 'hbacsudoers-' + object_type
+        sudorule = 'testrule-' + object_type
+        commands = [['ipa', 'hbacrule-add', hbacrule,
+                     '--usercat=all', '--hostcat=all'],
+                    ['ipa', 'hbacrule-add-service', hbacrule,
+                     '--hbacsvcs=sudo'],
+                    ['ipa', 'sudocmd-add', 'ALL'],
+                    ['ipa', 'sudorule-add', sudorule, '--hostcat=all'],
+                    ['ipa', 'sudorule-add-user', sudorule,
+                     '--users', object_name],
+                    ['ipa', 'sudorule-add-option', sudorule,
+                     '--sudooption', '!authenticate'],
+                    ['ipa', 'sudorule-add-allow-command', sudorule,
+                     '--sudocmds', 'ALL']]
+        for c in commands:
+            self.master.run_command(c)
+
+        # allow additional configuration
+        yield TestDataRule(sudorule, 'sudo', object_name, testuser)
+
+        # Modify refresh_expired_interval to reduce time for refreshing
+        # expired entries in SSSD cache in order to avoid waiting at least
+        # 30 seconds before SSSD updates SUDO rules and undertermined time
+        # that takes to refresh the rules.
+        sssd_conf_backup = tasks.FileBackup(self.master, paths.SSSD_CONF)
+        try:
+            with tasks.remote_sssd_config(self.master) as sssd_conf:
+                sssd_conf.edit_domain(
+                    self.master.domain, 'refresh_expired_interval', 1)
+                sssd_conf.edit_domain(
+                    self.master.domain, 'entry_cache_timeout', 1)
+            tasks.clear_sssd_cache(self.master)
+
+            # Sleep some time so that SSSD settles down
+            # cache updates
+            time.sleep(10)
+            result = self.master.run_command(
+                ['su', '-', testuser, '-c', 'sudo -l'])
+            if isinstance(expected, (tuple, list)):
+                assert any(x for x in expected if x in result.stdout_text)
+            else:
+                assert expected in result.stdout_text
+        finally:
+            sssd_conf_backup.restore()
+            tasks.clear_sssd_cache(self.master)
+
+        commands = [['ipa', 'sudorule-del', sudorule],
+                    ['ipa', 'sudocmd-del', 'ALL'],
+                    ['ipa', 'hbacrule-del', hbacrule]]
+        for c in commands:
+            self.master.run_command(c)
+
+    def test_sudorules_ad_users(self):
+        """Verify trusted domain users can be added to sudorules"""
+
+        tasks.kdestroy_all(self.master)
+        tasks.kinit_admin(self.master)
+
+        testuser = '%s@%s' % (self.master.config.ad_admin_name, self.ad_domain)
+        expected = "(root) NOPASSWD: ALL"
+
+        with self.check_sudorules_for("user", testuser, testuser, expected):
+            # no additional configuration
+            pass
+
+    def test_sudorules_ad_groups(self):
+        """Verify trusted domain groups can be added to sudorules"""
+
+        tasks.kdestroy_all(self.master)
+        tasks.kinit_admin(self.master)
+
+        testuser = '%s@%s' % (self.master.config.ad_admin_name, self.ad_domain)
+        testgroup = 'Enterprise Admins@%s' % self.ad_domain
+        expected = "(root) NOPASSWD: ALL"
+        with self.check_sudorules_for("group", testuser, testuser,
+                                      expected) as sudorule:
+            # Remove the user and instead add a group
+            self.master.run_command(['ipa',
+                                     'sudorule-remove-user', sudorule.name,
+                                     '--users', sudorule.user])
+            self.master.run_command(['ipa', 'sudorule-add-user', sudorule.name,
+                                     '--groups', testgroup])
+
+    def test_sudorules_ad_runasuser(self):
+        """Verify trusted domain users can be added to runAsUser"""
+
+        tasks.kdestroy_all(self.master)
+        tasks.kinit_admin(self.master)
+
+        testuser = '%s@%s' % (self.master.config.ad_admin_name, self.ad_domain)
+        expected = "(%s) NOPASSWD: ALL" % (testuser.lower())
+
+        with self.check_sudorules_for("user", testuser, testuser,
+                                      expected) as sudorule:
+            # Add runAsUser with the same user
+            self.master.run_command(['ipa',
+                                     'sudorule-add-runasuser', sudorule.name,
+                                     '--users', sudorule.subject])
+
+    def test_sudorules_ad_runasuser_group(self):
+        """Verify trusted domain groups can be added to runAsUser"""
+
+        tasks.kdestroy_all(self.master)
+        tasks.kinit_admin(self.master)
+
+        testuser = '%s@%s' % (self.master.config.ad_admin_name, self.ad_domain)
+        testgroup = 'Enterprise Admins@%s' % self.ad_domain
+        expected1 = '("%%%s") NOPASSWD: ALL' % testgroup.lower()
+        expected2 = '("%%%%%s") NOPASSWD: ALL' % testgroup.lower()
+
+        with self.check_sudorules_for("group", testuser, testuser,
+                                      [expected1, expected2]) as sudorule:
+            # Add runAsUser with the same user
+            self.master.run_command(['ipa',
+                                     'sudorule-add-runasuser',
+                                     sudorule.name,
+                                     '--groups', testgroup])
+
+    def test_sudorules_ad_runasgroup(self):
+        """Verify trusted domain groups can be added to runAsGroup"""
+
+        tasks.kdestroy_all(self.master)
+        tasks.kinit_admin(self.master)
+
+        testuser = '%s@%s' % (self.master.config.ad_admin_name, self.ad_domain)
+        testgroup = 'Enterprise Admins@%s' % self.ad_domain
+        expected = '(%s : "%%%s") NOPASSWD: ALL' % (testuser.lower(),
+                                                    testgroup.lower())
+        with self.check_sudorules_for("group", testuser, testuser,
+                                      expected) as sudorule:
+            # Add runAsGroup with the same user
+            self.master.run_command(['ipa',
+                                     'sudorule-add-runasgroup',
+                                     sudorule.name,
+                                     '--groups', testgroup])
+
+    # Test with AD trust defining subordinate suffixes
+    def test_subordinate_suffix(self):
+        """Test subordinate UPN suffixes routing.
+
+        Given an AD domain ad.test with additional UPN suffix suffix.ad.test
+        check that requests from IPA for suffix.ad.test
+        are properly routed to ad.test.
+
+        This is a regression test for https://pagure.io/freeipa/issue/8554
+        """
+
+        # Create subordinate UPN suffix
+        subordinate_suffix = 'test_subdomain.' + self.ad_domain
+        self.ad.run_command([
+            'powershell', '-c',
+            'Set-ADForest -Identity {} -UPNSuffixes @{{add="{}"}}'.format(
+                self.ad_domain, subordinate_suffix)])
+        try:
+            # Verify UPN suffix is created
+            cmd = ('Get-ADForest -Identity {} '
+                   '| Select-Object -Property UPNSuffixes'
+                   .format(self.ad_domain))
+            res = self.ad.run_command(['powershell', '-c', cmd])
+            assert subordinate_suffix in res.stdout_text
+
+            # Verify IPA does not receive subordinate suffix from AD
+            self.master.run_command(
+                ['ipa', 'trust-fetch-domains', self.ad_domain],
+                ok_returncode=1)
+            res = self.master.run_command(
+                ['ipa', 'trust-show', self.ad_domain])
+            assert subordinate_suffix not in res.stdout_text
+
+            # Set UPN for the AD user
+            upn = 'testuser@' + subordinate_suffix
+            cmd = 'Set-Aduser -UserPrincipalName {} -Identity testuser'.format(
+                upn)
+            self.ad.run_command(['powershell', '-c', cmd])
+
+            # Check user resolution
+            res = self.master.run_command(['getent', 'passwd', upn])
+            expected_regex = (
+                r'^testuser@{domain}:\*:(\d+):(\d+):'
+                r'Test User:/home/{domain}/testuser:{shell}$'
+                .format(domain=re.escape(self.ad_domain),
+                        shell=self.default_shell))
+            assert re.search(expected_regex, res.stdout_text)
+
+            # Check user authentication
+            self.master.run_command(
+                ['kinit', '-E', upn], stdin_text='Secret123')
+        finally:
+            # cleanup
+            tasks.kdestroy_all(self.master)
+            cmd = ('Set-ADForest -Identity {} -UPNSuffixes @{{Remove="{}"}}'
+                   .format(self.ad_domain, subordinate_suffix))
+            self.ad.run_command(['powershell', '-c', cmd])
 
     def test_remove_nonposix_trust(self):
         self.remove_trust(self.ad)
@@ -390,7 +634,7 @@ class TestTrust(BaseTestTrust):
 
                 result = self.master.run_command(
                     ['ipa', 'trust-add', '--type', 'ad', self.ad_domain,
-                     '--admin', 'Administrator',
+                     '--admin', 'Administrator@' + self.ad_domain,
                      '--range-type', range_type, '--password'],
                     raiseonerr=False,
                     stdin_text=self.master.config.ad_admin_password)
@@ -441,8 +685,8 @@ class TestTrust(BaseTestTrust):
 
             result = self.master.run_command([
                 'ipa', 'trust-add', '--type', 'ad', self.ad_subdomain,
-                '--admin',
-                'Administrator', '--password', '--range-type', 'ipa-ad-trust'
+                '--admin', 'Administrator@' + self.ad_subdomain,
+                '--password', '--range-type', 'ipa-ad-trust'
             ], stdin_text=self.master.config.ad_admin_password,
                 raiseonerr=False)
 
@@ -493,8 +737,8 @@ class TestTrust(BaseTestTrust):
 
             result = self.master.run_command([
                 'ipa', 'trust-add', '--type', 'ad', self.ad_treedomain,
-                '--admin',
-                'Administrator', '--password', '--range-type', 'ipa-ad-trust'
+                '--admin', 'Administrator@' + self.ad_treedomain,
+                '--password', '--range-type', 'ipa-ad-trust'
             ], stdin_text=self.master.config.ad_admin_password,
                 raiseonerr=False)
 
@@ -521,6 +765,7 @@ class TestTrust(BaseTestTrust):
 
     # Test for one-way forest trust with shared secret
 
+    @skip_in_fips_mode_due_to_issue_8715
     def test_establish_forest_trust_with_shared_secret(self):
         tasks.configure_dns_for_trust(self.master, self.ad)
         tasks.configure_windows_dns_for_trust(self.ad, self.master)
@@ -545,6 +790,7 @@ class TestTrust(BaseTestTrust):
         tasks.establish_trust_with_ad(
             self.master, self.ad_domain, shared_secret=self.shared_secret)
 
+    @skip_in_fips_mode_due_to_issue_8715
     def test_trustdomains_found_in_forest_trust_with_shared_secret(self):
         result = self.master.run_command(
             ['ipa', 'trust-fetch-domains', self.ad.domain.name],
@@ -553,6 +799,7 @@ class TestTrust(BaseTestTrust):
         self.check_trustdomains(
             self.ad_domain, [self.ad_domain, self.ad_subdomain])
 
+    @skip_in_fips_mode_due_to_issue_8715
     def test_user_gid_uid_resolution_in_forest_trust_with_shared_secret(self):
         """Check that user has SID-generated UID"""
         # Using domain name since it is lowercased realm name for AD domains
@@ -571,6 +818,7 @@ class TestTrust(BaseTestTrust):
         assert re.search(
             testuser_regex, result.stdout_text), result.stdout_text
 
+    @skip_in_fips_mode_due_to_issue_8715
     def test_remove_forest_trust_with_shared_secret(self):
         ps_cmd = (
             '[System.DirectoryServices.ActiveDirectory.Forest]'
@@ -593,6 +841,7 @@ class TestTrust(BaseTestTrust):
 
     # Test for one-way external trust with shared secret
 
+    @skip_in_fips_mode_due_to_issue_8715
     def test_establish_external_trust_with_shared_secret(self):
         tasks.configure_dns_for_trust(self.master, self.ad)
         tasks.configure_windows_dns_for_trust(self.ad, self.master)
@@ -608,6 +857,7 @@ class TestTrust(BaseTestTrust):
             self.master, self.ad_domain, shared_secret=self.shared_secret,
             extra_args=['--range-type', 'ipa-ad-trust', '--external=True'])
 
+    @skip_in_fips_mode_due_to_issue_8715
     def test_trustdomains_found_in_external_trust_with_shared_secret(self):
         result = self.master.run_command(
             ['ipa', 'trust-fetch-domains', self.ad.domain.name],
@@ -616,6 +866,7 @@ class TestTrust(BaseTestTrust):
         self.check_trustdomains(
             self.ad_domain, [self.ad_domain])
 
+    @skip_in_fips_mode_due_to_issue_8715
     def test_user_uid_resolution_in_external_trust_with_shared_secret(self):
         """Check that user has SID-generated UID"""
         # Using domain name since it is lowercased realm name for AD domains
@@ -634,6 +885,7 @@ class TestTrust(BaseTestTrust):
         assert re.search(
             testuser_regex, result.stdout_text), result.stdout_text
 
+    @skip_in_fips_mode_due_to_issue_8715
     def test_remove_external_trust_with_shared_secret(self):
         self.ad.run_command(
             ['netdom.exe', 'trust', self.master.domain.name,
@@ -703,8 +955,9 @@ class TestTrust(BaseTestTrust):
             # Check that trust can not be established without --server option
             # This checks that our setup is correct
             result = self.master.run_command(
-                ['ipa', 'trust-add', self.ad.domain.name,
-                 '--admin', 'Administrator', '--password'], raiseonerr=False,
+                ['ipa', 'trust-add', self.ad_domain,
+                 '--admin', 'Administrator@' + self.ad_domain, '--password'],
+                raiseonerr=False,
                 stdin_text=self.master.config.ad_admin_password)
             assert result.returncode == 1
             assert 'CIFS server communication error: code "3221225653", ' \
@@ -733,7 +986,9 @@ class TestTrust(BaseTestTrust):
             assert ('List of trust domains successfully refreshed'
                     in result.stdout_text)
         finally:
-            self.remove_trust(self.ad)
             tasks.restore_files(self.master)
-            self.master.run_command(['rm', '-f', ad_zone_file])
             tasks.restart_named(self.master)
+            tasks.clear_sssd_cache(self.master)
+            self.master.run_command(['rm', '-f', ad_zone_file])
+            tasks.configure_dns_for_trust(self.master, self.ad)
+            self.remove_trust(self.ad)

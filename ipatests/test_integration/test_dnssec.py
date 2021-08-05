@@ -4,19 +4,24 @@
 
 from __future__ import absolute_import
 
+import base64
 import logging
 import re
 import subprocess
 import time
+import textwrap
 
 import dns.dnssec
-import dns.resolver
 import dns.name
+import pytest
+import yaml
 
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.pytest_ipa.integration import tasks
 from ipatests.pytest_ipa.integration.firewall import Firewall
+from ipaplatform.tasks import tasks as platform_tasks
 from ipaplatform.paths import paths
+from ipapython.dnsutil import DNSResolver
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +38,7 @@ example3_test_zone = "example3.test."
 
 
 def resolve_with_dnssec(nameserver, query, rtype="SOA"):
-    res = dns.resolver.Resolver()
+    res = DNSResolver()
     res.nameservers = [nameserver]
     res.lifetime = 10  # wait max 10 seconds for reply
     # enable Authenticated Data + Checking Disabled flags
@@ -42,7 +47,7 @@ def resolve_with_dnssec(nameserver, query, rtype="SOA"):
     # enable EDNS v0 + enable DNSSEC-Ok flag
     res.use_edns(0, dns.flags.DO, 0)
 
-    ans = res.query(query, rtype)
+    ans = res.resolve(query, rtype)
     return ans
 
 
@@ -83,6 +88,31 @@ def wait_until_record_is_signed(nameserver, record, rtype="SOA",
         time.sleep(1)
     return False
 
+
+def dnskey_rec_with_ksk_and_zsk(nameserver, query):
+    """
+    Returns true if the DNSKEY record contains 2 types of keys, KSK and ZSK
+    :param nameserver: nameserver to query
+    :param record: query
+    :return: True if the DNSKEY records contains a ZSK and a KSK
+    """
+    ksk = False
+    zsk = False
+    ans = resolve_with_dnssec(nameserver, query, rtype="DNSKEY")
+    dnskey_rrset = ans.response.get_rrset(
+        ans.response.answer,
+        dns.name.from_text(query),
+        dns.rdataclass.IN,
+        dns.rdatatype.DNSKEY)
+    assert dnskey_rrset, "No DNSKEY records received"
+
+    for key_rdata in dnskey_rrset:
+        if key_rdata.flags == 257:
+            ksk = True
+        elif key_rdata.flags == 256:
+            zsk = True
+
+    return (ksk and zsk)
 
 def dnszone_add_dnssec(host, test_zone):
     """Add dnszone with dnssec and short TTL
@@ -153,6 +183,12 @@ class TestInstallDNSSECLast(IntegrationTest):
         assert wait_until_record_is_signed(
             self.master.ip, test_zone_repl, timeout=5
         ), "DNS zone %s is not signed (master)" % test_zone
+
+    def test_key_types(self):
+        assert dnskey_rec_with_ksk_and_zsk(self.master.ip, test_zone)
+        assert dnskey_rec_with_ksk_and_zsk(self.replicas[0].ip, test_zone)
+        assert dnskey_rec_with_ksk_and_zsk(self.master.ip, test_zone_repl)
+        assert dnskey_rec_with_ksk_and_zsk(self.replicas[0].ip, test_zone_repl)
 
     def test_disable_reenable_signing_master(self):
         dnskey_old = resolve_with_dnssec(self.master.ip, test_zone,
@@ -273,7 +309,8 @@ class TestInstallDNSSECFirst(IntegrationTest):
         # support before
         Firewall(cls.master).enable_services(["dns"])
 
-        tasks.install_replica(cls.master, cls.replicas[0], setup_dns=True)
+        tasks.install_replica(cls.master, cls.replicas[0], setup_dns=True,
+                              nameservers=None)
 
         # backup trusted key
         tasks.backup_file(cls.master, paths.DNSSEC_TRUSTED_KEY)
@@ -318,11 +355,7 @@ class TestInstallDNSSECFirst(IntegrationTest):
             self.replicas[0].ip, root_zone, timeout=300
         ), "Zone %s is not signed (replica)" % root_zone
 
-    def test_chain_of_trust(self):
-        """
-        Validate signed DNS records, using our own signed root zone
-        :return:
-        """
+    def test_delegation(self):
         dnszone_add_dnssec(self.master, example_test_zone)
 
         # delegation
@@ -387,6 +420,10 @@ class TestInstallDNSSECFirst(IntegrationTest):
             rtype="DS"
         ), "No DS record of '%s' returned from replica" % example_test_zone
 
+    def test_chain_of_trust_drill(self):
+        """
+        Validate signed DNS records, using our own signed root zone
+        """
         # extract DSKEY from root zone
         ans = resolve_with_dnssec(self.master.ip, root_zone,
                                   rtype="DNSKEY")
@@ -430,11 +467,104 @@ class TestInstallDNSSECFirst(IntegrationTest):
         self.master.run_command(args)
         self.replicas[0].run_command(args)
 
-    def test_resolvconf(self):
-        # check that resolv.conf contains IP address for localhost
+    def test_chain_of_trust_delv(self):
+        """
+        Validate signed DNS records, using our own signed root zone
+        """
+        INITIAL_KEY_FMT = '%s initial-key %d %d %d "%s";'
+
+        # delv reports its version on stderr
+        delv_version = self.master.run_command(
+            ["delv", "-v"]
+        ).stderr_text.rstrip().replace("delv ", "")
+        assert delv_version
+
+        delv_version_parsed = platform_tasks.parse_ipa_version(delv_version)
+        if delv_version_parsed < platform_tasks.parse_ipa_version("9.16"):
+            pytest.skip(
+                f"Requires delv >= 9.16(+yaml), installed: '{delv_version}'"
+            )
+
+        # extract DSKEY from root zone
+        ans = resolve_with_dnssec(
+            self.master.ip, root_zone, rtype="DNSKEY"
+        )
+        dnskey_rrset = ans.response.get_rrset(
+            ans.response.answer,
+            dns.name.from_text(root_zone),
+            dns.rdataclass.IN,
+            dns.rdatatype.DNSKEY,
+        )
+        assert dnskey_rrset, "No DNSKEY records received"
+
+        # export trust keys for root zone
+        initial_keys = []
+        for key_rdata in dnskey_rrset:
+            if key_rdata.flags != 257:
+                continue  # it is not KSK
+
+            initial_keys.append(
+                INITIAL_KEY_FMT % (
+                    root_zone,
+                    key_rdata.flags,
+                    key_rdata.protocol,
+                    key_rdata.algorithm,
+                    base64.b64encode(key_rdata.key).decode("utf-8"),
+                )
+            )
+
+        assert initial_keys, "No KSK returned from the root zone"
+
+        trust_anchors = textwrap.dedent(
+            """\
+            trust-anchors {{
+            {initial_key}
+            }};
+            """
+        ).format(initial_key="\n".join(initial_keys))
+        logger.debug("Root zone trust-anchors: %s", trust_anchors)
+
+        # set trusted anchor for our root zone
         for host in [self.master, self.replicas[0]]:
-            resolvconf = host.get_file_contents(paths.RESOLV_CONF, 'utf-8')
-            assert any(ip in resolvconf for ip in ('127.0.0.1', '::1'))
+            host.put_file_contents(paths.DNSSEC_TRUSTED_KEY, trust_anchors)
+
+        # verify signatures
+        args = [
+            "delv",
+            "+yaml",
+            "+nosplit",
+            "+vtrace",
+            "@127.0.0.1",
+            example_test_zone,
+            "-a",
+            paths.DNSSEC_TRUSTED_KEY,
+            "SOA",
+        ]
+
+        # delv puts trace info on stderr
+        for host in [self.master, self.replicas[0]]:
+            result = host.run_command(args)
+            yaml_data = yaml.safe_load(result.stdout_text)
+
+            query_name_abs = dns.name.from_text(example_test_zone)
+            root_zone_name = dns.name.from_text(root_zone)
+            query_name_rel = query_name_abs.relativize(
+                root_zone_name
+            ).to_text()
+            assert yaml_data["query_name"] == query_name_rel
+            assert yaml_data["status"] == "success"
+
+            assert len(yaml_data["records"]) == 1
+            fully_validated = yaml_data["records"][0]["fully_validated"]
+            fully_validated.sort()
+            assert len(fully_validated) == 2
+            assert f"{example_test_zone} 1 IN RRSIG SOA" in fully_validated[0]
+            assert f"{example_test_zone} 1 IN SOA" in fully_validated[1]
+
+    def test_servers_use_localhost_as_dns(self):
+        # check that localhost is set as DNS server
+        for host in [self.master, self.replicas[0]]:
+            assert host.resolver.uses_localhost_as_dns()
 
 
 class TestMigrateDNSSECMaster(IntegrationTest):

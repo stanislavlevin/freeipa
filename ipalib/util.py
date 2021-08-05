@@ -42,7 +42,7 @@ import struct
 import subprocess
 
 import netaddr
-from dns import resolver, rdatatype
+from dns import rdatatype
 from dns.exception import DNSException
 from dns.resolver import NXDOMAIN
 from netaddr.core import AddrFormatError
@@ -65,10 +65,15 @@ from ipalib.facts import is_ipa_client_configured
 from ipalib.text import _
 from ipaplatform.constants import constants
 from ipaplatform.paths import paths
+from ipapython import ipautil
 from ipapython.ssh import SSHPublicKey
 from ipapython.dn import DN, RDN
-from ipapython.dnsutil import DNSName
-from ipapython.dnsutil import resolve_ip_addresses
+from ipapython.dnsutil import (
+    DNSName,
+    DNSResolver,
+    resolve,
+    resolve_ip_addresses,
+)
 from ipapython.admintool import ScriptError
 
 if sys.version_info >= (3, 2):
@@ -117,13 +122,13 @@ def has_soa_or_ns_record(domain):
     Returns True or False.
     """
     try:
-        resolver.query(domain, rdatatype.SOA)
+        resolve(domain, rdatatype.SOA)
         soa_record_found = True
     except DNSException:
         soa_record_found = False
 
     try:
-        resolver.query(domain, rdatatype.NS)
+        resolve(domain, rdatatype.NS)
         ns_record_found = True
     except DNSException:
         ns_record_found = False
@@ -153,7 +158,7 @@ def isvalid_base64(data):
 
     The character set must only include of a-z, A-Z, 0-9, + or / and
     be padded with = to be a length divisible by 4 (so only 0-2 =s are
-    allowed). Its length must be divisible by 4. White space is
+    allowed). Its length must be divisible by 4. Whitespace is
     not significant so it is removed.
 
     This doesn't guarantee we have a base64-encoded value, just that it
@@ -238,7 +243,7 @@ def normalize_zone(zone):
 def get_proper_tls_version_span(tls_version_min, tls_version_max):
     """
     This function checks whether the given TLS versions are known in
-    FreeIPA and that these versions fulfill the requirements for minimal
+    IPA and that these versions fulfill the requirements for minimal
     TLS version (see
     `ipalib.constants: TLS_VERSIONS, TLS_VERSION_MINIMAL`).
 
@@ -797,7 +802,7 @@ def _resolve_record(owner, rtype, nameserver_ip=None, edns0=False,
     assert isinstance(nameserver_ip, str) or nameserver_ip is None
     assert isinstance(rtype, str)
 
-    res = dns.resolver.Resolver()
+    res = DNSResolver()
     if nameserver_ip:
         res.nameservers = [nameserver_ip]
     res.lifetime = timeout
@@ -815,7 +820,7 @@ def _resolve_record(owner, rtype, nameserver_ip=None, edns0=False,
     elif edns0:
         res.use_edns(0, 0, 4096)
 
-    return res.query(owner, rtype)
+    return res.resolve(owner, rtype)
 
 
 def _validate_edns0_forwarder(owner, rtype, ip_addr, timeout=10):
@@ -985,7 +990,7 @@ def detect_dns_zone_realm_type(api, domain):
     kerberos_record_name = kerberos_prefix + domain_suffix
 
     try:
-        result = resolver.query(kerberos_record_name, rdatatype.TXT)
+        result = resolve(kerberos_record_name, rdatatype.TXT)
         answer = result.response.answer
 
         # IPA domain will have only one _kerberos TXT record
@@ -1012,7 +1017,7 @@ def detect_dns_zone_realm_type(api, domain):
 
     try:
         # The presence of this record is enough, return foreign in such case
-        resolver.query(ad_specific_record_name, rdatatype.SRV)
+        resolve(ad_specific_record_name, rdatatype.SRV)
     except DNSException:
         # If we could not detect type with certainty, return unknown
         return 'unknown'
@@ -1023,6 +1028,31 @@ def detect_dns_zone_realm_type(api, domain):
 def has_managed_topology(api):
     domainlevel = api.Command['domainlevel_get']().get('result', DOMAIN_LEVEL_0)
     return domainlevel > DOMAIN_LEVEL_0
+
+
+def print_replication_status(entry, verbose):
+    """Pretty print nsds5replicalastinitstatus, nsds5replicalastinitend,
+    nsds5replicalastupdatestatus, nsds5replicalastupdateend for a
+    replication agreement.
+    """
+
+    if verbose:
+        initstatus = entry.single_value.get('nsds5replicalastinitstatus')
+        if initstatus is not None:
+            print("  last init status: %s" % initstatus)
+            print("  last init ended: %s" % str(
+                ipautil.parse_generalized_time(
+                    entry.single_value['nsds5replicalastinitend'])))
+        updatestatus = entry.single_value.get(
+            'nsds5replicalastupdatestatus'
+        )
+        if updatestatus is not None:
+            print("  last update status: %s" % updatestatus)
+            print("  last update ended: %s" % str(
+                ipautil.parse_generalized_time(
+                    entry.single_value['nsds5replicalastupdateend']
+                ))
+            )
 
 
 class classproperty:

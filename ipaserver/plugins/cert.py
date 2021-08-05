@@ -31,7 +31,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from dns import resolver, reversename
 import six
 
-from ipalib import Command, Str, Int, Flag
+from ipalib import Command, Str, Int, Flag, StrEnum
 from ipalib import api
 from ipalib import errors, messages
 from ipalib import x509
@@ -52,6 +52,7 @@ from ipalib.request import context
 from ipalib import output
 from ipapython import dnsutil, kerberos
 from ipapython.dn import DN
+from ipapython.ipautil import datetime_from_utctimestamp
 from ipaserver.plugins.service import normalize_principal, validate_realm
 from ipaserver.masters import (
     ENABLED_SERVICE, CONFIGURED_SERVICE, is_service_enabled
@@ -254,8 +255,9 @@ def normalize_pkidate(value):
 
 
 def convert_pkidatetime(value):
-    value = datetime.datetime.fromtimestamp(int(value) // 1000)
-    return x509.format_datetime(value)
+    if isinstance(value, str):
+        value = int(value)
+    return x509.format_datetime(datetime_from_utctimestamp(value, units=1000))
 
 
 def normalize_serial_number(num):
@@ -873,7 +875,7 @@ class cert_request(Create, BaseCertMethod, VirtualCommand):
                             "with subject alt name '%s'.") % name)
                 if not bypass_caacl:
                     if principal_type == KRBTGT:
-                        ca_kdc_check(ldap, alt_principal.hostname)
+                        ca_kdc_check(self.api, alt_principal.hostname)
                     else:
                         caacl_check(alt_principal, ca, profile_id)
 
@@ -1191,7 +1193,7 @@ def _san_ip_update_reachable(reachable, dnsname, cname_depth):
     """
     fqdn = dnsutil.DNSName(dnsname).make_absolute()
     try:
-        zone = dnsutil.DNSName(resolver.zone_for_name(fqdn))
+        zone = dnsutil.DNSName(dnsutil.zone_for_name(fqdn))
     except resolver.NoNameservers:
         return  # if there's no zone, there are no records
     name = fqdn.relativize(zone)
@@ -1225,7 +1227,7 @@ def _ip_ptr_records(ip):
     """
     rname = dnsutil.DNSName(reversename.from_address(ip))
     try:
-        zone = dnsutil.DNSName(resolver.zone_for_name(rname))
+        zone = dnsutil.DNSName(dnsutil.zone_for_name(rname))
         name = rname.relativize(zone)
         result = api.Command['dnsrecord_show'](zone, name)['result']
     except resolver.NoNameservers:
@@ -1557,6 +1559,12 @@ class cert_find(Search, CertMethod):
             normalizer=normalize_pkidate,
             autofill=False,
         ),
+        StrEnum(
+            'status?',
+            doc=_("Status of the certificate"),
+            values=(u'VALID', u'INVALID', u'REVOKED', u'EXPIRED',
+                    u'REVOKED_EXPIRED'),
+        ),
         Flag('pkey_only?',
             label=_("Primary key only"),
             doc=_("Results should contain primary key attribute only "
@@ -1642,7 +1650,8 @@ class cert_find(Search, CertMethod):
                      'validnotafter_from', 'validnotafter_to',
                      'validnotbefore_from', 'validnotbefore_to',
                      'issuedon_from', 'issuedon_to',
-                     'revokedon_from', 'revokedon_to'):
+                     'revokedon_from', 'revokedon_to',
+                     'status'):
             try:
                 value = options[name]
             except KeyError:
@@ -1678,6 +1687,8 @@ class cert_find(Search, CertMethod):
                 ra_options['subject'] = hosts[0]
             elif len(users) == 1 and not services and not hosts:
                 ra_options['subject'] = users[0]
+        if 'status' in options:
+            ra_options['status'] = options.get('status')
 
         try:
             ca_enabled_check(self.api)
@@ -1810,10 +1821,7 @@ class cert_find(Search, CertMethod):
 
     def execute(self, criteria=None, all=False, raw=False, pkey_only=False,
                 no_members=True, timelimit=None, sizelimit=None, **options):
-        # Store ca_enabled status in the context to save making the API
-        # call multiple times.
         ca_enabled = self.api.Command.ca_is_enabled()['result']
-        setattr(context, 'ca_enabled', ca_enabled)
 
         if 'cacn' in options:
             ca_obj = api.Command.ca_show(options['cacn'])['result']
@@ -1931,5 +1939,12 @@ class ca_is_enabled(Command):
     has_output = output.standard_value
 
     def execute(self, *args, **options):
-        result = is_service_enabled('CA', conn=self.api.Backend.ldap2)
+        # Store ca_enabled status in the context to save making the API
+        # call multiple times.
+        ca_enabled = getattr(context, 'ca_enabled', None)
+        if ca_enabled is not None and api.env.context in ('lite', 'server',):
+            result = ca_enabled
+        else:
+            result = is_service_enabled('CA', conn=self.api.Backend.ldap2)
+            setattr(context, 'ca_enabled', result)
         return dict(result=result, value=pkey_to_value(None, options))

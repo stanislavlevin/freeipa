@@ -22,14 +22,12 @@ from __future__ import absolute_import
 
 import logging
 
-import dns.resolver
-
 import six
 
 from ipalib import api, errors, util
 from ipalib import messages
 from ipalib import Str, StrEnum, Flag
-from ipalib.parameters import Principal, Certificate
+from ipalib.parameters import Data, Principal, Certificate
 from ipalib.plugable import Registry
 from .baseldap import (LDAPQuery, LDAPObject, LDAPCreate,
                                      LDAPDelete, LDAPUpdate, LDAPSearch,
@@ -64,7 +62,7 @@ from ipapython.ipautil import (
     CheckedIPAddress,
     TMP_PWD_ENTROPY_BITS
 )
-from ipapython.dnsutil import DNSName
+from ipapython.dnsutil import DNSName, zone_for_name
 from ipapython.ssh import SSHPublicKey
 from ipapython.dn import DN
 from ipapython import kerberos
@@ -254,6 +252,11 @@ def validate_ipaddr(ugettext, ipaddr):
     return None
 
 
+def resolve_fqdn(name):
+    hostentry = api.Command['host_show'](name)['result']
+    return hostentry['fqdn'][0]
+
+
 class HostPassword(Str):
     """
     A data type for host passwords to not log password values
@@ -262,6 +265,12 @@ class HostPassword(Str):
     setting a password on the command-line which would break
     backwards compatibility.
     """
+
+    kwargs = Data.kwargs + (
+        ('pattern', (str,), None),
+        ('noextrawhitespace', bool, False),
+    )
+
     def safe_value(self, value):
         return u'********'
 
@@ -586,7 +595,7 @@ class host(LDAPObject):
             'krbprincipalauthind*',
             cli_name='auth_ind',
             label=_('Authentication Indicators'),
-            doc=_("Defines a whitelist for Authentication Indicators."
+            doc=_("Defines an allow list for Authentication Indicators."
                   " Use 'otp' to allow OTP-based 2FA authentications."
                   " Use 'radius' to allow RADIUS-based 2FA authentications."
                   " Use 'pkinit' to allow PKINIT-based 2FA authentications."
@@ -791,20 +800,13 @@ class host_del(LDAPDelete):
 
     def pre_callback(self, ldap, dn, *keys, **options):
         assert isinstance(dn, DN)
-        # If we aren't given a fqdn, find it
-        config = ldap.get_ipa_config()
-        maxlen = int(config.get('ipamaxhostnamelength')[0])
-        if hostname_validator(None, keys[-1], maxlen=maxlen) is not None:
-            hostentry = api.Command['host_show'](keys[-1])['result']
-            fqdn = hostentry['fqdn'][0]
-        else:
-            fqdn = keys[-1]
+        fqdn = resolve_fqdn(keys[-1])
         host_is_master(ldap, fqdn)
         # Remove all service records for this host
         truncated = True
         while truncated:
             try:
-                ret = api.Command['service_find'](fqdn)
+                ret = api.Command['service_find'](fqdn, pkey_only=True)
                 truncated = ret['truncated']
                 services = ret['result']
             except errors.NotFound:
@@ -826,7 +828,7 @@ class host_del(LDAPDelete):
         if updatedns:
             # Remove A, AAAA, SSHFP and PTR records of the host
             fqdn_dnsname = DNSName(fqdn).make_absolute()
-            zone = DNSName(dns.resolver.zone_for_name(fqdn_dnsname))
+            zone = DNSName(zone_for_name(fqdn_dnsname))
             relative_hostname = fqdn_dnsname.relativize(zone)
 
             # Get all resources for this host
@@ -890,6 +892,7 @@ class host_mod(LDAPUpdate):
 
     def pre_callback(self, ldap, dn, entry_attrs, attrs_list, *keys, **options):
         assert isinstance(dn, DN)
+        fqdn = resolve_fqdn(keys[-1])
         # Allow an existing OTP to be reset but don't allow a OTP to be
         # added to an enrolled host.
         if options.get('userpassword') or options.get('random'):
@@ -955,7 +958,7 @@ class host_mod(LDAPUpdate):
                 entry_attrs['objectclass'] = obj_classes
 
         if options.get('updatedns', False) and dns_container_exists(ldap):
-            parts = keys[-1].split('.')
+            parts = fqdn.split('.')
             domain = unicode('.'.join(parts[1:]))
             try:
                 result = api.Command['dnszone_show'](domain)['result']
@@ -1186,13 +1189,7 @@ class host_disable(LDAPQuery):
     def execute(self, *keys, **options):
         ldap = self.obj.backend
 
-        # If we aren't given a fqdn, find it
-        if hostname_validator(None, keys[-1]) is not None:
-            hostentry = api.Command['host_show'](keys[-1])['result']
-            fqdn = hostentry['fqdn'][0]
-        else:
-            fqdn = keys[-1]
-
+        fqdn = resolve_fqdn(keys[-1])
         host_is_master(ldap, fqdn)
 
         # See if we actually do anthing here, and if not raise an exception
@@ -1201,7 +1198,7 @@ class host_disable(LDAPQuery):
         truncated = True
         while truncated:
             try:
-                ret = api.Command['service_find'](fqdn)
+                ret = api.Command['service_find'](fqdn, pkey_only=True)
                 truncated = ret['truncated']
                 services = ret['result']
             except errors.NotFound:

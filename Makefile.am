@@ -3,7 +3,7 @@ NULL =
 ACLOCAL_AMFLAGS = -I m4
 
 if ENABLE_SERVER
-    IPASERVER_SUBDIRS = ipaserver
+    IPASERVER_SUBDIRS = ipaserver ipasphinx
     SERVER_SUBDIRS = daemons init install
 endif
 
@@ -103,6 +103,7 @@ clean-local:
 	rm -f "$(top_builddir)"/$(PACKAGE)-*.tar.gz
 	rm -rf "$(top_srcdir)/cov-int"
 	rm -f "$(top_srcdir)/freeipa.tgz"
+	$(MAKE) -C "$(top_srcdir)/doc" distclean
 
 # convenience targets for RPM build
 .PHONY: rpmroot rpmdistdir version-update _dist-version-bakein _rpms-prep \
@@ -193,7 +194,10 @@ endif WITH_PYLINT
 if WITH_JSLINT
 JSLINT_TARGET = jslint
 endif WITH_JSLINT
-lint: acilint apilint $(POLINT_TARGET) $(PYLINT_TARGET) $(JSLINT_TARGET) yamllint
+if WITH_RPMLINT
+RPMLINT_TARGET = rpmlint
+endif  # WITH_RPMLINT
+lint: acilint apilint $(POLINT_TARGET) $(PYLINT_TARGET) $(JSLINT_TARGET) $(RPMLINT_TARGET) yamllint
 
 .PHONY: devcheck
 devcheck: all
@@ -209,12 +213,12 @@ endif
 	@ # just tests, aci, api and pylint on Python 3
 	PATH=$(abspath ipatests):$$PATH PYTHONPATH=$(abspath $(top_srcdir)) \
 	    $(PYTHON) ipatests/ipa-run-tests --ipaclient-unittests
-	$(MAKE) $(AM_MAKEFLAGS) acilint apilint polint pylint jslint yamllint check
+	$(MAKE) $(AM_MAKEFLAGS) acilint apilint polint pylint jslint $(RPMLINT_TARGET) yamllint check
 	@echo "All tests passed."
 
 .PHONY: fastcheck fasttest fastlint
 fastcheck:
-	@$(MAKE) -j1 $(AM_MAKEFLAGS) fastlint yamllint fasttest apilint acilint
+	@$(MAKE) -j1 $(AM_MAKEFLAGS) fastlint $(RPMLINT_TARGET) yamllint fasttest apilint acilint
 
 fasttest: $(GENERATED_PYTHON_FILES) ipasetup.py
 	@ # --ignore doubles speed of total test run compared to pytest.skip()
@@ -253,7 +257,8 @@ endif
 	        $(PYTHON) -m pycodestyle --diff || exit $$?; \
 	    echo -e "\npylint"; \
 	    echo "------"; \
-	    PYTHONPATH=$(abspath $(top_srcdir)) pylint.py3 \
+	    $(PYTHON) -m pylint --version; \
+	    PYTHONPATH=$(abspath $(top_srcdir)) $(PYTHON) -m pylint \
 	        --rcfile=$(top_srcdir)/pylintrc \
 	        --load-plugins pylint_plugins \
 	        $${FILES} || exit $$?; \
@@ -296,8 +301,10 @@ polint:
 	    validate-src-strings validate-po test-gettext
 
 .PHONY: rpmlint
+if WITH_RPMLINT
 rpmlint: freeipa.spec
-	rpmlint ./$<
+	@RPMLINT@ ./$<
+endif  # WITH_RPMLINT
 
 # Try to load yml/yaml files via safe_load, which recognizes only standard
 # YAML tags and cannot construct an arbitrary Python object.
@@ -327,6 +334,15 @@ yamllint:
 	done; \
 	echo "-----------"
 
+# Build & lint documentation.
+#
+.PHONY: doclint
+doclint:
+	@echo -e "\nBuild and lint documentation"
+	@echo "-----------"
+	$(MAKE) -C $(top_srcdir)/doc/ lint
+	@echo "-----------"
+
 # Run pylint for all python files. Finds all python files/packages, skips
 # folders rpmbuild, freeipa-* and dist. Skip (match, but don't print) .*,
 # *.in, *~. Finally print all python files, including scripts that do not
@@ -350,7 +366,8 @@ pylint: $(GENERATED_PYTHON_FILES) ipasetup.py python_scripts
 		-type f -exec grep -qsm1 '^#!.*\bpython' '{}' \; -print`; \
 	FILES=`echo -e "$${FILES}\n$(AZURE_PYTHON_SCRIPT_SUBDIR)"`; \
 	echo -e "Pylint on $(PYTHON) is running over files:\n$${FILES}\nPlease wait ...\n"; \
-	PYTHONPATH=$(top_srcdir) pylint.py3 \
+	$(PYTHON) -m pylint --version; \
+	PYTHONPATH=$(top_srcdir) $(PYTHON) -m pylint \
 		--rcfile=$(top_srcdir)/pylintrc \
 		--load-plugins pylint_plugins \
 		$${FILES}
