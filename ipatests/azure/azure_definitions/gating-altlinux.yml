@@ -157,16 +157,6 @@ vms:
       replicas: 1
 
 - vm_jobs:
-  - container_job: advise
-    containers:
-      clients: 1
-      resources:
-        client:
-          mem_limit: "768m"
-          memswap_limit: "1024m"
-    tests:
-    - test_integration/test_advise.py
-
   - container_job: cert
     tests:
     - test_integration/test_cert.py
