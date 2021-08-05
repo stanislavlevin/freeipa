@@ -53,6 +53,13 @@ jobs:
         name: base_matrix
     - script: python3 $(IPA_TESTS_SCRIPTS)/gating_compare.py
       displayName: Check for consistency with PR-CI
+    - template: templates/generate-matrix.yml
+      parameters:
+        definition: 'ipatests/azure/azure_definitions/nightly.yml'
+        displayName: Generate Matrix for Gating tests
+        name: nightly_matrix
+    - script: python3 $(IPA_TESTS_SCRIPTS)/nightly_compare.py
+      displayName: Check NIGHTLY for consistency with PR-CI
 
 - job: Lint
   pool:
@@ -167,6 +174,23 @@ jobs:
   condition: succeeded()
   strategy:
     matrix: $[ dependencies.Build.outputs['gating_matrix.matrix'] ]
+  timeoutInMinutes: 0
+  steps:
+    - template: templates/generate-job-variables.yml
+    - template: templates/test-jobs.yml
+
+- job: NIGHTLY
+  pool:
+    vmImage: $(VM_IMAGE)
+  dependsOn:
+    - Build
+    - Lint
+  variables:
+    IPA_IMAGE_ARTIFACT: $[ dependencies.Build.outputs['artifacts_image.image'] ]
+    IPA_PACKAGES_ARTIFACT: $[ dependencies.Build.outputs['artifacts_packages.packages'] ]
+  condition: succeeded()
+  strategy:
+    matrix: $[ dependencies.Build.outputs['nightly_matrix.matrix'] ]
   timeoutInMinutes: 0
   steps:
     - template: templates/generate-job-variables.yml
