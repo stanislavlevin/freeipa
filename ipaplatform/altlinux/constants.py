@@ -22,6 +22,7 @@ class ALTLinuxConstantsNamespace(BaseConstantsNamespace):
     SSSD_USER = User("_sssd")
     NAMED_DATA_DIR = "/var/lib/bind/data/"
     NAMED_ZONE_COMMENT = "//"
+    NAMED_RNDC_CONF_COMMENT = ""
     # ntpd init variable used for daemon options
     NTPD_OPTS_VAR = "NTPD_ARGS"
     NAMED_OPENSSL_ENGINE = "pkcs11"
