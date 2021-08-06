@@ -896,6 +896,8 @@ class BindInstance(service.Service):
             NAMED_DATA_DIR=constants.NAMED_DATA_DIR,
             NAMED_ZONE_COMMENT=constants.NAMED_ZONE_COMMENT,
             NAMED_DNSSEC_VALIDATION=self._get_dnssec_validation(),
+            NAMED_RNDC_CONF_COMMENT=constants.NAMED_RNDC_CONF_COMMENT,
+            NAMED_RNDC_CONF=paths.NAMED_RNDC_CONF,
         )
 
     def __setup_dns_container(self):
