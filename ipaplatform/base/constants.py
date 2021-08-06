@@ -125,6 +125,7 @@ class BaseConstantsNamespace:
     NAMED_OPENSSL_ENGINE = None
     NAMED_OPENSSL_PROVIDER = None
     NAMED_ZONE_COMMENT = ""
+    NAMED_RNDC_CONF_COMMENT = "//"
     NOBODY_GROUP = Group("nobody")
     PKI_USER = User("pkiuser")
     PKI_GROUP = Group("pkiuser")

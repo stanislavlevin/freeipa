@@ -941,6 +941,8 @@ class BindInstance(service.Service):
             NAMED_DNSSEC_VALIDATION=self._get_dnssec_validation(),
             NAMED_DNS_OVER_TLS_OPTIONS_CONF=named_tls_options,
             NAMED_DNS_OVER_TLS_CONF=named_tls_conf,
+            NAMED_RNDC_CONF_COMMENT=constants.NAMED_RNDC_CONF_COMMENT,
+            NAMED_RNDC_CONF=paths.NAMED_RNDC_CONF,
         )
 
     def __setup_dns_container(self):
