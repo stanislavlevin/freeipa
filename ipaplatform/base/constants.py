@@ -121,6 +121,7 @@ class BaseConstantsNamespace:
     NAMED_OPTIONS_VAR = "OPTIONS"
     NAMED_OPENSSL_ENGINE = None
     NAMED_ZONE_COMMENT = ""
+    NAMED_RNDC_CONF_COMMENT = "//"
     PKI_USER = User("pkiuser")
     PKI_GROUP = Group("pkiuser")
     CHECK_PACKAGE_OPT = "-q"

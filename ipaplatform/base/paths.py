@@ -104,6 +104,7 @@ class BasePathNamespace:
     NAMED_ROOT_KEY = "/etc/named.root.key"
     NAMED_MANAGED_KEYS_DIR = "/var/named/dynamic"
     NAMED_CRYPTO_POLICY_FILE = None
+    NAMED_RNDC_CONF = ""
     NSLCD_CONF = "/etc/nslcd.conf"
     NSS_LDAP_CONF = "/etc/nss_ldap.conf"
     NSSWITCH_CONF = "/etc/nsswitch.conf"
