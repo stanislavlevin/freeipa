@@ -48,6 +48,7 @@ ${NAMED_ZONE_COMMENT}	type hint;
 ${NAMED_ZONE_COMMENT}	file "named.ca";
 ${NAMED_ZONE_COMMENT}};
 
+${NAMED_RNDC_CONF_COMMENT}include "$NAMED_RNDC_CONF";
 include "$RFC1912_ZONES";
 include "$ROOT_KEY";
 

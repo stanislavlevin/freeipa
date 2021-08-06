@@ -104,6 +104,7 @@ class BasePathNamespace:
     NAMED_ROOT_KEY = "/etc/named.root.key"
     NAMED_MANAGED_KEYS_DIR = "/var/named/dynamic"
     NAMED_CRYPTO_POLICY_FILE = None
+    NAMED_RNDC_CONF = ""
     UNBOUND_CONF_SRC = '/usr/share/ipa/client/unbound.conf.template'
     UNBOUND_CONFIG_DIR = "/etc/unbound/conf.d/"
     UNBOUND_CONF = "/etc/unbound/conf.d/zzz-ipa.conf"
