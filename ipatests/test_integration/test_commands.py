@@ -1438,6 +1438,8 @@ class TestIPACommand(IntegrationTest):
         # Run it again for good measure
         self.master.run_command(["ipa-certupdate"])
 
+    # https://pagure.io/freeipa/issue/7676
+    @pytest.mark.xfail(reason="Requires ssh config with Include", strict=True)
     def test_proxycommand_invalid_shell(self):
         """Test that ssh works with a user with an invalid shell.
 
