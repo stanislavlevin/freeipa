@@ -37,6 +37,43 @@ example2_test_zone = "example2.test."
 example3_test_zone = "example3.test."
 
 
+def make_ds_workaround(name, key, origin=None):
+    """Copypaste from fixed dns' make_ds"""
+    import hashlib
+    import struct
+
+    from dns.dnssec import _to_rdata, key_id
+    import dns.rdata
+    import dns.rdataclass
+    import dns.rdatatype
+
+    dsalg = 2
+    dshash = hashlib.sha256()
+
+    name = dns.name.from_text(name, origin)
+
+    dshash.update(name.canonicalize().to_wire())
+    dshash.update(_to_rdata(key, origin))
+    digest = dshash.digest()
+
+    dsrdata = struct.pack("!HBB", key_id(key), key.algorithm, dsalg) + digest
+    return dns.rdata.from_wire(
+        dns.rdataclass.IN, dns.rdatatype.DS, dsrdata, 0, len(dsrdata)
+    )
+
+
+def make_ds_compat(name, key, algorithm, origin=None):
+    """Compat with dnspython 1.16+
+    https://github.com/rthalley/dnspython/issues/343
+    """
+    try:
+        return dns.dnssec.make_ds(name, key, algorithm, origin)
+    except NameError as e:
+        if str(e) == "name 'SHA256' is not defined":
+            return make_ds_workaround(name, key, origin)
+        raise
+
+
 def resolve_with_dnssec(nameserver, query, rtype="SOA"):
     res = DNSResolver()
     res.nameservers = [nameserver]
@@ -394,8 +431,9 @@ class TestInstallDNSSECFirst(IntegrationTest):
         for key_rdata in dnskey_rrset:
             if key_rdata.flags != 257:
                 continue  # it is not KSK
-            ds_records.append(dns.dnssec.make_ds(example_test_zone, key_rdata,
-                                                 'sha256'))
+            ds_records.append(
+                make_ds_compat(example_test_zone, key_rdata, 'sha256')
+            )
         assert ds_records, ("No KSK returned from the %s zone" %
                             example_test_zone)
 
@@ -458,8 +496,9 @@ class TestInstallDNSSECFirst(IntegrationTest):
         # verify signatures
         time.sleep(DNSSEC_SLEEP)
         args = [
-            "drill", "@localhost", "-k",
+            "drill", "-V", "5", "@localhost", "-k",
             paths.DNSSEC_TRUSTED_KEY, "-S",
+            "-t",
             example_test_zone, "SOA"
         ]
 
