@@ -1678,6 +1678,8 @@ class TestIPACommand(IntegrationTest):
         assert re.search(error, result.stderr_text)
         self.replicas[0].run_command(["ipactl", "start"])
 
+    # https://pagure.io/freeipa/issue/7676
+    @pytest.mark.xfail(reason="Requires ssh config with Include", strict=True)
     def test_proxycommand_invalid_shell(self):
         """Test that ssh works with a user with an invalid shell.
 
