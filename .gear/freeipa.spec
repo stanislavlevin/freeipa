@@ -43,6 +43,7 @@
 %define slapi_nis_version 0.56.3
 %define sssd_version 1.16.3
 %define openldap_version 2.4.47-alt2
+%define opendnssec_version 2.1.9-alt1
 
 Name: freeipa
 Version: 4.8.9
@@ -275,7 +276,7 @@ Requires: %name-server = %EVR
 Requires: bind-dyndb-ldap >= %bind_dyndb_ldap_version
 Requires: bind >= %bind_version
 Requires: bind-utils >= %bind_version
-Requires: opendnssec
+Requires: opendnssec >= %opendnssec_version
 Requires: libp11
 
 %description server-dns
