@@ -28,7 +28,9 @@
 %define etc_systemd_dir %_sysconfdir/systemd/system
 
 # versions defines
-%define apache_version 2.4.41-alt3
+# https://bugzilla.altlinux.org/40688
+%define apache_version 1:2.4.48-alt5
+
 %define bind_version 9.11
 %define bind_dyndb_ldap_version 11.1-alt7
 %define certmonger_version 0.79.7
