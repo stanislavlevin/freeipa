@@ -44,6 +44,7 @@
 %define sssd_version 1.16.3
 %define openldap_version 2.4.47-alt2
 %define opendnssec_version 2.1.9-alt1
+%define libp11_version 0.4.10-alt2
 
 Name: freeipa
 Version: 4.8.9
@@ -277,7 +278,7 @@ Requires: bind-dyndb-ldap >= %bind_dyndb_ldap_version
 Requires: bind >= %bind_version
 Requires: bind-utils >= %bind_version
 Requires: opendnssec >= %opendnssec_version
-Requires: libp11
+Requires: libp11 >= %libp11_version
 
 %description server-dns
 IPA integrated DNS server with support for automatic DNSSEC signing.
