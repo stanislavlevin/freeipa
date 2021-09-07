@@ -163,6 +163,7 @@ BuildRequires: python3-module-pytest-multihost
 BuildRequires: python3-module-pytest_sourceorder
 BuildRequires: python3-module-qrcode
 BuildRequires: python3-module-samba
+BuildRequires: python3(sphinx)
 BuildRequires: python3-module-sss
 BuildRequires: python3-module-sss_nss_idmap
 BuildRequires: python3-module-sss-murmur
