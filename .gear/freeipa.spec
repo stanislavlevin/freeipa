@@ -50,7 +50,8 @@
 %define libp11_version 0.4.10-alt2
 
 Name: freeipa
-Version: 4.9.6
+# don't forget to update .gear/rules
+Version: 4.9.7
 Release: alt1
 
 Summary: The Identity, Policy and Audit system
@@ -1088,6 +1089,9 @@ fi
 %python3_sitelibdir/ipaplatform-*.egg-info/
 
 %changelog
+* Tue Sep 07 2021 Stanislav Levin <slev@altlinux.org> 4.9.7-alt1
+- 4.9.6 -> 4.9.7.
+
 * Wed Aug 04 2021 Stanislav Levin <slev@altlinux.org> 4.9.6-alt1
 - 4.8.9 -> 4.9.6.
 
