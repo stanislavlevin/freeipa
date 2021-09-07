@@ -286,7 +286,7 @@ class TestIpaHealthCheck(IntegrationTest):
         for source in sources_avail:
             assert source in result.stdout_text
 
-    def test_human_output(self, restart_service):
+    def test_human_severity(self, restart_service):
         """
         Test that in human output the severity value is correct
 
@@ -305,6 +305,18 @@ class TestIpaHealthCheck(IntegrationTest):
         assert returncode == 1
         assert output == \
             "ERROR: ipahealthcheck.meta.services.sssd: sssd: not running"
+
+    def test_human_output(self):
+        """
+        Test if in case no  failures were found, informative string is printed
+        in human output.
+
+        https://pagure.io/freeipa/issue/8892
+        """
+        returncode, output = run_healthcheck(self.master, output_type="human",
+                                             failures_only=True)
+        assert returncode == 0
+        assert output == "No issues found."
 
     def test_ipa_healthcheck_after_certupdate(self):
         """
@@ -499,9 +511,6 @@ class TestIpaHealthCheck(IntegrationTest):
         from host's keytab.
         """
         msg = (
-            "Failed to obtain host TGT: Major (458752): "
-            "No credentials were "
-            "supplied, or the credentials were unavailable or inaccessible, "
             "Minor (2529639107): No credentials cache found"
         )
 
@@ -514,7 +523,7 @@ class TestIpaHealthCheck(IntegrationTest):
             )
             assert returncode == 1
             assert data[0]["result"] == "ERROR"
-            assert data[0]["kw"]["msg"] == msg
+            assert msg in data[0]["kw"]["msg"]
 
     def test_source_ipahealthcheck_topology_IPATopologyDomainCheck(self):
         """
@@ -1217,6 +1226,29 @@ class TestIpaHealthCheck(IntegrationTest):
             ]
         )
         assert msg in cmd.stdout_text
+
+    def test_ipahealthcheck_verify_perms_for_source_files(self,
+                                                          modify_permissions):
+        """
+        This tests checks if files in /var/log are checked with ipa.files
+        source.
+        The test modifies permissions of ipainstall log file and checks the
+        response from healthcheck.
+
+        https://pagure.io/freeipa/issue/8949
+        """
+        modify_permissions(self.master, path=paths.IPASERVER_INSTALL_LOG,
+                           mode="0644")
+        returncode, data = run_healthcheck(
+            self.master, "ipahealthcheck.ipa.files", failures_only=True)
+
+        assert returncode == 1
+        assert len(data) == 1
+        assert data[0]["result"] == "WARNING"
+        assert data[0]["kw"]["path"] == paths.IPASERVER_INSTALL_LOG
+        assert data[0]["kw"]["type"] == "mode"
+        assert data[0]["kw"]["expected"] == "0600"
+
 
     @pytest.fixture
     def remove_healthcheck(self):

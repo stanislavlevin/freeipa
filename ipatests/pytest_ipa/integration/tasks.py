@@ -29,7 +29,6 @@ import re
 import collections
 import itertools
 import shutil
-import shlex
 import copy
 import subprocess
 import tempfile
@@ -597,7 +596,9 @@ def install_adtrust(host):
     dig_command = ['dig', 'SRV', '+short', '@localhost',
                    '_ldap._tcp.%s' % host.domain.name]
     dig_output = '0 100 389 %s.' % host.hostname
-    dig_test = lambda x: re.search(re.escape(dig_output), x)
+
+    def dig_test(x):
+        return re.search(re.escape(dig_output), x)
 
     run_repeatedly(host, dig_command, test=dig_test)
 
@@ -2122,8 +2123,8 @@ def create_active_user(host, login, password, first='test', last='user',
         result = host.run_command(
             "KRB5_TRACE=/dev/stdout kinit %s" % login,
             stdin_text='{0}\n{1}\n{1}\n'.format(
-                temp_password, password, raiseonerr=False
-            )
+                temp_password, password
+            ), raiseonerr=False
         )
         # Retrieve kdc.$REALM after the password change, just in case SSSD
         # domain status flipped to online during the password change.
@@ -2264,10 +2265,10 @@ class KerberosKeyCopier:
             [paths.KLIST, "-eK", "-k", keytab], log_stdout=False)
 
         keys_to_sync = []
-        for l in result.stdout_text.splitlines():
-            if (princ in l and any(e in l for e in self.valid_etypes)):
+        for line in result.stdout_text.splitlines():
+            if (princ in line and any(e in line for e in self.valid_etypes)):
 
-                els = l.split()
+                els = line.split()
                 els[-2] = els[-2].strip('()')
                 els[-1] = els[-1].strip('()')
                 keys_to_sync.append(KeyEntry._make(els))
@@ -2439,9 +2440,9 @@ def install_packages(host, pkgs):
     :param pkgs: packages to install, provided as a list of strings
     """
     platform = get_platform(host)
-    if platform in ('rhel', 'fedora'):
+    if platform in {'rhel', 'fedora'}:
         install_cmd = ['/usr/bin/dnf', 'install', '-y']
-    elif platform in ('ubuntu'):
+    elif platform in {'debian', 'ubuntu'}:
         install_cmd = ['apt-get', 'install', '-y']
     else:
         raise ValueError('install_packages: unknown platform %s' % platform)
@@ -2480,26 +2481,22 @@ def uninstall_packages(host, pkgs, nodeps=False):
     :param nodeps: ignore dependencies (dangerous!).
     """
     platform = get_platform(host)
-    if platform not in ('rhel', 'fedora', 'ubuntu'):
-        raise ValueError('uninstall_packages: unknown platform %s' % platform)
+    if platform not in {"rhel", "fedora", "debian", "ubuntu"}:
+        raise ValueError(f"uninstall_packages: unknown platform {platform}")
     if nodeps:
-        if platform in ('rhel', 'fedora'):
-            cmd = "rpm -e --nodeps"
-        elif platform in ('ubuntu'):
-            cmd = "dpkg -P --force-depends"
+        if platform in {"rhel", "fedora"}:
+            cmd = ["rpm", "-e", "--nodeps"]
+        elif platform in {"debian", "ubuntu"}:
+            cmd = ["dpkg", "-P", "--force-depends"]
         for package in pkgs:
-            uninstall_cmd = shlex.split(cmd)
-            uninstall_cmd.append(package)
             # keep raiseonerr=True here. --fcami
-            host.run_command(uninstall_cmd)
+            host.run_command(cmd + [package])
     else:
-        if platform in ('rhel', 'fedora'):
-            cmd = "/usr/bin/dnf remove -y"
-        elif platform in ('ubuntu'):
-            cmd = "apt-get remove -y"
-        uninstall_cmd = shlex.split(cmd)
-        uninstall_cmd.extend(pkgs)
-        host.run_command(uninstall_cmd, raiseonerr=False)
+        if platform in {"rhel", "fedora"}:
+            cmd = ["/usr/bin/dnf", "remove", "-y"]
+        elif platform in {"debian", "ubuntu"}:
+            cmd = ["apt-get", "remove", "-y"]
+        host.run_command(cmd + pkgs, raiseonerr=False)
 
 
 def wait_for_request(host, request_id, timeout=120):
@@ -2787,11 +2784,11 @@ def run_ssh_cmd(
 
 def is_package_installed(host, pkg):
     platform = get_platform(host)
-    if platform in ('rhel', 'fedora'):
+    if platform in {'rhel', 'fedora'}:
         result = host.run_command(
             ['rpm', '-q', pkg], raiseonerr=False
         )
-    elif platform in ['ubuntu']:
+    elif platform in {'debian', 'ubuntu'}:
         result = host.run_command(
             ['dpkg', '-s', pkg], raiseonerr=False
         )
@@ -2800,3 +2797,14 @@ def is_package_installed(host, pkg):
             'is_package_installed: unknown platform %s' % platform
         )
     return result.returncode == 0
+
+
+def move_date(host, chrony_cmd, date_str):
+    """Helper method to move system date
+    :param host: host on which date is to be manipulated
+    :param chrony_cmd: systemctl command to apply to
+                       chrony service, for instance 'start', 'stop'
+    :param date_str: date string to change the date i.e '3years2months1day1'
+    """
+    host.run_command(['systemctl', chrony_cmd, 'chronyd'])
+    host.run_command(['date', '-s', date_str])

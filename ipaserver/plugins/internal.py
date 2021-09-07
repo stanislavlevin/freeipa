@@ -1364,6 +1364,20 @@ class i18n_messages(Command):
                 "undel_success": _("${count} user(s) restored"),
                 "user_categories": _("User categories"),
             },
+            "subid": {
+                "add": _("Add subid"),
+                "assigned_subids": _("Assigned subids"),
+                "baseid": _("Base ID"),
+                "dna_remaining": _("DNA remaining"),
+                "ipaowner": _("Owner"),
+                "ipasubgidcount": _("SubGID range size"),
+                "ipasubgidnumber": _("SubGID range start"),
+                "ipasubuidcount": _("SubUID range size"),
+                "ipasubuidnumber": _("SubUID range start"),
+                "rangesize": _("Range size"),
+                "remaining_subids": _("Remaining subids"),
+                "stats": _("Subordinate ID Statistics"),
+            },
             "sudocmd": {
                 "add": _("Add sudo command"),
                 "add_into_sudocmdgroups": _(
@@ -1569,6 +1583,11 @@ class i18n_messages(Command):
                 ),
                 "add_into_sudo": _(
                     "Add user '${primary_key}' into sudo rules"
+                ),
+                "auto_subid": _("Auto assign subordinate ids"),
+                "auto_subid_confirm": _(
+                    "Are you sure you want to auto-assign a subordinate id "
+                    "to user ${object}?"
                 ),
                 "contact": _("Contact Settings"),
                 "delete_mode": _("Delete mode"),
@@ -1930,6 +1949,7 @@ class i18n_messages(Command):
             "network_services": _("Network Services"),
             "policy": _("Policy"),
             "role": _("Role-Based Access Control"),
+            "subid": _("Subordinate IDs"),
             "sudo": _("Sudo"),
             "topology": _("Topology"),
             "trust": _("Trusts"),

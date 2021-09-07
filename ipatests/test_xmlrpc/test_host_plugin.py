@@ -605,6 +605,27 @@ class TestProtectedMaster(XMLRPC_test):
                 error=u'An IPA master host cannot be deleted or disabled')):
             command()
 
+    def test_try_add_auth_ind_master(self, this_host):
+        command = this_host.make_update_command({
+            u'krbprincipalauthind': u'radius'})
+        with raises_exact(errors.ValidationError(
+            name='krbprincipalauthind',
+            error=u'authentication indicators not allowed '
+                'in service "host"'
+        )):
+            command()
+
+    def test_add_non_master_with_auth_ind(self, host5):
+        host5.ensure_missing()
+        command = host5.make_command(
+            'host_add', host5.fqdn, krbprincipalauthind=['radius'],
+            force=True
+        )
+        result = command()
+        # The fact that the command succeeds exercises the change but
+        # let's check the indicator as well.
+        assert result['result']['krbprincipalauthind'] == ('radius',)
+
 
 @pytest.mark.tier1
 class TestValidation(XMLRPC_test):

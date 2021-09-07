@@ -19,7 +19,7 @@
 
 import six
 
-from ipalib import api, errors
+from ipalib import api, errors, constants
 from ipalib import (
     Flag, Int, Password, Str, Bool, StrEnum, DateTime, DNParam)
 from ipalib.parameters import Principal, Certificate
@@ -29,11 +29,11 @@ from .baseldap import (
     LDAPRetrieve, LDAPAddAttribute, LDAPModAttribute, LDAPRemoveAttribute,
     LDAPAddMember, LDAPRemoveMember,
     LDAPAddAttributeViaOption, LDAPRemoveAttributeViaOption,
-    add_missing_object_class)
+    add_missing_object_class
+)
 from ipaserver.plugins.service import (validate_realm, normalize_principal)
 from ipalib.request import context
 from ipalib import _
-from ipalib.constants import PATTERN_GROUPUSER_NAME
 from ipapython import kerberos
 from ipapython.ipautil import ipa_generate_password, TMP_PWD_ENTROPY_BITS
 from ipapython.ipavalidate import Email
@@ -161,7 +161,7 @@ class baseuser(LDAPObject):
     possible_objectclasses = [
         'meporiginentry', 'ipauserauthtypeclass', 'ipauser',
         'ipatokenradiusproxyuser', 'ipacertmapobject',
-        'ipantuserattrs'
+        'ipantuserattrs',
     ]
     disallow_object_classes = ['krbticketpolicyaux']
     permission_filter_objectclasses = ['posixaccount']
@@ -175,7 +175,7 @@ class baseuser(LDAPObject):
         'krbprincipalexpiration', 'usercertificate;binary',
         'krbprincipalname', 'krbcanonicalname',
         'ipacertmapdata', 'ipantlogonscript', 'ipantprofilepath',
-        'ipanthomedirectory', 'ipanthomedirectorydrive'
+        'ipanthomedirectory', 'ipanthomedirectorydrive',
     ]
     search_display_attributes = [
         'uid', 'givenname', 'sn', 'homedirectory', 'krbcanonicalname',
@@ -186,7 +186,9 @@ class baseuser(LDAPObject):
     uuid_attribute = 'ipauniqueid'
     attribute_members = {
         'manager': ['user'],
-        'memberof': ['group', 'netgroup', 'role', 'hbacrule', 'sudorule'],
+        'memberof': [
+            'group', 'netgroup', 'role', 'hbacrule', 'sudorule', 'subid'
+        ],
         'memberofindirect': ['group', 'netgroup', 'role', 'hbacrule', 'sudorule'],
     }
     allow_rename = True
@@ -198,7 +200,7 @@ class baseuser(LDAPObject):
 
     takes_params = (
         Str('uid',
-            pattern=PATTERN_GROUPUSER_NAME,
+            pattern=constants.PATTERN_GROUPUSER_NAME,
             pattern_errmsg='may only include letters, numbers, _, -, . and $',
             maxlength=255,
             cli_name='login',
@@ -538,6 +540,9 @@ class baseuser_add(LDAPCreate):
         self.obj.convert_usercertificate_pre(entry_attrs)
         if entry_attrs.get('ipatokenradiususername', None):
             add_missing_object_class(ldap, u'ipatokenradiusproxyuser', dn,
+                                     entry_attrs, update=False)
+        if entry_attrs.get('ipauserauthtype', None):
+            add_missing_object_class(ldap, u'ipauserauthtypeclass', dn,
                                      entry_attrs, update=False)
 
     def post_common_callback(self, ldap, dn, entry_attrs, *keys, **options):

@@ -1076,7 +1076,7 @@ args: 0,1,1
 option: Str('version?')
 output: Output('result')
 command: config_mod/1
-args: 0,28,3
+args: 0,29,3
 option: Str('addattr*', cli_name='addattr')
 option: Flag('all', autofill=True, cli_name='all', default=False)
 option: Str('ca_renewal_master_server?', autofill=False)
@@ -1099,6 +1099,7 @@ option: Int('ipasearchtimelimit?', autofill=False, cli_name='searchtimelimit')
 option: Str('ipaselinuxusermapdefault?', autofill=False)
 option: Str('ipaselinuxusermaporder?', autofill=False)
 option: StrEnum('ipauserauthtype*', autofill=False, cli_name='user_auth_type', values=[u'password', u'radius', u'otp', u'pkinit', u'hardened', u'disabled'])
+option: Bool('ipauserdefaultsubordinateid?', autofill=False, cli_name='user_default_subid')
 option: Str('ipauserobjectclasses*', autofill=False, cli_name='userobjectclasses')
 option: IA5Str('ipausersearchfields?', autofill=False, cli_name='usersearch')
 option: Flag('raw', autofill=True, cli_name='raw', default=False)
@@ -5068,7 +5069,7 @@ output: Output('result', type=[<type 'dict'>])
 output: Output('summary', type=[<type 'unicode'>, <type 'NoneType'>])
 output: ListOfPrimaryKeys('value')
 command: stageuser_find/1
-args: 1,58,4
+args: 1,60,4
 arg: Str('criteria?')
 option: Flag('all', autofill=True, cli_name='all', default=False)
 option: Str('carlicense*', autofill=False)
@@ -5086,6 +5087,7 @@ option: Str('in_group*', cli_name='in_groups')
 option: Str('in_hbacrule*', cli_name='in_hbacrules')
 option: Str('in_netgroup*', cli_name='in_netgroups')
 option: Str('in_role*', cli_name='in_roles')
+option: Str('in_subid*', cli_name='in_subids')
 option: Str('in_sudorule*', cli_name='in_sudorules')
 option: Str('initials?', autofill=False)
 option: Str('ipanthomedirectory?', autofill=False, cli_name='smb_home_dir')
@@ -5108,6 +5110,7 @@ option: Str('not_in_group*', cli_name='not_in_groups')
 option: Str('not_in_hbacrule*', cli_name='not_in_hbacrules')
 option: Str('not_in_netgroup*', cli_name='not_in_netgroups')
 option: Str('not_in_role*', cli_name='not_in_roles')
+option: Str('not_in_subid*', cli_name='not_in_subids')
 option: Str('not_in_sudorule*', cli_name='not_in_sudorules')
 option: Str('ou?', autofill=False, cli_name='orgunit')
 option: Str('pager*', autofill=False)
@@ -5247,6 +5250,100 @@ option: Str('version?')
 output: Entry('result')
 output: Output('summary', type=[<type 'unicode'>, <type 'NoneType'>])
 output: PrimaryKey('value')
+command: subid_add/1
+args: 1,8,3
+arg: Str('ipauniqueid?', cli_name='id')
+option: Str('addattr*', cli_name='addattr')
+option: Flag('all', autofill=True, cli_name='all', default=False)
+option: Str('description?', cli_name='desc')
+option: Str('ipaowner', cli_name='owner')
+option: Int('ipasubuidnumber?', cli_name='subuid')
+option: Flag('raw', autofill=True, cli_name='raw', default=False)
+option: Str('setattr*', cli_name='setattr')
+option: Str('version?')
+output: Entry('result')
+output: Output('summary', type=[<type 'unicode'>, <type 'NoneType'>])
+output: PrimaryKey('value')
+command: subid_del/1
+args: 1,2,3
+arg: Str('ipauniqueid+', cli_name='id')
+option: Flag('continue', autofill=True, cli_name='continue', default=False)
+option: Str('version?')
+output: Output('result', type=[<type 'dict'>])
+output: Output('summary', type=[<type 'unicode'>, <type 'NoneType'>])
+output: ListOfPrimaryKeys('value')
+command: subid_find/1
+args: 1,11,4
+arg: Str('criteria?')
+option: Flag('all', autofill=True, cli_name='all', default=False)
+option: Str('description?', autofill=False, cli_name='desc')
+option: Str('ipaowner?', autofill=False, cli_name='owner')
+option: Int('ipasubgidnumber?', autofill=False, cli_name='subgid')
+option: Int('ipasubuidnumber?', autofill=False, cli_name='subuid')
+option: Str('ipauniqueid?', autofill=False, cli_name='id')
+option: Flag('pkey_only?', autofill=True, default=False)
+option: Flag('raw', autofill=True, cli_name='raw', default=False)
+option: Int('sizelimit?', autofill=False)
+option: Int('timelimit?', autofill=False)
+option: Str('version?')
+output: Output('count', type=[<type 'int'>])
+output: ListOfEntries('result')
+output: Output('summary', type=[<type 'unicode'>, <type 'NoneType'>])
+output: Output('truncated', type=[<type 'bool'>])
+command: subid_generate/1
+args: 0,4,3
+option: Flag('all', autofill=True, cli_name='all', default=False)
+option: Str('ipaowner?', cli_name='owner')
+option: Flag('raw', autofill=True, cli_name='raw', default=False)
+option: Str('version?')
+output: Entry('result')
+output: Output('summary', type=[<type 'unicode'>, <type 'NoneType'>])
+output: PrimaryKey('value')
+command: subid_match/1
+args: 1,7,4
+arg: Str('criteria?')
+option: Flag('all', autofill=True, cli_name='all', default=False)
+option: Int('ipasubuidnumber', autofill=False, cli_name='subuid')
+option: Flag('pkey_only?', autofill=True, default=False)
+option: Flag('raw', autofill=True, cli_name='raw', default=False)
+option: Int('sizelimit?', autofill=False)
+option: Int('timelimit?', autofill=False)
+option: Str('version?')
+output: Output('count', type=[<type 'int'>])
+output: ListOfEntries('result')
+output: Output('summary', type=[<type 'unicode'>, <type 'NoneType'>])
+output: Output('truncated', type=[<type 'bool'>])
+command: subid_mod/1
+args: 1,8,3
+arg: Str('ipauniqueid', cli_name='id')
+option: Str('addattr*', cli_name='addattr')
+option: Flag('all', autofill=True, cli_name='all', default=False)
+option: Str('delattr*', cli_name='delattr')
+option: Str('description?', autofill=False, cli_name='desc')
+option: Flag('raw', autofill=True, cli_name='raw', default=False)
+option: Flag('rights', autofill=True, default=False)
+option: Str('setattr*', cli_name='setattr')
+option: Str('version?')
+output: Entry('result')
+output: Output('summary', type=[<type 'unicode'>, <type 'NoneType'>])
+output: PrimaryKey('value')
+command: subid_show/1
+args: 1,4,3
+arg: Str('ipauniqueid', cli_name='id')
+option: Flag('all', autofill=True, cli_name='all', default=False)
+option: Flag('raw', autofill=True, cli_name='raw', default=False)
+option: Flag('rights', autofill=True, default=False)
+option: Str('version?')
+output: Entry('result')
+output: Output('summary', type=[<type 'unicode'>, <type 'NoneType'>])
+output: PrimaryKey('value')
+command: subid_stats/1
+args: 0,3,2
+option: Flag('all', autofill=True, cli_name='all', default=False)
+option: Flag('raw', autofill=True, cli_name='raw', default=False)
+option: Str('version?')
+output: Entry('result')
+output: Output('summary', type=[<type 'unicode'>, <type 'NoneType'>])
 command: sudocmd_add/1
 args: 1,7,3
 arg: Str('sudocmd', cli_name='command')
@@ -6168,7 +6265,7 @@ output: Output('result', type=[<type 'bool'>])
 output: Output('summary', type=[<type 'unicode'>, <type 'NoneType'>])
 output: PrimaryKey('value')
 command: user_find/1
-args: 1,61,4
+args: 1,63,4
 arg: Str('criteria?')
 option: Flag('all', autofill=True, cli_name='all', default=False)
 option: Str('carlicense*', autofill=False)
@@ -6186,6 +6283,7 @@ option: Str('in_group*', cli_name='in_groups')
 option: Str('in_hbacrule*', cli_name='in_hbacrules')
 option: Str('in_netgroup*', cli_name='in_netgroups')
 option: Str('in_role*', cli_name='in_roles')
+option: Str('in_subid*', cli_name='in_subids')
 option: Str('in_sudorule*', cli_name='in_sudorules')
 option: Str('initials?', autofill=False)
 option: Str('ipanthomedirectory?', autofill=False, cli_name='smb_home_dir')
@@ -6208,6 +6306,7 @@ option: Str('not_in_group*', cli_name='not_in_groups')
 option: Str('not_in_hbacrule*', cli_name='not_in_hbacrules')
 option: Str('not_in_netgroup*', cli_name='not_in_netgroups')
 option: Str('not_in_role*', cli_name='not_in_roles')
+option: Str('not_in_subid*', cli_name='not_in_subids')
 option: Str('not_in_sudorule*', cli_name='not_in_sudorules')
 option: Bool('nsaccountlock?', autofill=False, cli_name='disabled', default=False)
 option: Str('ou?', autofill=False, cli_name='orgunit')
@@ -7093,6 +7192,15 @@ default: stageuser_remove_certmapdata/1
 default: stageuser_remove_manager/1
 default: stageuser_remove_principal/1
 default: stageuser_show/1
+default: subid/1
+default: subid_add/1
+default: subid_del/1
+default: subid_find/1
+default: subid_generate/1
+default: subid_match/1
+default: subid_mod/1
+default: subid_show/1
+default: subid_stats/1
 default: sudocmd/1
 default: sudocmd_add/1
 default: sudocmd_del/1

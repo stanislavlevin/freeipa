@@ -38,6 +38,7 @@ from ipatests.create_external_ca import ExternalCA
 from ipatests.test_ipalib.test_x509 import good_pkcs7, badcert
 from ipapython.ipautil import realm_to_suffix, ipa_generate_password
 from ipaserver.install.installutils import realm_to_serverid
+from pkg_resources import parse_version
 
 logger = logging.getLogger(__name__)
 
@@ -1467,6 +1468,64 @@ class TestIPACommand(IntegrationTest):
             assert 'This account is currently not available' in \
                 result.stdout_text
 
+    def test_ipa_getkeytab_server(self):
+        """
+        Exercise the ipa-getkeytab server options
+
+        This relies on the behavior that without a TGT
+        ipa-getkeytab will quit and not do much of anything.
+
+        A bogus keytab and principal are passed in to satisfy the
+        minimum requirements.
+        """
+        tasks.kdestroy_all(self.master)
+
+        # Pass in a server name to use
+        result = self.master.run_command(
+            [
+                paths.IPA_GETKEYTAB,
+                "-k",
+                "/tmp/keytab",
+                "-p",
+                "foo",
+                "-s",
+                self.master.hostname,
+                "-v",
+            ], raiseonerr=False).stderr_text
+
+        assert 'Using provided server %s' % self.master.hostname in result
+
+        # Don't pass in a name, should use /etc/ipa/default.conf
+        result = self.master.run_command(
+            [
+                paths.IPA_GETKEYTAB,
+                "-k",
+                "/tmp/keytab",
+                "-p",
+                "foo",
+                "-v",
+            ], raiseonerr=False).stderr_text
+
+        assert (
+            'Using server from config %s' % self.master.hostname
+            in result
+        )
+
+        # Use DNS SRV lookup
+        result = self.master.run_command(
+            [
+                paths.IPA_GETKEYTAB,
+                "-k",
+                "/tmp/keytab",
+                "-p",
+                "foo",
+                "-s",
+                "_srv_",
+                "-v",
+            ], raiseonerr=False).stderr_text
+
+        assert 'Discovered server %s' % self.master.hostname in result
+
 
 class TestIPACommandWithoutReplica(IntegrationTest):
     """
@@ -1499,3 +1558,70 @@ class TestIPACommandWithoutReplica(IntegrationTest):
         )
         # Run the command again after cache is removed
         self.master.run_command(['ipa', 'user-show', 'ipauser1'])
+
+    def test_basesearch_compat_tree(self):
+        """Test ldapsearch against compat tree is working
+
+        This to ensure that ldapsearch with base scope is not failing.
+
+        related: https://bugzilla.redhat.com/show_bug.cgi?id=1958909
+        """
+        version = self.master.run_command(
+            ["rpm", "-qa", "--qf", "%{VERSION}", "slapi-nis"]
+        )
+        if tasks.get_platform(self.master) == "fedora" and parse_version(
+                version.stdout_text) <= parse_version("0.56.7"):
+            pytest.skip("Test requires slapi-nis with fix on fedora")
+        tasks.kinit_admin(self.master)
+        base_dn = str(self.master.domain.basedn)
+        base = "cn=admins,cn=groups,cn=compat,{basedn}".format(basedn=base_dn)
+        tasks.ldapsearch_dm(self.master, base, ldap_args=[], scope='sub')
+        tasks.ldapsearch_dm(self.master, base, ldap_args=[], scope='base')
+
+
+class TestIPAautomount(IntegrationTest):
+    @classmethod
+    def install(cls, mh):
+        tasks.install_master(cls.master, setup_dns=True)
+
+    def test_tofiles_orphan_keys(self):
+        """
+        Validate automountlocation-tofiles output
+
+        automount in LDAP is difficult to keep straight so a client-side
+        map generator was created.
+        """
+        tasks.kinit_admin(self.master)
+
+        self.master.run_command(
+            [
+                'ipa',
+                'automountmap-add', 'default',
+                'auto.test'
+            ]
+        )
+        self.master.run_command(
+            [
+                'ipa',
+                'automountkey-add', 'default',
+                'auto.test',
+                '--key', '/test',
+                '--info', 'nfs.example.com:/exports/test'
+            ]
+        )
+        self.master.run_command(
+            [
+                'ipa',
+                'automountkey-add', 'default',
+                'auto.test',
+                '--key', '/test2',
+                '--info', 'nfs.example.com:/exports/test2'
+            ]
+        )
+        result = self.master.run_command(
+            [
+                'ipa', 'automountlocation-tofiles', 'default'
+            ]
+        ).stdout_text
+        assert '/test' in result
+        assert '/test2' in result

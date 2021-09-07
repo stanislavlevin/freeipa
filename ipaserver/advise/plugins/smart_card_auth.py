@@ -149,7 +149,7 @@ class config_server_for_smart_card_auth(common_smart_card_auth_config):
         self.log.exit_on_predicate(
             '[ -z "$ipaca_records" ]',
             [
-                'Can not resolve ipa-ca records for ${domain_name}',
+                f'Can not resolve ipa-ca records for {ipa_domain_name}',
                 'Please make sure to update your DNS infrastructure with ',
                 'ipa-ca record pointing to IP addresses of IPA CA masters'
             ])
@@ -306,8 +306,9 @@ class config_client_for_smart_card_auth(common_smart_card_auth_config):
         shared_lib = self.pkcs11_shared_lib
 
         self.log.commands_on_predicate(
-            'modutil -dbdir {} -list | grep -q {}'.format(
-                nssdb, module_name),
+            'modutil -dbdir {nssdb} -list | grep -q {module_name} || '
+            'p11-kit list-modules | grep -i {module_name} -q'.format(
+                nssdb=nssdb, module_name=module_name),
             [
                 'echo "{} PKCS#11 module already configured"'.format(
                     module_name)

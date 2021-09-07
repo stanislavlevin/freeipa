@@ -131,6 +131,9 @@ DEFAULT_CONFIG = (
     ('container_ranges', DN(('cn', 'ranges'), ('cn', 'etc'))),
     ('container_dna', DN(('cn', 'dna'), ('cn', 'ipa'), ('cn', 'etc'))),
     ('container_dna_posix_ids', DN(('cn', 'posix-ids'), ('cn', 'dna'), ('cn', 'ipa'), ('cn', 'etc'))),
+    ('container_dna_subordinate_ids', DN(
+        ('cn', 'subordinate-ids'), ('cn', 'dna'), ('cn', 'ipa'), ('cn', 'etc')
+    )),
     ('container_realm_domains', DN(('cn', 'Realm Domains'), ('cn', 'ipa'), ('cn', 'etc'))),
     ('container_otp', DN(('cn', 'otp'))),
     ('container_radiusproxy', DN(('cn', 'radiusproxy'))),
@@ -148,6 +151,7 @@ DEFAULT_CONFIG = (
     ('container_certmaprules', DN(('cn', 'certmaprules'), ('cn', 'certmap'))),
     ('container_ca_renewal',
         DN(('cn', 'ca_renewal'), ('cn', 'ipa'), ('cn', 'etc'))),
+    ('container_subids', DN(('cn', 'subids'), ('cn', 'accounts'))),
 
     # Ports, hosts, and URIs:
     # Following values do not have any reasonable default.
@@ -343,3 +347,24 @@ SOFTHSM_DNSSEC_TOKEN_LABEL = u'ipaDNSSEC'
 # Apache's mod_ssl SSLVerifyDepth value (Maximum depth of CA
 # Certificates in Client Certificate verification)
 MOD_SSL_VERIFY_DEPTH = '5'
+
+# subuid / subgid counts are hard-coded
+# An interval of 65536 uids/gids is required to map nobody (65534).
+SUBID_COUNT = 65536
+
+# upper half of uid_t (uint32_t)
+SUBID_RANGE_START = 2 ** 31
+# theoretical max limit is UINT32_MAX-1 ((2 ** 32) - 2)
+# We use a smaller value to keep the topmost subid interval unused.
+SUBID_RANGE_MAX = (2 ** 32) - (2 * SUBID_COUNT)
+SUBID_RANGE_SIZE = SUBID_RANGE_MAX - SUBID_RANGE_START
+# threshold before DNA plugin requests a new range
+SUBID_DNA_THRESHOLD = 500
+
+# moved from ipaserver/install/krainstance.py::KRAInstance to avoid duplication
+# as per https://pagure.io/freeipa/issue/8795
+KRA_TRACKING_REQS = {
+    'auditSigningCert cert-pki-kra': 'caAuditSigningCert',
+    'transportCert cert-pki-kra': 'caTransportCert',
+    'storageCert cert-pki-kra': 'caStorageCert',
+}

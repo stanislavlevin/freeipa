@@ -461,12 +461,17 @@ return {
                     $type: 'cert_request',
                     hide_cond: ['preserved-user'],
                     title: '@i18n:objects.cert.issue_for_user'
+                },
+                {
+                    $type: 'subid_generate',
+                    hide_cond: ['preserved-user', 'self-service-other'],
+                    enable_cond: ['no-subid']
                 }
             ],
             header_actions: [
                 'reset_password', 'enable', 'disable', 'stage', 'undel',
                 'delete_active_user', 'delete', 'unlock', 'add_otptoken',
-                'automember_rebuild', 'request_cert'
+                'automember_rebuild', 'request_cert', 'subid_generate'
             ],
             state: {
                 evaluators: [
@@ -485,7 +490,8 @@ return {
                     IPA.user.self_service_other_user_evaluator,
                     IPA.user.preserved_user_evaluator,
                     IPA.user.is_locked_evaluator,
-                    IPA.cert.certificate_evaluator
+                    IPA.cert.certificate_evaluator,
+                    IPA.user.has_subid_evaluator
                 ],
                 summary_conditions: [
                     {
@@ -546,6 +552,39 @@ return {
             add_title: '@i18n:objects.user.add_into_sudo',
             remove_method: 'remove_user',
             remove_title: '@i18n:objects.user.remove_from_sudo'
+        },
+        {
+            $type: 'association',
+            name: 'memberof_subid',
+            columns: [
+                'ipauniqueid',
+                'ipasubuidnumber',
+                'ipasubgidnumber'
+            ],
+            associator: IPA.serial_associator,
+            read_only: true,
+            state: {
+                evaluators: [
+                    IPA.user.self_service_other_user_evaluator,
+                    IPA.user.preserved_user_evaluator,
+                    IPA.user.has_subid_evaluator
+                ]
+            },
+            actions: [
+                {
+                    $type: 'subid_generate',
+                    name: 'subid_generate',
+                    hide_cond: ['preserved-user', 'self-service-other'],
+                    enable_cond: ['no-subid']
+                }
+            ],
+            control_buttons: [
+                {
+                    name: 'subid_generate',
+                    label: '@i18n:objects.user.auto_subid',
+                    icon: 'fa-plus'
+                }
+            ]
         }
     ],
     standard_association_facets: {
@@ -1165,6 +1204,60 @@ IPA.user.is_locked_evaluator = function(spec) {
     return that;
 };
 
+IPA.user.has_subid_evaluator = function(spec) {
+
+    spec = spec || {};
+    spec.event = spec.event || 'post_load';
+
+    var that = IPA.state_evaluator(spec);
+    that.name = spec.name || 'has_subid_evaluator';
+    that.param = spec.param || 'memberof_subid';
+
+    /**
+     * Evaluates if user already has a subid
+     */
+    that.on_event = function(data) {
+
+        var old_state = that.state;
+        that.state = [];
+
+        var value = that.adapter.load(data);
+        if (value.length === 0) {
+            that.state.push('no-subid');
+        }
+
+        that.notify_on_change(old_state);
+    };
+
+    return that;
+};
+
+IPA.user.subid_generate_action = function(spec) {
+
+    spec = spec || {};
+    spec.name = spec.name || 'subid_generate';
+    spec.label = spec.label || '@i18n:objects.user.auto_subid';
+    spec.hide_cond = spec.hide_cond || ['preserved-user'];
+    spec.confirm_msg = spec.confirm_msg || '@i18n:objects.user.auto_subid_confirm';
+
+    var that = IPA.action(spec);
+
+    that.execute_action = function(facet) {
+        var owner = facet.get_pkey();
+        var command = rpc.command({
+            entity: 'subid',
+            method: 'generate'
+        });
+        command.set_option('ipaowner', owner);
+        command.on_success = function(data, text_status, xhr) {
+            facet.refresh();
+        };
+        command.execute();
+    };
+
+    return that;
+};
+
 exp.entity_spec = make_spec();
 exp.register = function() {
     var e = reg.entity;
@@ -1174,6 +1267,7 @@ exp.register = function() {
     a.register('reset_password', IPA.user.reset_password_action);
     a.register('add_otptoken', IPA.user.add_otptoken_action);
     a.register('delete_active_user', IPA.user.delete_active_user_action);
+    a.register('subid_generate', IPA.user.subid_generate_action);
     d.copy('password', 'user_password', {
         factory: IPA.user.password_dialog,
         pre_ops: [IPA.user.password_dialog_pre_op]

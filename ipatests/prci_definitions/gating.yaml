@@ -30,8 +30,8 @@ jobs:
         git_repo: '{git_repo}'
         git_refspec: '{git_refspec}'
         template: &ci-ipa-4-9-latest
-          name: freeipa/ci-ipa-4-9-f33
-          version: 0.0.6
+          name: freeipa/ci-ipa-4-9-f34
+          version: 0.0.3
         timeout: 1800
         topology: *build
 
@@ -44,7 +44,7 @@ jobs:
         build_url: '{fedora-latest-ipa-4-9/build_url}'
         test_suite: test_integration/test_installation.py::TestInstallMaster
         template: *ci-ipa-4-9-latest
-        timeout: 3600
+        timeout: 7200
         topology: *master_1repl
 
   fedora-latest-ipa-4-9/simple_replication:
@@ -295,6 +295,18 @@ jobs:
       args:
         build_url: '{fedora-latest-ipa-4-9/build_url}'
         test_suite: test_integration/test_upgrade.py
+        template: *ci-ipa-4-9-latest
+        timeout: 3600
+        topology: *master_1repl
+
+  fedora-latest-ipa-4-9/test_subids:
+    requires: [fedora-latest-ipa-4-9/build]
+    priority: 100
+    job:
+      class: RunPytest
+      args:
+        build_url: '{fedora-latest-ipa-4-9/build_url}'
+        test_suite: test_integration/test_subids.py
         template: *ci-ipa-4-9-latest
         timeout: 3600
         topology: *master_1repl

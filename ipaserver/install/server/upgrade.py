@@ -1196,6 +1196,16 @@ def setup_krb_paths(krb):
         aug.close()
 
 
+def add_agent_to_security_domain_admins():
+    user_dn = DN(('uid', "ipara"), ('ou', 'People'), ('o', 'ipaca'))
+    group_dn = DN(('cn', 'Security Domain Administrators'), ('ou', 'groups'),
+                  ('o', 'ipaca'))
+    try:
+        api.Backend.ldap2.add_entry_to_group(user_dn, group_dn, 'uniqueMember')
+    except ipalib.errors.AlreadyGroupMember:
+        pass
+
+
 def setup_pkinit(krb):
     logger.info("[Setup PKINIT]")
 
@@ -1859,6 +1869,7 @@ def upgrade_configuration():
         ca.setup_acme()
         ca_update_acme_configuration(ca, fqdn)
         ca_initialize_hsm_state(ca)
+        add_agent_to_security_domain_admins()
 
     migrate_to_authselect()
     add_systemd_user_hbac()

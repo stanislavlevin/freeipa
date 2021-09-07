@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography import x509 as crypto_x509
 
 from ipalib import x509
-from ipalib.constants import DOMAIN_LEVEL_0
+from ipalib.constants import DOMAIN_LEVEL_0, KRA_TRACKING_REQS
 from ipalib.constants import IPA_CA_RECORD
 from ipalib.sysrestore import SYSRESTORE_STATEFILE, SYSRESTORE_INDEXFILE
 from ipapython.dn import DN
@@ -34,7 +34,7 @@ from ipatests.pytest_ipa.integration.env_config import get_global_config
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.test_integration.test_caless import CALessBase, ipa_certs_cleanup
 from ipaplatform import services
-from ipaserver.install import krainstance
+
 
 config = get_global_config()
 
@@ -703,6 +703,33 @@ class TestInstallMaster(IntegrationTest):
     def test_install_master(self):
         tasks.install_master(self.master, setup_dns=False)
 
+    @pytest.mark.skip_if_platform(
+        "debian", reason="This test hardcodes the httpd service name"
+    )
+    def test_smoke_test_for_debug_mode(self):
+        """Test if an IPA server works in debug mode.
+        Related: https://pagure.io/freeipa/issue/8891
+
+        Note: this test hardcodes the "httpd" service name.
+        """
+
+        target_fname = paths.IPA_SERVER_CONF
+        assert not self.master.transport.file_exists(target_fname)
+
+        # set the IPA server in debug mode
+        server_conf = "[global]\ndebug=True"
+        self.master.put_file_contents(target_fname, server_conf)
+        self.master.run_command(["systemctl", "restart", "httpd"])
+
+        # smoke test in debug mode
+        tasks.kdestroy_all(self.master)
+        tasks.kinit_admin(self.master)
+        self.master.run_command(["ipa", "user-show", "admin"])
+
+        # rollback
+        self.master.run_command(["rm", target_fname])
+        self.master.run_command(["systemctl", "restart", "httpd"])
+
     def test_schema_compat_attribute_and_tree_disable(self):
         """Test if schema-compat-entry-attribute is set
 
@@ -1255,8 +1282,7 @@ class TestInstallMasterKRA(IntegrationTest):
         """
         Test that the KRA subsystem certificates renew properly
         """
-        kra = krainstance.KRAInstance(self.master.domain.realm)
-        for nickname in kra.tracking_reqs:
+        for nickname in KRA_TRACKING_REQS:
             cert = tasks.certutil_fetch_cert(
                 self.master,
                 paths.PKI_TOMCAT_ALIAS_DIR,
@@ -1515,6 +1541,38 @@ class TestKRAinstallAfterCertRenew(IntegrationTest):
         self.master.run_command(['kinit', 'admin'], stdin_text=passwd)
         cmd = self.master.run_command(['ipa-kra-install', '-p', dm_pass, '-U'])
         self.master.run_command(['systemctl', 'start', 'chronyd'])
+
+
+class TestKRAinstallOnReplicaWithCAHost(IntegrationTest):
+    """ Test that KRA install on replica with ca_host overriden fails
+
+    KRA install on a replica should fail
+    if the ca_host line in /etc/ipa/default.conf is present
+
+    Related: https://pagure.io/freeipa/issue/8245
+    """
+
+    num_replicas = 1
+
+    def test_kra_install_on_replica_with_ca_host_overriden(self):
+        tasks.install_master(self.master)
+        tasks.install_replica(self.master, self.replicas[0])
+
+        content = self.replicas[0].get_file_contents(paths.IPA_DEFAULT_CONF,
+                                                     encoding='utf-8')
+        ca_host_line = "ca_host = %s" % self.master.hostname
+        new_content = content + '\n' + ca_host_line
+        self.replicas[0].put_file_contents(paths.IPA_DEFAULT_CONF,
+                                           new_content)
+
+        self.master.run_command(['firewall-cmd', '--add-port=8443/tcp'])
+
+        result = tasks.install_kra(self.replicas[0], raiseonerr=False)
+
+        err_str = "KRA can not be installed when 'ca_host' is overriden in IPA"
+        "configuration file."
+        assert result.returncode == 1
+        assert err_str in result.stderr_text
 
 
 class TestMaskInstall(IntegrationTest):
@@ -1795,3 +1853,30 @@ class TestInstallWithoutSudo(IntegrationTest):
         result = tasks.install_client(self.master, self.clients[0])
         assert self.no_sudo_str not in result.stderr_text
         assert self.sudo_version_str not in result.stdout_text
+
+
+class TestInstallWithoutNamed(IntegrationTest):
+    num_replicas = 1
+
+    @classmethod
+    def remove_named(cls, host):
+        # remove the bind package and make sure the named user does not exist.
+        # https://pagure.io/freeipa/issue/8936
+        result = host.run_command(['id', 'named'], raiseonerr=False)
+        if result.returncode == 0:
+            tasks.uninstall_packages(host, ['bind'])
+            host.run_command(['userdel', constants.NAMED_USER])
+        assert host.run_command(
+            ['id', 'named'], raiseonerr=False
+        ).returncode == 1
+
+    @classmethod
+    def install(cls, mh):
+        for tgt in (cls.master, cls.replicas[0]):
+            cls.remove_named(tgt)
+        tasks.install_master(cls.master, setup_dns=False)
+
+    def test_replica0_install(self):
+        tasks.install_replica(
+            self.master, self.replicas[0], setup_ca=False, setup_dns=False
+        )
