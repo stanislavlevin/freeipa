@@ -490,7 +490,6 @@ Requires: python3-module-ipaclient = %EVR
 Requires: python3-module-ipaserver = %EVR
 Requires: tar
 Requires: xz
-Requires: python3-module-coverage
 Requires: python3-module-sssdconfig >= %sssd_version
 Requires: openssh-clients
 Requires: sshpass
