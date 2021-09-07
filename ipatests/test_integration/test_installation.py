@@ -737,7 +737,13 @@ class TestInstallMaster(IntegrationTest):
         # set the IPA server in debug mode
         server_conf = "[global]\ndebug=True"
         self.master.put_file_contents(target_fname, server_conf)
-        self.master.run_command(["systemctl", "restart", "httpd"])
+        script = (
+            "from ipaplatform.services import knownservices; "
+            "print(knownservices.httpd.systemd_name)"
+        )
+        result = self.master.run_command(["python3", "-c", script])
+        service_name = result.stdout_text.strip()
+        self.master.run_command(["systemctl", "restart", service_name])
 
         # smoke test in debug mode
         tasks.kdestroy_all(self.master)
@@ -746,7 +752,7 @@ class TestInstallMaster(IntegrationTest):
 
         # rollback
         self.master.run_command(["rm", target_fname])
-        self.master.run_command(["systemctl", "restart", "httpd"])
+        self.master.run_command(["systemctl", "restart", service_name])
 
     def test_schema_compat_attribute_and_tree_disable(self):
         """Test if schema-compat-entry-attribute is set
