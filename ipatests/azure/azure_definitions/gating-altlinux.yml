@@ -125,7 +125,7 @@ vms:
       clients: 1
       resources:
         server:
-          mem_limit: "3500m"
+          mem_limit: "3800m"
           memswap_limit: "4000m"
         client:
           mem_limit: "768m"
