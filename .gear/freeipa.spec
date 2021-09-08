@@ -42,7 +42,8 @@
 %define pki_version 10.10.5
 %define python_ldap_version 3.2.0
 %define samba_version 4.7.6
-%define slapi_nis_version 0.56.3
+# RHBZ#1958909, RHBZ#1967906
+%define slapi_nis_version 0.56.7-alt2
 %define sssd_version 1.16.3
 %define openldap_version 2.4.47-alt2
 %define opendnssec_version 2.1.9-alt1
