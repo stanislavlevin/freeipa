@@ -37,7 +37,7 @@
 %endif
 
 # Include SELinux subpackage
-%if 0%{?fedora} >= 30 || 0%{?rhel} > 8
+%if 0%{?fedora} >= 30 || 0%{?rhel}
     %global with_selinux 1
     %global selinuxtype targeted
     %global modulename ipa
@@ -46,8 +46,8 @@
 %if 0%{?rhel}
 %global package_name ipa
 %global alt_name freeipa
-%global krb5_version 1.16.1
-%global krb5_kdb_version 7.0
+%global krb5_version 1.18
+%global krb5_kdb_version 8.0
 # 0.7.16: https://github.com/drkjam/netaddr/issues/71
 %global python_netaddr_version 0.7.16
 # Require 4.7.0 which brings Python 3 bindings
@@ -72,8 +72,12 @@
 %global python_netaddr_version 0.7.16
 # Require 4.7.0 which brings Python 3 bindings
 %global samba_version 2:4.7.0
-# SELinux context for /etc/named directory, RHBZ#1759495
-%global selinux_policy_version 3.14.3-52
+# SELinux context for dirsrv unit file, BZ 1820298
+%if 0%{?fedora} >= 32
+%global selinux_policy_version 3.14.5-39
+%else
+%global selinux_policy_version 3.14.4-52
+%endif
 %global slapi_nis_version 0.56.1
 
 # krb5 can only provide one KDB at a time
@@ -108,9 +112,9 @@
 # Fedora
 %endif
 
-# 10.7.3 supports LWCA key replication using AES
-# https://pagure.io/freeipa/issue/8020
-%global pki_version 10.7.3-1
+# PKIConnection has been modified to always validate certs.
+# https://pagure.io/freeipa/issue/8379
+%global pki_version 10.9.0-0.4
 
 # https://pagure.io/certmonger/issue/90
 %global certmonger_version 0.79.7-1
@@ -178,7 +182,6 @@ BuildRequires:  systemd
 # systemd-tmpfiles which is executed from make install requires apache user
 BuildRequires:  httpd
 BuildRequires:  nspr-devel
-BuildRequires:  nss-devel >= %{nss_version}
 BuildRequires:  openssl-devel
 BuildRequires:  libini_config-devel
 BuildRequires:  cyrus-sasl-devel
@@ -192,7 +195,12 @@ BuildRequires:  libsss_idmap-devel
 BuildRequires:  libsss_certmap-devel
 BuildRequires:  libsss_nss_idmap-devel >= %{sssd_version}
 BuildRequires:  nodejs(abi)
+# use old dependency on RHEL 8 for now
+%if 0%{?rhel}
 BuildRequires:  uglify-js
+%else
+BuildRequires:  python3-rjsmin
+%endif
 BuildRequires:  libverto-devel
 BuildRequires:  libunistring-devel
 # 0.13.0: https://bugzilla.redhat.com/show_bug.cgi?id=1584773
@@ -237,6 +245,7 @@ BuildRequires:  python3-wheel
 BuildRequires:  jsl
 BuildRequires:  rpmlint
 BuildRequires:  softhsm
+BuildRequires:  keyutils
 BuildRequires:  python3-augeas
 BuildRequires:  python3-cffi
 BuildRequires:  python3-cryptography >= 1.6
@@ -277,6 +286,7 @@ BuildRequires:  python3-sss
 BuildRequires:  python3-sss-murmur
 BuildRequires:  python3-sssdconfig >= %{sssd_version}
 BuildRequires:  python3-systemd
+BuildRequires:  python3-yaml
 BuildRequires:  python3-yubico
 # with_lint
 %endif
@@ -318,7 +328,6 @@ Requires: python3-ipaserver = %{version}-%{release}
 Requires: python3-ldap >= %{python_ldap_version}
 Requires: 389-ds-base >= %{ds_version}
 Requires: openldap-clients > 2.4.35-4
-Requires: nss >= %{nss_version}
 Requires: nss-tools >= %{nss_version}
 Requires(post): krb5-server >= %{krb5_version}
 Requires(post): krb5-server >= %{krb5_base_version}, krb5-server < %{krb5_base_version}.100
@@ -457,7 +466,12 @@ Requires: bind >= 9.11.0-6.P2
 Requires: bind-utils >= 9.11.0-6.P2
 Requires: bind-pkcs11 >= 9.11.0-6.P2
 Requires: bind-pkcs11-utils >= 9.11.0-6.P2
+%if 0%{?fedora} >= 32
+# See https://bugzilla.redhat.com/show_bug.cgi?id=1825812
+Requires: opendnssec >= 2.1.6-5
+%else
 Requires: opendnssec >= 1.4.6-4
+%endif
 %{?systemd_requires}
 
 Provides: %{alt_name}-server-dns = %{version}
@@ -579,6 +593,19 @@ Requires: cifs-utils
 %description client-samba
 This package provides command-line tools to deploy Samba domain member
 on the machine enrolled into a FreeIPA environment
+
+%package client-epn
+Summary: Tools to configure Expiring Password Notification in IPA
+Group: System Environment/Base
+Requires: systemd-units
+Requires(post): systemd-units
+Requires(preun): systemd-units
+Requires(postun): systemd-units
+Requires: %{name}-client = %{version}-%{release}
+
+%description client-epn
+This package provides a service to collect and send expiring password
+notifications via email (SMTP).
 
 %package -n python3-ipaclient
 Summary: Python libraries used by IPA client
@@ -739,7 +766,7 @@ Requires: ldns-utils
 Requires: python3-coverage
 Requires: python3-cryptography >= 1.6
 Requires: python3-polib
-Requires: python3-pytest >= 2.6
+Requires: python3-pytest >= 3.9.1
 Requires: python3-pytest-multihost >= 0.5
 Requires: python3-pytest-sourceorder
 Requires: python3-sssdconfig >= %{sssd_version}
@@ -894,7 +921,7 @@ fi
 
 %posttrans server
 # don't execute upgrade and restart of IPA when server is not installed
-%{__python3} -c "import sys; from ipaserver.install import installutils; sys.exit(0 if installutils.is_ipa_configured() else 1);" > /dev/null 2>&1
+%{__python3} -c "import sys; from ipalib import facts; sys.exit(0 if facts.is_ipa_configured() else 1);" > /dev/null 2>&1
 
 if [  $? -eq 0 ]; then
     # This is necessary for Fedora system upgrades which by default
@@ -973,7 +1000,7 @@ fi
 
 
 %posttrans server-trust-ad
-%{__python3} -c "import sys; from ipaserver.install import installutils; sys.exit(0 if installutils.is_ipa_configured() else 1);" > /dev/null 2>&1
+%{__python3} -c "import sys; from ipalib import facts; sys.exit(0 if facts.is_ipa_configured() else 1);" > /dev/null 2>&1
 if [  $? -eq 0 ]; then
 # NOTE: systemd specific section
     /bin/systemctl try-restart httpd.service >/dev/null 2>&1 || :
@@ -991,6 +1018,17 @@ fi
 # ONLY_CLIENT
 %endif
 
+%preun client-epn
+%systemd_preun ipa-epn.service
+%systemd_preun ipa-epn.timer
+
+%postun client-epn
+%systemd_postun ipa-epn.service
+%systemd_postun ipa-epn.timer
+
+%post client-epn
+%systemd_post ipa-epn.service
+%systemd_post ipa-epn.timer
 
 %post client
 if [ $1 -gt 1 ] ; then
@@ -1015,14 +1053,11 @@ if [ $1 -gt 1 ] ; then
         fi
 
         %{__python3} -c 'from ipaclient.install.client import configure_krb5_snippet; configure_krb5_snippet()' >>/var/log/ipaupgrade.log 2>&1
-    fi
-
-    if [ $restore -ge 2 ]; then
         %{__python3} -c 'from ipaclient.install.client import update_ipa_nssdb; update_ipa_nssdb()' >>/var/log/ipaupgrade.log 2>&1
-    fi
-
-    if [ $restore -ge 2 ]; then
-        sed -E --in-place=.orig 's/^(HostKeyAlgorithms ssh-rsa,ssh-dss)$/# disabled by ipa-client update\n# \1/' /etc/ssh/ssh_config
+        SSH_CLIENT_SYSTEM_CONF="/etc/ssh/ssh_config"
+        if [ -f "$SSH_CLIENT_SYSTEM_CONF" ]; then
+            sed -E --in-place=.orig 's/^(HostKeyAlgorithms ssh-rsa,ssh-dss)$/# disabled by ipa-client update\n# \1/' "$SSH_CLIENT_SYSTEM_CONF"
+        fi
     fi
 fi
 
@@ -1049,7 +1084,7 @@ fi
 %endif
 
 
-%triggerin client -- openssh-server
+%triggerin client -- openssh-server < 8.2
 # Has the client been configured?
 restore=0
 test -f '/var/lib/ipa-client/sysrestore/sysrestore.index' && restore=$(wc -l '/var/lib/ipa-client/sysrestore/sysrestore.index' | awk '{print $1}')
@@ -1079,6 +1114,26 @@ if [ -f '/etc/ssh/sshd_config' -a $restore -ge 2 ]; then
 
         mv -Z /etc/ssh/sshd_config.ipanew /etc/ssh/sshd_config
         chmod 600 /etc/ssh/sshd_config
+
+        /bin/systemctl condrestart sshd.service 2>&1 || :
+    fi
+fi
+
+
+%triggerin client -- openssh-server >= 8.2
+# Has the client been configured?
+restore=0
+test -f '/var/lib/ipa-client/sysrestore/sysrestore.index' && restore=$(wc -l '/var/lib/ipa-client/sysrestore/sysrestore.index' | awk '{print $1}')
+
+if [ -f '/etc/ssh/sshd_config' -a $restore -ge 2 ]; then
+    # If the snippet already exists, skip
+    if [ ! -f '/etc/ssh/sshd_config.d/04-ipa.conf' ]; then
+        # Take the values from /etc/ssh/sshd_config and put them in 04-ipa.conf
+        grep -E '^(PubkeyAuthentication|KerberosAuthentication|GSSAPIAuthentication|UsePAM|ChallengeResponseAuthentication|AuthorizedKeysCommand|AuthorizedKeysCommandUser)' /etc/ssh/sshd_config 2>/dev/null > /etc/ssh/sshd_config.d/04-ipa.conf
+        # Remove the values from sshd_conf
+        sed -ri '
+            /^(PubkeyAuthentication|KerberosAuthentication|GSSAPIAuthentication|UsePAM|ChallengeResponseAuthentication|AuthorizedKeysCommand|AuthorizedKeysCommandUser)[ \t]/ d
+        ' /etc/ssh/sshd_config
 
         /bin/systemctl condrestart sshd.service 2>&1 || :
     fi
@@ -1123,6 +1178,7 @@ fi
 %{_libexecdir}/ipa/ipa-pki-retrieve-key
 %{_libexecdir}/ipa/ipa-pki-wait-running
 %{_libexecdir}/ipa/ipa-otpd
+%{_libexecdir}/ipa/ipa-print-pac
 %dir %{_libexecdir}/ipa/custodia
 %attr(755,root,root) %{_libexecdir}/ipa/custodia/ipa-custodia-dmldap
 %attr(755,root,root) %{_libexecdir}/ipa/custodia/ipa-custodia-pki-tomcat
@@ -1147,7 +1203,6 @@ fi
 %attr(755,root,root) %{plugin_dir}/libipa_uuid.so
 %attr(755,root,root) %{plugin_dir}/libipa_modrdn.so
 %attr(755,root,root) %{plugin_dir}/libipa_lockout.so
-%attr(755,root,root) %{plugin_dir}/libipa_cldap.so
 %attr(755,root,root) %{plugin_dir}/libipa_dns.so
 %attr(755,root,root) %{plugin_dir}/libipa_range_check.so
 %attr(755,root,root) %{plugin_dir}/libipa_otp_counter.so
@@ -1204,9 +1259,9 @@ fi
 %{_usr}/share/ipa/kdcproxy.wsgi
 %{_usr}/share/ipa/ipaca*.ini
 %{_usr}/share/ipa/*.ldif
+%exclude %{_datadir}/ipa/ipa-cldap-conf.ldif
 %{_usr}/share/ipa/*.uldif
 %{_usr}/share/ipa/*.template
-%{_usr}/share/ipa/bind.ipa-ext.conf
 %dir %{_usr}/share/ipa/advise
 %dir %{_usr}/share/ipa/advise/legacy
 %{_usr}/share/ipa/advise/legacy/*.template
@@ -1252,6 +1307,7 @@ fi
 %ghost %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/ipa/kdcproxy/ipa-kdc-proxy.conf
 %ghost %attr(0644,root,root) %config(noreplace) %{_usr}/share/ipa/html/ca.crt
 %ghost %attr(0640,root,named) %config(noreplace) %{_sysconfdir}/named/ipa-ext.conf
+%ghost %attr(0640,root,named) %config(noreplace) %{_sysconfdir}/named/ipa-options-ext.conf
 %ghost %attr(0644,root,root) %{_usr}/share/ipa/html/krb.con
 %ghost %attr(0644,root,root) %{_usr}/share/ipa/html/krb5.ini
 %ghost %attr(0644,root,root) %{_usr}/share/ipa/html/krbrealm.con
@@ -1295,6 +1351,8 @@ fi
 %{_sbindir}/ipa-adtrust-install
 %{_usr}/share/ipa/smb.conf.empty
 %attr(755,root,root) %{_libdir}/samba/pdb/ipasam.so
+%attr(755,root,root) %{plugin_dir}/libipa_cldap.so
+%{_datadir}/ipa/ipa-cldap-conf.ldif
 %{_mandir}/man1/ipa-adtrust-install.1*
 %ghost %{_libdir}/krb5/plugins/libkrb5/winbind_krb5_locator.so
 %{_sysconfdir}/dbus-1/system.d/oddjob-ipa-trust.conf
@@ -1330,6 +1388,19 @@ fi
 %license COPYING
 %{_sbindir}/ipa-client-samba
 %{_mandir}/man1/ipa-client-samba.1*
+
+
+%files client-epn
+%doc README.md Contributors.txt
+%dir %{_sysconfdir}/ipa/epn
+%license COPYING
+%{_sbindir}/ipa-epn
+%{_mandir}/man1/ipa-epn.1*
+%{_mandir}/man5/epn.conf.5*
+%attr(644,root,root) %{_unitdir}/ipa-epn.service
+%attr(644,root,root) %{_unitdir}/ipa-epn.timer
+%attr(600,root,root) %config(noreplace) %{_sysconfdir}/ipa/epn.conf
+%attr(644,root,root) %config(noreplace) %{_sysconfdir}/ipa/epn/expire_msg.template
 
 %files -n python3-ipaclient
 %doc README.md Contributors.txt
@@ -1405,7 +1476,6 @@ fi
 %{python3_sitelib}/ipapython-*.egg-info
 %{python3_sitelib}/ipalib-*.egg-info
 %{python3_sitelib}/ipaplatform-*.egg-info
-%{python3_sitelib}/ipaplatform-*-nspkg.pth
 
 
 %if 0%{?with_ipatests}

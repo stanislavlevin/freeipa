@@ -44,6 +44,7 @@ sbin_SCRIPTS =			\
 	ipa-client-automount	\
 	ipa-client-install	\
 	ipa-client-samba	\
+	ipa-epn                 \
 	$(NULL)
 
 ipa_getkeytab_SOURCES =		\
@@ -91,10 +92,13 @@ ipa_join_LDADD = 		\
 	$(NULL)
 
 SUBDIRS =			\
-	share		\
+	share		        \
 	man			\
-	sysconfig	\
+	sysconfig	        \
+	systemd			\
 	$(NULL)
+#       init                    
+
 
 noinst_HEADERS =		\
 	ipa-client-common.h
@@ -104,6 +108,7 @@ EXTRA_DIST =			\
 	ipa-client-automount.in	\
 	ipa-client-install.in	\
 	ipa-client-samba.in	\
+	ipa-epn.in              \
 	$(NULL)
 
 install-data-hook:

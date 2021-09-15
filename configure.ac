@@ -54,16 +54,17 @@ AM_CONDITIONAL([WITH_IPATESTS], [test x"$with_ipatests" = xyes])
 AM_CONDITIONAL([HAVE_GCC], [test "$ac_cv_prog_gcc" = yes])
 
 dnl ---------------------------------------------------------------------------
-dnl - Check for NSPR/NSS
+dnl - Check for POPT
 dnl ---------------------------------------------------------------------------
-PKG_CHECK_MODULES([NSPR], [nspr])
-PKG_CHECK_MODULES([NSS], [nss])
+
+PKG_CHECK_MODULES([POPT], [popt])
 
 dnl ---------------------------------------------------------------------------
 dnl - Check for KRB5
 dnl ---------------------------------------------------------------------------
 
 PKG_CHECK_MODULES([KRB5], [krb5])
+PKG_CHECK_MODULES([KRB5_GSSAPI], [krb5-gssapi])
 
 AC_CHECK_HEADER(kdb.h, [], [AC_MSG_ERROR([kdb.h not found])])
 AC_CHECK_MEMBER(
@@ -220,6 +221,25 @@ AC_ARG_WITH([runstatedir],
 AC_SUBST([runstatedir])
 
 dnl ---------------------------------------------------------------------------
+dnl - Check for systemd directories
+dnl ---------------------------------------------------------------------------
+
+PKG_CHECK_EXISTS([systemd], [], [AC_MSG_ERROR([systemd not found])])
+AC_ARG_WITH([systemdsystemunitdir],
+            AS_HELP_STRING([--with-systemdsystemunitdir=DIR],
+               [Directory for systemd service files]),
+            [systemdsystemunitdir=$with_systemdsystemunitdir],
+        [systemdsystemunitdir=$($PKG_CONFIG --define-variable=prefix='${prefix}' --variable=systemdsystemunitdir systemd)])
+AC_SUBST([systemdsystemunitdir])
+
+AC_ARG_WITH([systemdtmpfilesdir],
+            AS_HELP_STRING([--with-systemdtmpfilesdir=DIR],
+               [Directory for systemd-tmpfiles configuration files]),
+            [systemdtmpfilesdir=$with_systemdtmpfilesdir],
+        [systemdtmpfilesdir=$($PKG_CONFIG --define-variable=prefix='${prefix}' --variable=tmpfilesdir systemd)])
+AC_SUBST([systemdtmpfilesdir])
+
+dnl ---------------------------------------------------------------------------
 dnl - Server-only configuration
 dnl ---------------------------------------------------------------------------
 
@@ -329,6 +349,7 @@ if test "x${IPAPLATFORM}" == "xdebian"; then
     KRB5KDC_SERVICE="krb5-kdc.service"
     NAMED_GROUP="bind"
     ODS_USER="opendnssec"
+    ODS_GROUP="opendnssec"
     # see https://www.debian.org/doc/packaging-manuals/python-policy/ap-packaging_tools.html
     PYTHON_INSTALL_EXTRA_OPTIONS="--install-layout=deb"
 elif test "x${IPAPLATFORM}" == "xaltlinux"; then
@@ -340,6 +361,7 @@ else
     KRB5KDC_SERVICE="krb5kdc.service"
     NAMED_GROUP="named"
     ODS_USER="ods"
+    ODS_GROUP="ods"
     PYTHON_INSTALL_EXTRA_OPTIONS=""
 fi
 
@@ -352,6 +374,10 @@ AC_MSG_RESULT([${NAMED_GROUP}])
 AC_MSG_CHECKING([ODS_USER])
 AC_SUBST([ODS_USER])
 AC_MSG_RESULT([${ODS_USER}])
+
+AC_MSG_CHECKING([ODS_GROUP])
+AC_SUBST([ODS_GROUP])
+AC_MSG_RESULT([${ODS_GROUP}])
 
 AC_MSG_CHECKING([python setup.py install extra options])
 AC_SUBST([PYTHON_INSTALL_EXTRA_OPTIONS])
@@ -525,6 +551,8 @@ AS_CASE([$JSLINT],
 AC_SUBST([JSLINT])
 AM_CONDITIONAL([WITH_JSLINT], [test "x${JSLINT}" != "xno"])
 
+AM_CONDITIONAL([HAVE_UNSHARE],
+    [test "x${ac_cv_func_unshare}" = "xyes" -a "x${ac_cv_func_chroot}" = "xyes"])
 
 # Flags
 
@@ -542,6 +570,7 @@ AC_CONFIG_FILES([
     client/share/Makefile
     client/man/Makefile
     client/sysconfig/Makefile
+    client/systemd/Makefile
     contrib/completion/Makefile
     contrib/Makefile
     daemons/dnssec/Makefile
@@ -635,13 +664,13 @@ echo "
         jslint:                   ${JSLINT}
         LDAP libs:                ${LDAP_LIBS}
         OpenSSL crypto libs:      ${CRYPTO_LIBS}
-        KRB5 libs:                ${KRB5_LIBS}"
+        KRB5 libs:                ${KRB5_LIBS}
+        systemdsystemunitdir:     ${systemdsystemunitdir}"
 
 AM_COND_IF([ENABLE_SERVER], [
     echo "\
         KRAD libs:                ${KRAD_LIBS}
         krb5rundir:               ${krb5rundir}
-        systemdsystemunitdir:     ${systemdsystemunitdir}
         systemdtmpfilesdir:       ${systemdtmpfilesdir}
         build mode:               server & client"
 ], [

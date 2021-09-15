@@ -2,13 +2,17 @@
 #
 AUTOMAKE_OPTIONS = 1.7
 
+NULL =
+
 dist_noinst_DATA = 			\
 	ipa-custodia.service.in		\
-	ipa.service.in
+	ipa.service.in			\
+	$(NULL)
 
 systemdsystemunit_DATA = 	\
 	ipa-custodia.service	\
-	ipa.service
+	ipa.service				\
+	$(NULL)
 
 CLEANFILES = $(systemdsystemunit_DATA)
 

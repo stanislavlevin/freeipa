@@ -7,6 +7,7 @@ from __future__ import absolute_import
 import os
 import re
 import string
+from SSSDConfig import ServiceAlreadyExists
 from ipatests.pytest_ipa.integration import tasks
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.pytest_ipa.integration.env_config import get_global_config
@@ -40,19 +41,22 @@ class TestCertsInIDOverrides(IntegrationTest):
         # A setup for test_dbus_user_lookup
         master.run_command(['dnf', 'install', '-y', 'sssd-dbus'],
                            raiseonerr=False)
-        # The tasks.modify_sssd_conf way did not work because
-        # sssd_domain.set_option knows nothing about 'services' parameter of
-        # the sssd config file. Therefore I am using sed approach
-        master.run_command(
-            "sed -i '/^services/ s/$/, ifp/' %s" % paths.SSSD_CONF)
         master.run_command(
             "sed -i 's/= 7/= 0xFFF0/' %s" % paths.SSSD_CONF, raiseonerr=False)
+        with tasks.remote_sssd_config(master) as sssd_config:
+            try:
+                sssd_config.new_service('ifp')
+            except ServiceAlreadyExists:
+                pass
+            sssd_config.activate_service('ifp')
+
         master.run_command(['systemctl', 'restart', 'sssd.service'])
         # End of setup for test_dbus_user_lookup
 
         # AD-related stuff
         tasks.install_adtrust(master)
         tasks.sync_time(master, cls.ad)
+        tasks.configure_dns_for_trust(master, cls.ad)
         tasks.establish_trust_with_ad(cls.master, cls.ad_domain,
                                       extra_args=['--range-type',
                                                   'ipa-ad-trust'])
@@ -83,10 +87,16 @@ class TestCertsInIDOverrides(IntegrationTest):
                            cls.reqdir, stdin=stdin_text)
 
         # Export the previously generated cert
-        tasks.run_certutil(master, ['-L', '-n', cls.adcert1, '-a', '>',
-                                    cls.adcert1_file], cls.reqdir)
-        tasks.run_certutil(master, ['-L', '-n', cls.adcert2, '-a', '>',
-                                    cls.adcert2_file], cls.reqdir)
+        res = tasks.run_certutil(master, ['-L', '-n', cls.adcert1, '-a'],
+                                 cls.reqdir)
+        master.put_file_contents(
+            os.path.join(master.config.test_dir, cls.adcert1_file),
+            res.stdout_text)
+        res = tasks.run_certutil(master, ['-L', '-n', cls.adcert2, '-a'],
+                                 cls.reqdir)
+        master.put_file_contents(
+            os.path.join(master.config.test_dir, cls.adcert2_file),
+            res.stdout_text)
         cls.cert1_base64 = cls.master.run_command(
             "openssl x509 -outform der -in %s | base64 -w 0" % cls.adcert1_file
             ).stdout_text

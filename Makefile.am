@@ -207,8 +207,8 @@ if ! WITH_JSLINT
 	@echo "ERROR: jslint not available"; exit 1
 endif
 	@ # just tests, aci, api and pylint on Python 3
-	PYTHONPATH=$(abspath $(top_srcdir)) $(PYTHON) ipatests/ipa-run-tests \
-	    --ipaclient-unittests
+	PATH=$(abspath ipatests):$$PATH PYTHONPATH=$(abspath $(top_srcdir)) \
+	    $(PYTHON) ipatests/ipa-run-tests --ipaclient-unittests
 	$(MAKE) $(AM_MAKEFLAGS) acilint apilint polint pylint jslint yamllint check
 	@echo "All tests passed."
 
@@ -253,7 +253,7 @@ endif
 	        $(PYTHON) -m pycodestyle --diff || exit $$?; \
 	    echo -e "\npylint"; \
 	    echo "------"; \
-	    PYTHONPATH=$(abspath $(top_srcdir)) $(PYTHON) -m pylint \
+	    PYTHONPATH=$(abspath $(top_srcdir)) pylint.py3 \
 	        --rcfile=$(top_srcdir)/pylintrc \
 	        --load-plugins pylint_plugins \
 	        $${FILES} || exit $$?; \
@@ -272,11 +272,23 @@ $(top_builddir)/ipapython/version.py:
 
 .PHONY: acilint
 acilint: $(GENERATED_PYTHON_FILES)
-	cd $(srcdir); $(PYTHON) ./makeaci --validate
+	cd $(srcdir); \
+	PYTHONPATH=$(abspath $(top_srcdir)) $(PYTHON) ./makeaci --validate
+
+.PHONY: aci
+aci: $(GENERATED_PYTHON_FILES)
+	cd $(srcdir); \
+	PYTHONPATH=$(abspath $(top_srcdir)) $(PYTHON) ./makeaci
 
 .PHONY: apilint
 apilint: $(GENERATED_PYTHON_FILES)
-	cd $(srcdir); $(PYTHON) ./makeapi --validate
+	cd $(srcdir); \
+	PYTHONPATH=$(abspath $(top_srcdir)) $(PYTHON) ./makeapi --validate
+
+.PHONY: api
+api: $(GENERATED_PYTHON_FILES)
+	cd $(srcdir); \
+	PYTHONPATH=$(abspath $(top_srcdir)) $(PYTHON) ./makeapi
 
 .PHONY: polint
 polint:
@@ -338,7 +350,7 @@ pylint: $(GENERATED_PYTHON_FILES) ipasetup.py python_scripts
 		-type f -exec grep -qsm1 '^#!.*\bpython' '{}' \; -print`; \
 	FILES=`echo -e "$${FILES}\n$(AZURE_PYTHON_SCRIPT_SUBDIR)"`; \
 	echo -e "Pylint on $(PYTHON) is running over files:\n$${FILES}\nPlease wait ...\n"; \
-	PYTHONPATH=$(top_srcdir) $(PYTHON) -m pylint \
+	PYTHONPATH=$(top_srcdir) pylint.py3 \
 		--rcfile=$(top_srcdir)/pylintrc \
 		--load-plugins pylint_plugins \
 		$${FILES}

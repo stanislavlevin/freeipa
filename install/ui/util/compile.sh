@@ -23,17 +23,20 @@ set -o errexit
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 RDIR=$DIR/../release
 
+# for platform ID
+. /etc/os-release
+
 usage() {
 cat <<-__EOF__;
 NAME
-     compile.sh - Compiles layer file of Dojo build using uglify.js.
+     compile.sh - Compiles layer file of Dojo build using Python rjsmin.
                   Deletes all other files.
 
 SYNOPSIS
      path/to/compile.sh [--help] --release RELEASE --layer NAME/NAME
 
 DESCRIPTION
-     Compiles layer file of Dojo build output using uglify.js.
+     Compiles layer file of Dojo build output using Python rjsmin.
      Deletes all other files.
 
 OPTIONS
@@ -105,7 +108,13 @@ if [[ ! $OUTPUT_FILE ]] ; then
     OUTPUT_FILE=$RDIR/$RELEASE/$LAYER.js
 fi
 
-# compile using uglifyjs
+# compile using python rjsmin on most platforms and uglify-js on RHEL 8
 echo "Minimizing: $RDIR/$RELEASE/$LAYER.js"
 echo "Target file: $OUTPUT_FILE"
-uglifyjs $RDIR/$RELEASE/$LAYER.js > $OUTPUT_FILE
+if [ $ID = "rhel" ]; then
+    echo "Minifier: uglifyjs"
+    uglifyjs < $RDIR/$RELEASE/$LAYER.js > $OUTPUT_FILE
+else
+    echo "Minifier: rjsmin"
+    ${PYTHON:-python3} -m rjsmin < $RDIR/$RELEASE/$LAYER.js > $OUTPUT_FILE
+fi

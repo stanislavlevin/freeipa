@@ -45,7 +45,8 @@ dist_app_DATA =				\
 	domainlevel.ldif			\
 	kerberos.ldif			\
 	indices.ldif			\
-	bind.ipa-ext.conf		\
+	bind.ipa-ext.conf.template		\
+	bind.ipa-options-ext.conf.template	\
 	bind.named.conf.template	\
 	certmap.conf.template		\
 	kdc.conf.template		\
@@ -57,6 +58,7 @@ dist_app_DATA =				\
 	krb.con.template		\
 	krbrealm.con.template		\
 	smb.conf.template		\
+	smb.conf.registry.template		\
 	smb.conf.empty			\
 	referint-conf.ldif		\
 	dna.ldif			\

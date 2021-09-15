@@ -75,7 +75,8 @@ add: member: cn=Host Administrators,cn=privileges,cn=pbac,$SUFFIX
 
 dn: cn=ipa,cn=etc,$SUFFIX
 remove:aci:(target = "ldap:///cn=CAcert,cn=ipa,cn=etc,$SUFFIX")(targetattr = cACertificate)(version 3.0; acl "Modify CA Certificate"; allow (write) userdn = "ldap:///fqdn=$FQDN,cn=computers,cn=accounts,$SUFFIX";)
-add:aci:(target = "ldap:///cn=CAcert,cn=ipa,cn=etc,$SUFFIX")(targetattr = cACertificate)(version 3.0; acl "Modify CA Certificate"; allow (write) groupdn = "ldap:///cn=ipaservers,cn=hostgroups,cn=accounts,$SUFFIX";)
+remove:aci:(target = "ldap:///cn=CAcert,cn=ipa,cn=etc,$SUFFIX")(targetattr = cACertificate)(version 3.0; acl "Modify CA Certificate"; allow (write) groupdn = "ldap:///cn=ipaservers,cn=hostgroups,cn=accounts,$SUFFIX";)
+add:aci:(target = "ldap:///cn=CAcert,cn=ipa,cn=etc,$SUFFIX")(targetattr = "cACertificate")(version 3.0; acl "Modify CA Certificate"; allow (write) groupdn = "ldap:///cn=ipaservers,cn=hostgroups,cn=accounts,$SUFFIX";)
 
 dn: cn=certificates,cn=ipa,cn=etc,$SUFFIX
 remove:aci:(targetfilter = "(&(objectClass=ipaCertificate)(ipaConfigString=ipaCA))")(targetattr = "ipaCertIssuerSerial || cACertificate")(version 3.0; acl "Modify CA Certificate Store Entry"; allow (write) userdn = "ldap:///fqdn=$FQDN,cn=computers,cn=accounts,$SUFFIX";)
@@ -98,7 +99,8 @@ default:member: cn=Automember Task Administrator,cn=privileges,cn=pbac,$SUFFIX
 default:ipapermissiontype: SYSTEM
 
 dn: cn=config
-add:aci: (target = "ldap:///cn=automember rebuild membership,cn=tasks,cn=config")(targetattr=*)(version 3.0;acl "permission:Add Automember Rebuild Membership Task";allow (add) groupdn = "ldap:///cn=Add Automember Rebuild Membership Task,cn=permissions,cn=pbac,$SUFFIX";)
+remove:aci: (target = "ldap:///cn=automember rebuild membership,cn=tasks,cn=config")(targetattr=*)(version 3.0;acl "permission:Add Automember Rebuild Membership Task";allow (add) groupdn = "ldap:///cn=Add Automember Rebuild Membership Task,cn=permissions,cn=pbac,$SUFFIX";)
+add:aci: (target = "ldap:///cn=automember rebuild membership,cn=tasks,cn=config")(targetattr = "*")(version 3.0;acl "permission:Add Automember Rebuild Membership Task";allow (add) groupdn = "ldap:///cn=Add Automember Rebuild Membership Task,cn=permissions,cn=pbac,$SUFFIX";)
 
 
 # Virtual operations
@@ -209,6 +211,28 @@ default:ipapermissiontype: SYSTEM
 
 dn: cn=config
 add:aci: (targetattr = "cn || createtimestamp || entryusn || modifytimestamp || objectclass || passsyncmanagersdns*")(target = "ldap:///cn=ipa_pwd_extop,cn=plugins,cn=config")(version 3.0;acl "permission:Read PassSync Managers Configuration";allow (compare,read,search) groupdn = "ldap:///cn=Read PassSync Managers Configuration,cn=permissions,cn=pbac,$SUFFIX";)
+
+dn: cn=Read Replication Changelog Configuration,cn=permissions,cn=pbac,$SUFFIX
+default:objectClass: groupofnames
+default:objectClass: ipapermission
+default:objectClass: top
+default:cn: Read Replication Changelog Configuration
+default:member: cn=Replication Administrators,cn=privileges,cn=pbac,$SUFFIX
+default:ipapermissiontype: SYSTEM
+
+dn: cn=config
+add:aci: (targetattr = "cn || objectclass || nsslapd-changelogmaxentries || nsslapd-changelogmaxage || nsslapd-changelogtrim-interval || nsslapd-encryptionalgorithm || nsSymmetricKey")(targetfilter = "cn=changelog")(target = "ldap:///cn=ldbm database,cn=plugins,cn=config")(version 3.0; acl "permission:Read Replication Changelog Configuration"; allow (read,search) groupdn = "ldap:///cn=Read Replication Changelog Configuration,cn=permissions,cn=pbac,$SUFFIX";)
+
+dn: cn=Write Replication Changelog Configuration,cn=permissions,cn=pbac,$SUFFIX
+default:objectClass: groupofnames
+default:objectClass: ipapermission
+default:objectClass: top
+default:cn: Write Replication Changelog Configuration
+default:member: cn=Replication Administrators,cn=privileges,cn=pbac,$SUFFIX
+default:ipapermissiontype: SYSTEM
+
+dn: cn=config
+add:aci: (targetattr = "nsslapd-changelogmaxentries || nsslapd-changelogmaxage || nsslapd-changelogtrim-interval || nsslapd-encryptionalgorithm || nsSymmetricKey")(targetfilter = "cn=changelog")(target = "ldap:///cn=ldbm database,cn=plugins,cn=config")(version 3.0; acl "permission:Write Replication Changelog Configuration"; allow (write) groupdn = "ldap:///cn=Write Replication Changelog Configuration,cn=permissions,cn=pbac,$SUFFIX";)
 
 dn: cn=Modify PassSync Managers Configuration,cn=permissions,cn=pbac,$SUFFIX
 default:objectClass: groupofnames

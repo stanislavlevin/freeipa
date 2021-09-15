@@ -75,6 +75,7 @@ freeipa2-dev-doc
 /daemons/dnssec/ipa-ods-exporter.service
 /daemons/dnssec/ipa-ods-exporter.socket
 /daemons/ipa-kdb/ipa_kdb_tests
+/daemons/ipa-kdb/ipa-print-pac
 /daemons/ipa-kdb/tests/.dirstamp
 /daemons/ipa-otpd/ipa-otpd
 /daemons/ipa-otpd/ipa-otpd.socket
@@ -88,10 +89,11 @@ freeipa2-dev-doc
 /po/test.po
 /po/test_locale/xh_ZA/LC_MESSAGES/ipa.mo
 
+/util/t_pwd
+
 /init/ipa_memcached
 /init/systemd/ipa-custodia.service
 /init/systemd/ipa.service
-/init/systemd/ipa_memcached.service
 /init/tmpfilesd/ipa.conf
 
 !/install/ui/doc/Makefile.in
@@ -112,6 +114,8 @@ freeipa2-dev-doc
 /client/ipa-getkeytab
 /client/ipa-join
 /client/ipa-rmkeytab
+/client/systemd/ipa-epn.service
+/client/systemd/ipa-epn.timer
 
 /ipaplatform/override.py
 /ipapython/version.py
@@ -125,8 +129,10 @@ makeaci
 makeapi
 client/ipa-certupdate
 client/ipa-client-automount
+client/certbot-dns-ipa
 client/ipa-client-install
 client/ipa-client-samba
+client/ipa-epn
 daemons/dnssec/ipa-dnskeysyncd
 daemons/dnssec/ipa-dnskeysync-replica
 daemons/dnssec/ipa-ods-exporter
@@ -147,6 +153,7 @@ install/restart_scripts/renew_ra_cert_pre
 install/restart_scripts/restart_dirsrv
 install/restart_scripts/restart_httpd
 install/restart_scripts/stop_pkicad
+install/tools/ipa-acme-manage
 install/tools/ipa-adtrust-install
 install/tools/ipa-advise
 install/tools/ipa-backup
@@ -161,6 +168,7 @@ install/tools/ipa-custodia
 install/tools/ipa-custodia-check
 install/tools/ipa-dns-install
 install/tools/ipa-httpd-kdcproxy
+install/tools/ipa-httpd-pwdreader
 install/tools/ipa-kra-install
 install/tools/ipa-ldap-updater
 install/tools/ipa-managed-entries

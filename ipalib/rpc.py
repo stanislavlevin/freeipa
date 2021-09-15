@@ -52,7 +52,7 @@ import six
 
 from ipalib.backend import Connectible
 from ipalib.constants import LDAP_GENERALIZED_TIME_FORMAT
-from ipalib.errors import (public_errors, UnknownError, NetworkError,
+from ipalib.errors import (errors_by_code, UnknownError, NetworkError,
                            XMLRPCMarshallError, JSONError)
 from ipalib import errors, capabilities
 from ipalib.request import context, Connection
@@ -96,8 +96,6 @@ logger = logging.getLogger(__name__)
 
 COOKIE_NAME = 'ipa_session'
 CCACHE_COOKIE_KEY = 'X-IPA-Session-Cookie'
-
-errors_by_code = dict((e.errno, e) for e in public_errors)
 
 
 def update_persistent_client_session_data(principal, data):
@@ -686,6 +684,9 @@ class KerbTransport(SSLTransport):
             return False
         return True
 
+    # pylint: disable=inconsistent-return-statements
+    # pylint does not properly manage the _handle_exception call
+    # that is always raising an exception
     def single_request(self, host, handler, request_body, verbose=0):
         # Based on Python 2.7's xmllib.Transport.single_request
         try:
@@ -747,6 +748,7 @@ class KerbTransport(SSLTransport):
             logger.debug("HTTP connection destroyed (%s)",
                          host, exc_info=True)
             raise
+    # pylint: enable=inconsistent-return-statements
 
     if six.PY3:
         def __send_request(self, connection, host, handler, request_body, debug):
@@ -1170,11 +1172,11 @@ class RPCClient(Connectible):
                     try:
                         principal = getattr(context, 'principal', None)
                         delete_persistent_client_session_data(principal)
-                    except Exception as e:
+                    except Exception as e2:
                         # This shouldn't happen if we have a session
                         # but it isn't fatal.
                         logger.debug("Error trying to remove persisent "
-                                     "session data: %s", e)
+                                     "session data: %s", e2)
 
                     # Create a new serverproxy with the non-session URI
                     serverproxy = self.create_connection(

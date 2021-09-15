@@ -182,49 +182,6 @@ ipa_class_members = {
         'validatedns',
         'normalizedns',
     ],
-    'ipatests.test_integration.base.IntegrationTest': [
-        {'domain': [
-            {'name': dir(str)},
-        ]},
-        {'master': [
-            {'config': [
-                {'dirman_dn': dir(str)},
-                {'dirman_password': dir(str)},
-                {'admin_password': dir(str)},
-                {'admin_name': dir(str)},
-                {'dns_forwarder': dir(str)},
-                {'test_dir': dir(str)},
-                {'ad_admin_name': dir(str)},
-                {'ad_admin_password': dir(str)},
-                {'domain_level': dir(str)},
-                {'fips_mode': dir(bool)},
-            ]},
-            {'domain': [
-                {'basedn': dir(str)},
-                {'realm': dir(str)},
-                {'name': dir(str)},
-            ]},
-            {'external_hostname': dir(str)},
-            {'hostname': dir(str)},
-            'ip',
-            'collect_log',
-            {'run_command': [
-                {'stdout_text': dir(str)},
-                {'stderr_text': dir(str)},
-                'returncode',
-            ]},
-            {'transport': ['put_file', 'file_exists']},
-            'put_file_contents',
-            'get_file_contents',
-            'ldap_connect',
-        ]},
-        'replicas',
-        'clients',
-        'ad_domains',
-        {'ads': dir(list)},
-        {'ad_subdomains': dir(list)},
-        {'ad_treedomains': dir(list)},
-    ]
 }
 
 
@@ -548,3 +505,71 @@ AstroidBuilder(MANAGER).string_build(textwrap.dedent(
     api.env.webui_prod = True
     """
 ))
+
+# dnspython 2.x introduces enums and creates module level globals from them
+# pylint does not understand the trick
+AstroidBuilder(MANAGER).string_build(textwrap.dedent(
+    """
+    import dns.flags
+    import dns.rdataclass
+    import dns.rdatatype
+
+    dns.flags.AD = 0
+    dns.flags.CD = 0
+    dns.flags.DO = 0
+    dns.flags.RD = 0
+
+    dns.rdataclass.IN = 0
+
+    dns.rdatatype.A = 0
+    dns.rdatatype.AAAA = 0
+    dns.rdatatype.CNAME = 0
+    dns.rdatatype.DNSKEY = 0
+    dns.rdatatype.MX = 0
+    dns.rdatatype.NS = 0
+    dns.rdatatype.PTR = 0
+    dns.rdatatype.RRSIG = 0
+    dns.rdatatype.SOA = 0
+    dns.rdatatype.SRV = 0
+    dns.rdatatype.TXT = 0
+    dns.rdatatype.URI = 0
+    """
+))
+
+AstroidBuilder(MANAGER).string_build(
+    textwrap.dedent(
+        """\
+    from ipatests.test_integration.base import IntegrationTest
+    from ipatests.pytest_ipa.integration.host import Host, WinHost
+    from ipatests.pytest_ipa.integration.config import Config, Domain
+
+
+    class PylintIPAHosts:
+        def __getitem__(self, key):
+            return Host()
+
+
+    class PylintWinHosts:
+        def __getitem__(self, key):
+            return WinHost()
+
+
+    class PylintADDomains:
+        def __getitem__(self, key):
+            return Domain()
+
+
+    Host.config = Config()
+    Host.domain = Domain()
+
+    IntegrationTest.domain = Domain()
+    IntegrationTest.master = Host()
+    IntegrationTest.replicas = PylintIPAHosts()
+    IntegrationTest.clients = PylintIPAHosts()
+    IntegrationTest.ads = PylintWinHosts()
+    IntegrationTest.ad_treedomains = PylintWinHosts()
+    IntegrationTest.ad_subdomains = PylintWinHosts()
+    IntegrationTest.ad_domains = PylintADDomains()
+    """
+    )
+)

@@ -20,7 +20,6 @@ from ipalib.constants import (
     DOMAIN_LEVEL_1, IPA_CA_NICKNAME, CA_SUFFIX_NAME)
 from ipaplatform.paths import paths
 from ipapython import certdb
-from ipatests.test_integration.test_backup_and_restore import backup
 from ipatests.test_integration.test_dns_locations import (
     resolve_records_from_server, IPA_DEFAULT_MASTER_SRV_REC
 )
@@ -46,6 +45,21 @@ class ReplicaPromotionBase(IntegrationTest):
                                           raiseonerr=False)
         found = result2.stdout_text.find("0 vaults matched")
         assert(found > 0), result2.stdout_text
+
+
+def sssd_config_allows_ipaapi_access_to_ifp(host):
+    """Checks that the sssd configuration allows the ipaapi user to access
+    ifp
+
+    :param host the machine on which to check that sssd allows ipaapi
+    access to ifp
+    """
+    with tasks.remote_sssd_config(host) as sssd_conf:
+        ifp = sssd_conf.get_service('ifp')
+        uids = [
+            uid.strip() for uid in ifp.get_option('allowed_uids').split(',')
+        ]
+        assert 'ipaapi' in uids
 
 
 class TestReplicaPromotionLevel1(ReplicaPromotionBase):
@@ -100,6 +114,10 @@ class TestReplicaPromotionLevel1(ReplicaPromotionBase):
         # Ensure that pkinit is properly configured, test for 7566
         result = self.replicas[0].run_command(['ipa-pkinit-manage', 'status'])
         assert "PKINIT is enabled" in result.stdout_text
+
+        # Verify that the sssd configuration allows the ipaapi user to
+        # access ifp
+        sssd_config_allows_ipaapi_access_to_ifp(self.replicas[0])
 
 
 class TestUnprivilegedUserPermissions(IntegrationTest):
@@ -171,6 +189,9 @@ class TestUnprivilegedUserPermissions(IntegrationTest):
                                       '-n', self.master.domain.name,
                                       '-r', self.master.domain.realm,
                                       '-U'])
+
+    def test_sssd_config_allows_ipaapi_access_to_ifp(self):
+        sssd_config_allows_ipaapi_access_to_ifp(self.replicas[0])
 
 
 class TestProhibitReplicaUninstallation(IntegrationTest):
@@ -928,7 +949,7 @@ class TestHiddenReplicaPromotion(IntegrationTest):
         """
         self._check_server_role(self.replicas[0], 'hidden')
         # backup
-        backup_path = backup(self.replicas[0])
+        backup_path = tasks.get_backup_dir(self.replicas[0])
         # uninstall
         tasks.uninstall_master(self.replicas[0])
         # restore

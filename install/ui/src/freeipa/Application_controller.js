@@ -238,23 +238,26 @@ define([
             IPA.logout();
         },
 
-        is_selfservice: function() {
-            var whoami = IPA.whoami.data;
-            var self_service = true;
-
+        is_admin: function(whoami) {
             if (whoami.hasOwnProperty('memberof_group') &&
                 whoami.memberof_group.indexOf('admins') !== -1) {
-                self_service = false;
+                return true;
             } else if (whoami.hasOwnProperty('memberofindirect_group')&&
                     whoami.memberofindirect_group.indexOf('admins') !== -1) {
-                self_service = false;
+                return true;
             } else if (whoami.hasOwnProperty('memberof_role') &&
                     whoami.memberof_role.length > 0) {
-                self_service = false;
+                return true;
             } else if (whoami.hasOwnProperty('memberofindirect_role') &&
                     whoami.memberofindirect_role.length > 0) {
-                self_service = false;
+                return true;
             }
+            return false;
+        },
+
+        is_selfservice: function() {
+            var whoami = IPA.whoami.data;
+            var self_service = !this.is_admin(whoami);
 
             IPA.is_selfservice = self_service; // quite ugly, needed for users
 
@@ -262,11 +265,14 @@ define([
         },
 
         is_aduser_selfservice: function() {
-            var selfservice = IPA.whoami.metadata.object === 'idoverrideuser';
-            // quite ugly, needed for users and iduseroverride to hide breadcrumb
-            IPA.is_aduser_selfservice = selfservice;
+            var whoami = IPA.whoami.data;
+            var idoverride = IPA.whoami.metadata.object === 'idoverrideuser';
+            var self_service = idoverride && (this.is_admin(whoami) === false);
 
-            return selfservice;
+            // quite ugly, needed for users and iduseroverride to hide breadcrumb
+            IPA.is_aduser_selfservice = self_service;
+
+            return self_service;
         },
 
         update_logged_in: function(logged_in) {
@@ -535,37 +541,9 @@ define([
          * Tries to find menu item with assigned facet and navigate to it.
          */
         on_menu_click: function(menu_item) {
-            this._navigate_to_menu_item(menu_item);
-        },
-
-        _navigate_to_menu_item: function(menu_item) {
-
-            if (menu_item.entity) {
-                // entity pages
-                routing.navigate([
-                    'entity',
-                    menu_item.entity,
-                    menu_item.facet,
-                    menu_item.pkeys,
-                    menu_item.args]);
-            } else if (menu_item.facet) {
-                // concrete facets
-                routing.navigate(['generic', menu_item.facet, menu_item.args]);
-            } else {
-                // categories, select first posible child, it may be the last
-                var children = this.menu.query({parent: menu_item.name });
-                if (children.total) {
-                    var success = false;
-                    for (var i=0; i<children.total;i++) {
-                        success = this._navigate_to_menu_item(children[i]);
-                        if (success) break;
-                    }
-                } else {
-                    return false;
-                }
-            }
-
-            return true;
+            routing.navigate(
+                this.app_widget.menu_widget.get_item_path(menu_item)
+            );
         },
 
         /**

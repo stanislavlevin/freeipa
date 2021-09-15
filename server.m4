@@ -4,6 +4,9 @@ dnl ---------------------------------------------------------------------------
 dnl - Check for DS slapi plugin
 dnl ---------------------------------------------------------------------------
 
+# 389-ds headers depend on NSPR
+PKG_CHECK_MODULES([NSPR], [nspr])
+
 # Need to hack CPPFLAGS to be able to correctly detect slapi-plugin.h
 SAVE_CPPFLAGS=$CPPFLAGS
 CPPFLAGS=$NSPR_CFLAGS
@@ -20,6 +23,8 @@ CPPFLAGS=$SAVE_CPPFLAGS
 if test "x$ac_cv_header_dirsrv_slapi_plugin_h" = "xno" ; then
     AC_MSG_ERROR([Required DS slapi plugin header not available (fedora-ds-base-devel)])
 fi
+
+AC_CHECK_FUNC(timegm, [], [AC_MSG_ERROR([timegm not found])])
 
 dnl -- dirsrv is needed for the extdom unit tests --
 PKG_CHECK_MODULES([DIRSRV], [dirsrv  >= 1.3.0])
@@ -150,20 +155,10 @@ dnl ---------------------------------------------------------------------------
 PKG_CHECK_MODULES([LIBVERTO], [libverto])
 
 dnl ---------------------------------------------------------------------------
-dnl - Check for systemd directories
+dnl Check for unshare(2) - Linux-only. We also check for chroot(2) as we use both
 dnl ---------------------------------------------------------------------------
 
-PKG_CHECK_EXISTS([systemd], [], [AC_MSG_ERROR([systemd not found])])
-AC_ARG_WITH([systemdsystemunitdir],
-            AS_HELP_STRING([--with-systemdsystemunitdir=DIR],
-               [Directory for systemd service files]),
-            [systemdsystemunitdir=$with_systemdsystemunitdir],
-        [systemdsystemunitdir=$($PKG_CONFIG --define-variable=prefix='${prefix}' --variable=systemdsystemunitdir systemd)])
-AC_SUBST([systemdsystemunitdir])
-
-AC_ARG_WITH([systemdtmpfilesdir],
-            AS_HELP_STRING([--with-systemdtmpfilesdir=DIR],
-               [Directory for systemd-tmpfiles configuration files]),
-            [systemdtmpfilesdir=$with_systemdtmpfilesdir],
-        [systemdtmpfilesdir=$($PKG_CONFIG --define-variable=prefix='${prefix}' --variable=tmpfilesdir systemd)])
-AC_SUBST([systemdtmpfilesdir])
+AC_CHECK_HEADER(sched.h, [
+    AC_CHECK_FUNC(unshare, [], [AC_MSG_WARN([unshare not found, no extdom unit tests to be run])])
+    AC_CHECK_FUNC(chroot, [], [AC_MSG_WARN([chroot not found, no extdom unit tests to be run])])
+], [AC_MSG_WARN([sched.h not found, unshare is not available])])

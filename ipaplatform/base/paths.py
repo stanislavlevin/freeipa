@@ -27,6 +27,7 @@ import os
 class BasePathNamespace:
     BIN_HOSTNAMECTL = "/bin/hostnamectl"
     ECHO = "/bin/echo"
+    FIPS_MODE_SETUP = "/usr/bin/fips-mode-setup"
     GZIP = "/bin/gzip"
     LS = "/bin/ls"
     SYSTEMCTL = "/bin/systemctl"
@@ -81,13 +82,18 @@ class BasePathNamespace:
     LDAP_CONF = "/etc/ldap.conf"
     LIBNSS_LDAP_CONF = "/etc/libnss-ldap.conf"
     NAMED_CONF = "/etc/named.conf"
-    NAMED_CUSTOM_CONFIG = "/etc/named/ipa-ext.conf"
-    NAMED_CUSTOM_CFG_SRC = '/usr/share/ipa/bind.ipa-ext.conf'
+    NAMED_CONF_BAK = "/etc/named.conf.ipa-backup"
+    NAMED_CUSTOM_CONF = "/etc/named/ipa-ext.conf"
+    NAMED_CUSTOM_OPTIONS_CONF = "/etc/named/ipa-options-ext.conf"
+    NAMED_CONF_SRC = '/usr/share/ipa/bind.named.conf.template'
+    NAMED_CUSTOM_CONF_SRC = '/usr/share/ipa/bind.ipa-ext.conf.template'
+    NAMED_CUSTOM_OPTIONS_CONF_SRC = (
+        '/usr/share/ipa/bind.ipa-options-ext.conf.template'
+    )
     NAMED_VAR_DIR = "/var/named"
     NAMED_KEYTAB = "/etc/named.keytab"
     NAMED_RFC1912_ZONES = "/etc/named.rfc1912.zones"
     NAMED_ROOT_KEY = "/etc/named.root.key"
-    NAMED_BINDKEYS_FILE = "/etc/named.iscdlv.key"
     NAMED_MANAGED_KEYS_DIR = "/var/named/dynamic"
     NAMED_CRYPTO_POLICY_FILE = None
     NSLCD_CONF = "/etc/nslcd.conf"
@@ -105,9 +111,14 @@ class BasePathNamespace:
     OPENLDAP_LDAP_CONF = "/etc/openldap/ldap.conf"
     PAM_LDAP_CONF = "/etc/pam_ldap.conf"
     PASSWD = "/etc/passwd"
+    # Trusted CA certificates used to be written out to this file. In newer
+    # versions of FreeIPA, it has been replaced by IPA_P11_KIT.
     SYSTEMWIDE_IPA_CA_CRT = "/etc/pki/ca-trust/source/anchors/ipa-ca.crt"
     IPA_P11_KIT = "/etc/pki/ca-trust/source/ipa.p11-kit"
+    CA_CERTIFICATES_BUNDLE_PEM = None
+    CA_CERTIFICATES_DIR = None
     NSS_DB_DIR = "/etc/pki/nssdb"
+    PKI_CONFIGURATION = "/etc/pki"
     PKI_TOMCAT = "/etc/pki/pki-tomcat"
     PKI_TOMCAT_ALIAS_DIR = "/etc/pki/pki-tomcat/alias"
     PKI_TOMCAT_ALIAS_PWDFILE_TXT = "/etc/pki/pki-tomcat/alias/pwdfile.txt"
@@ -121,6 +132,8 @@ class BasePathNamespace:
     SSH_CONFIG_DIR = "/etc/ssh"
     SSH_CONFIG = "/etc/ssh/ssh_config"
     SSHD_CONFIG = "/etc/ssh/sshd_config"
+    SSHD_IPA_CONFIG = "/etc/ssh/sshd_config.d/04-ipa.conf"
+    SSHD_IPA_CONFIG_TEMPLATE = "/usr/share/ipa/client/sshd_ipa.conf.template"
     SSSD_CONF = "/etc/sssd/sssd.conf"
     SSSD_CONF_BKP = "/etc/sssd/sssd.conf.bkp"
     SSSD_CONF_DELETED = "/etc/sssd/sssd.conf.deleted"
@@ -315,7 +328,7 @@ class BasePathNamespace:
         "/var/lib/pki/pki-tomcat/ca/profiles/ca/caSignedLogCert.cfg")
     KRA_CS_CFG_PATH = "/var/lib/pki/pki-tomcat/conf/kra/CS.cfg"
     KRACERT_P12 = "/root/kracert.p12"
-    SAMBA_DIR = "/var/lib/samba/"
+    SAMBA_DIR = "/var/lib/samba"
     SSSD_DB = "/var/lib/sss/db"
     SSSD_MC_GROUP = "/var/lib/sss/mc/group"
     SSSD_MC_PASSWD = "/var/lib/sss/mc/passwd"
@@ -339,6 +352,7 @@ class BasePathNamespace:
     IPASERVER_UNINSTALL_LOG = "/var/log/ipaserver-uninstall.log"
     IPAUPGRADE_LOG = "/var/log/ipaupgrade.log"
     IPATRUSTENABLEAGENT_LOG = "/var/log/ipatrust-enable-agent.log"
+    IPAEPN_LOG = "/var/log/ipaepn.log"
     KADMIND_LOG = "/var/log/kadmind.log"
     KRB5KDC_LOG = "/var/log/krb5kdc.log"
     MESSAGES = "/var/log/messages"
@@ -406,8 +420,10 @@ class BasePathNamespace:
     DIRSRV_LOCK_DIR = "/run/lock/dirsrv"
     ALL_SLAPD_INSTANCE_SOCKETS = "/run/slapd-*.socket"
     VAR_LOG_DIRSRV_INSTANCE_TEMPLATE = "/var/log/dirsrv/slapd-%s"
+    VAR_LOG_DIRSRV = "/var/log/dirsrv/"
     SLAPD_INSTANCE_ACCESS_LOG_TEMPLATE = "/var/log/dirsrv/slapd-%s/access"
     SLAPD_INSTANCE_ERROR_LOG_TEMPLATE = "/var/log/dirsrv/slapd-%s/errors"
+    SLAPD_INSTANCE_AUDIT_LOG_TEMPLATE = "/var/log/dirsrv/slapd-%s/audit"
     SLAPD_INSTANCE_SYSTEMD_IPA_ENV_TEMPLATE = \
         "/etc/systemd/system/dirsrv@%s.service.d/ipa-env.conf"
     IPA_SERVER_UPGRADE = '/usr/sbin/ipa-server-upgrade'

@@ -509,6 +509,13 @@ class CAInstance(DogtagInstance):
         else:
             pki_pin = None
 
+        # When spawning a CA instance, always point to IPA_CA_CRT if it
+        # exists. Later, when we're performing step 2 of an external CA
+        # installation, we'll overwrite this key to point to the real
+        # external CA.
+        if os.path.exists(paths.IPA_CA_CRT):
+            cfg['pki_cert_chain_path'] = paths.IPA_CA_CRT
+
         if self.clone:
             if self.no_db_setup:
                 cfg.update(
@@ -1065,8 +1072,11 @@ class CAInstance(DogtagInstance):
             logger.error(
                 "certmonger failed to start tracking certificate: %s", e)
 
-    def stop_tracking_certificates(self):
-        """Stop tracking our certificates. Called on uninstall.
+    def stop_tracking_certificates(self, stop_certmonger=True):
+        """
+        Stop tracking our certificates. Called on uninstall.  Also called
+        during upgrade to fix discrepancies.
+
         """
         super(CAInstance, self).stop_tracking_certificates(False)
 
@@ -1082,7 +1092,8 @@ class CAInstance(DogtagInstance):
             logger.error(
                 "certmonger failed to stop tracking certificate: %s", e)
 
-        services.knownservices.certmonger.stop()
+        if stop_certmonger:
+            services.knownservices.certmonger.stop()
 
 
     def set_audit_renewal(self):
@@ -1398,7 +1409,7 @@ class CAInstance(DogtagInstance):
                         rewriteRuleDisabled = False
                         break
         except IOError:
-            raise RuntimeError(
+            raise InconsistentCRLGenConfigException(
                 "Unable to read {}".format(paths.HTTPD_IPA_PKI_PROXY_CONF))
 
         # if enableCRLUpdates and rewriteRuleDisabled are different, the config

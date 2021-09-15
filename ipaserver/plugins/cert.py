@@ -36,7 +36,7 @@ from ipalib import api
 from ipalib import errors, messages
 from ipalib import x509
 from ipalib import ngettext
-from ipalib.constants import IPA_CA_CN
+from ipalib.constants import IPA_CA_CN, IPA_CA_RECORD
 from ipalib.crud import Create, PKQuery, Retrieve, Search
 from ipalib.frontend import Method, Object
 from ipalib.parameters import (
@@ -799,6 +799,21 @@ class cert_request(Create, BaseCertMethod, VirtualCommand):
 
                 name = gn.value
 
+                # Special case: if the DNS name is ipa-ca.$DOMAIN and if the
+                # subject principal is the HTTP service for an IPA server
+                # then allow the name.
+                if name == f'{IPA_CA_RECORD}.{self.api.env.domain}' \
+                        and principal.is_service \
+                        and principal.service_name == 'HTTP':
+                    try:
+                        self.api.Command.server_show(principal.hostname)
+                    except errors.NotFound:
+                        pass  # not an IPA server; proceed as usual
+                    else:
+                        # subject principal is an IPA server, so the
+                        # ipa-ca.$DOMAIN name is allowed
+                        continue
+
                 if _dns_name_matches_principal(name, principal, principal_obj):
                     san_dnsnames.add(name)
                     continue  # nothing more to check for this alt name
@@ -812,13 +827,13 @@ class cert_request(Create, BaseCertMethod, VirtualCommand):
                 try:
                     if principal_type == HOST:
                         alt_principal_obj = api.Command['host_show'](
-                            name, all=True)
+                            name, all=True)['result']
                     elif principal_type == KRBTGT:
                         alt_principal = kerberos.Principal(
                             (u'host', name), principal.realm)
                     elif principal_type == SERVICE:
                         alt_principal_obj = api.Command['service_show'](
-                            alt_principal, all=True)
+                            alt_principal, all=True)['result']
                 except errors.NotFound:
                     # We don't want to issue any certificates referencing
                     # machines we don't know about. Nothing is stored in this
@@ -851,7 +866,7 @@ class cert_request(Create, BaseCertMethod, VirtualCommand):
                         pass
 
                     # Now check write access and caacl
-                    altdn = alt_principal_obj['result']['dn']
+                    altdn = alt_principal_obj['dn']
                     if not ldap.can_write(altdn, "usercertificate"):
                         raise errors.ACIError(info=_(
                             "Insufficient privilege to create a certificate "
@@ -1824,9 +1839,14 @@ class cert_find(Search, CertMethod):
         truncated = False
         complete = False
 
-        for sub_search in (self._cert_search,
-                           self._ca_search,
-                           self._ldap_search):
+        # Do not execute the CA sub-search in CA-less deployment.
+        # See https://pagure.io/freeipa/issue/8369.
+        if ca_enabled:
+            searches = [self._cert_search, self._ca_search, self._ldap_search]
+        else:
+            searches = [self._cert_search, self._ldap_search]
+
+        for sub_search in searches:
             sub_result, sub_truncated, sub_complete = sub_search(
                 all=all,
                 raw=raw,

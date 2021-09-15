@@ -42,6 +42,9 @@ SIZE_1024 = 'abcdefgh' * 128
     os.environ.get('RPM_BUILD_DIR') is not None,
     reason='these tests depend on the host Linux key retention service',
 )
+@pytest.mark.skip_if_container(
+    "any", reason="kernel keyrings are not namespaced yet"
+)
 class test_keyring:
     """
     Test the kernel keyring interface
@@ -125,13 +128,10 @@ class test_keyring:
         See if a key is available
         """
         kernel_keyring.add_key(TEST_KEY, TEST_VALUE)
+        assert kernel_keyring.has_key(TEST_KEY)  # noqa
 
-        result = kernel_keyring.has_key(TEST_KEY)
-        assert(result == True)
         kernel_keyring.del_key(TEST_KEY)
-
-        result = kernel_keyring.has_key(TEST_KEY)
-        assert(result == False)
+        assert not kernel_keyring.has_key(TEST_KEY)  # noqa
 
     def test_07(self):
         """
