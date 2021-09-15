@@ -1425,6 +1425,10 @@ class TestIpaHealthCheck(IntegrationTest):
         yield
         self.master.run_command(["rm", "-f", HEALTHCHECK_LOG])
 
+    @pytest.mark.xfail(
+        reason="Too old sos in ALT: https://bugzilla.altlinux.org/40902",
+        strict=True,
+    )
     def test_sosreport_includes_healthcheck(self, create_logfile):
         """
         This testcase checks that sosreport command
