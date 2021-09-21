@@ -44,7 +44,7 @@
 
 Name: freeipa
 Version: 4.8.9
-Release: alt4.c9f2.1
+Release: alt4.c9f2.2
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1051,6 +1051,9 @@ fi
 %python3_sitelibdir/ipaplatform-*.egg-info/
 
 %changelog
+* Tue Sep 21 2021 Andrey Cherepanov <cas@altlinux.org> 4.8.9-alt4.c9f2.2
+- WebUI: Fix topology graph navigation crash (patch from upstream).
+
 * Wed Sep 15 2021 Stanislav Levin <slev@altlinux.org> 4.8.9-alt4.c9f2.1
 - Backported to c9f2.
 
