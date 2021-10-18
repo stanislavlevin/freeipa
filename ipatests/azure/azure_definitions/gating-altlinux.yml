@@ -182,6 +182,9 @@ vms:
     tests:
     - test_integration/test_upgrade.py
 
+  - container_job: subids
+    tests:
+    - test_integration/test_subids.py
 
   # requires external DNS configuration, this is not set up yet
   # - container_job: authselect
