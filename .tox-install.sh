@@ -35,12 +35,6 @@ fi
 export PIP_CACHE_DIR="${TOXINIDIR}/.tox/cache"
 mkdir -p "${PIP_CACHE_DIR}"
 
-# /tmp could be mounted with noexec option.
-# pip checks if path is executable and if not then doesn't set such
-# permission bits
-export PIP_BUILD="${ENVDIR}/pip_build"
-rm -rf "${PIP_BUILD}"
-
 DISTBUNDLE="${TOXINIDIR}/dist/bundle"
 mkdir -p "${DISTBUNDLE}"
 
