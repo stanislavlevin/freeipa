@@ -281,7 +281,7 @@ class Host(pytest_multihost.host.Host):
         else:
             return result
 
-    def spawn_expect(self, argv, default_timeout=10, encoding='utf-8',
+    def spawn_expect(self, argv, default_timeout=20, encoding='utf-8',
                      extra_ssh_options=None):
         """Run command on remote host using IpaTestExpect"""
         return self.transport.spawn_expect(argv, default_timeout, encoding,
