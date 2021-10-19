@@ -28,12 +28,6 @@ vms:
     tests:
     - test_integration/test_otp.py
 
-  - container_job: http_kdc_proxy
-    tests:
-    - test_integration/test_http_kdc_proxy.py
-    containers:
-      clients: 1
-
 - vm_jobs:
   - container_job: ntp_options_chrony
     tests:
@@ -77,10 +71,6 @@ vms:
       replicas: 2
       clients: 1
 
-  - container_job: idviews_TestRulesWithServicePrincipals
-    tests:
-    - test_integration/test_idviews.py::TestRulesWithServicePrincipals
-
 - vm_jobs:
   - container_job: idviews_TestIDViews
     tests:
@@ -101,6 +91,10 @@ vms:
   - container_job: automember
     tests:
     - test_integration/test_automember.py
+
+  - container_job: idviews_TestRulesWithServicePrincipals
+    tests:
+    - test_integration/test_idviews.py::TestRulesWithServicePrincipals
 
 - vm_jobs:
   - container_job: dns_locations
@@ -159,10 +153,6 @@ vms:
       clients: 1
 
 - vm_jobs:
-  - container_job: ipa_cert_fix
-    tests:
-    - test_integration/test_ipa_cert_fix.py
-
   - container_job: TestReplicaInstallWithExistingEnty
     tests:
     - test_integration/test_replica_promotion.py::TestReplicaInstallWithExistingEntry
@@ -235,6 +225,8 @@ vms:
     - test_integration/test_customized_ds_config_install.py
     containers:
       replicas: 1
+    # requires external dns
+    args: '-k "not test_customized_ds_install_replica"'
 
 - vm_jobs:
   - container_job: test_dns
@@ -261,11 +253,11 @@ vms:
     tests:
     - test_integration/test_external_ca.py::TestMultipleExternalCA
 
-  - container_job: TestADTrustInstall
-    tests:
-    - test_integration/test_installation.py::TestADTrustInstall
-    containers:
-      replicas: 2
+#   - container_job: TestADTrustInstall
+#     tests:
+#     - test_integration/test_installation.py::TestADTrustInstall
+#     containers:
+#       replicas: 2
 
 - vm_jobs:
   - container_job: TestADTrustInstallWithDNS_KRA_ADTrust
@@ -279,6 +271,8 @@ vms:
     - test_integration/test_installation.py::TestInstallCA
     containers:
       replicas: 2
+    # requires external dns
+    args: '-k "not test_replica_ca_install_with_no_host_dns and not test_replica_ca_install_with_skip_schema_check"'
 
   - container_job: TestInstallMasterDNS
     tests:
@@ -330,3 +324,10 @@ vms:
     - test_integration/test_uninstallation.py
     containers:
       replicas: 2
+    # requires external DNS
+    args: '-k "not test_uninstall_client_invalid_hostname and not test_install_uninstall_replica"'
+
+- vm_jobs:
+  - container_job: ipa_cert_fix
+    tests:
+    - test_integration/test_ipa_cert_fix.py
