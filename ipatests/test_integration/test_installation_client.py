@@ -186,9 +186,17 @@ class TestClientInstallBind(IntegrationTest):
             bindserverip=bindserver.ip,
             zoneupper=bindserver.domain.name.upper()
         )
-        bindserverdb = "/var/named/{0}.db".format(bindserver.domain.name)
+        bindserverdb = os.path.join(
+            bindserver.paths.NAMED_VAR_DIR, f"{bindserver.domain.name}.db"
+        )
         bindserver.put_file_contents(bindserverdb, add_records)
-        bindserver.run_command(['systemctl', 'start', 'named'])
+        bindserver.run_command(
+            [
+                "systemctl",
+                "restart",
+                bindserver.knownservices["named"].systemd_name,
+            ]
+        )
         Firewall(bindserver).enable_services(["dns"])
         yield
         named_conf_backup.restore()
