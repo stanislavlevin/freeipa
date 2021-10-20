@@ -1562,6 +1562,11 @@ class TestKRAinstallAfterCertRenew(IntegrationTest):
     related ticket: https://pagure.io/freeipa/issue/7288
     """
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_KRA_install_after_cert_renew(self):
 
         tasks.install_master(self.master)
