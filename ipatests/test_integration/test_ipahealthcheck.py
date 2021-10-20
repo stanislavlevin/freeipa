@@ -1568,6 +1568,11 @@ class TestIpaHealthCheck(IntegrationTest):
         self.master.run_command(['date','-s', '-3Years'])
         self.master.run_command(['ipactl', 'restart'])
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_nsscheck_cert_expired(self, expire_cert_critical):
         """
         This test checks that critical message is displayed
@@ -1584,7 +1589,11 @@ class TestIpaHealthCheck(IntegrationTest):
             assert "Expired Certificate" in check["kw"]["items"]
             assert check["kw"]["msg"] == msg
 
-
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_ipa_healthcheck_expiring(self, restart_service):
         """
         There are two overlapping tests for expiring certs, check both.
