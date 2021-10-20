@@ -2947,3 +2947,23 @@ def allow_sshd_interactive_auth(host):
     )
     host.put_file_contents(pam_sshd_path, pam_sshd)
     host.run_command(["cat", pam_sshd_path])
+
+
+def remote_service_name(host, service):
+    """Helper method to get actual service name on remote host
+    :param Host host: remote host
+    :param str service: IPA knownservice name
+    :return: remote service name
+    :rtype: str
+    """
+    result = host.run_command(
+        [
+            "python3",
+            "-c",
+            (
+                "from ipaplatform.services import knownservices; "
+                "print(knownservices.named.systemd_name)"
+            ),
+        ]
+    )
+    return result.stdout_text.strip()
