@@ -147,6 +147,11 @@ class TestIpaCertFix(IntegrationTest):
         tasks.uninstall_master(self.master)
         tasks.move_date(self.master, 'start', '-20Years-1day')
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_missing_csr(self, expire_cert_critical):
         """
         Test that ipa-cert-fix succeeds when CSR is missing from CS.cfg
@@ -208,6 +213,11 @@ class TestIpaCertFix(IntegrationTest):
                 # timeout
                 raise AssertionError('Timeout: Failed to renew all the certs')
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_renew_expired_cert_on_master(self, expire_cert_critical):
         """Test if ipa-cert-fix renews expired certs
 
@@ -246,6 +256,11 @@ class TestIpaCertFix(IntegrationTest):
                                          raiseonerr=False)
         assert result.returncode == 2
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_missing_startup(self, expire_cert_critical):
         """
         Test ipa-cert-fix fails/warns when startup directive is missing
@@ -294,6 +309,11 @@ class TestIpaCertFix(IntegrationTest):
         else:
             assert warn_msg in result.stderr_text
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_expired_CA_cert(self, expire_ca_cert):
         """Test to check ipa-cert-fix when CA certificate is expired
 
@@ -364,6 +384,11 @@ class TestCertFixKRA(IntegrationTest):
         # the fixture
         pass
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_renew_expired_cert_with_kra(self, expire_cert_critical):
         """Test if ipa-cert-fix renews expired certs with kra installed
 
@@ -429,6 +454,11 @@ class TestCertFixReplica(IntegrationTest):
             tasks.uninstall_master(host)
             tasks.move_date(host, 'start', '-3years-1days')
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_renew_expired_cert_replica(self, expire_certs):
         """Test renewal of certificates on replica with ipa-cert-fix
 

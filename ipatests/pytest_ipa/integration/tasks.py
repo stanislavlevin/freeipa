@@ -2966,6 +2966,8 @@ def move_date(host, chrony_cmd, date_str):
                        chrony service, for instance 'start', 'stop'
     :param date_str: date string to change the date i.e '3years2months1day1'
     """
+    if host.osinfo.container is not None:
+        pytest.fail("Containers don't support time namespaces yet")
     host.run_command(['systemctl', chrony_cmd, 'chronyd'])
     host.run_command(['date', '-s', date_str])
 
