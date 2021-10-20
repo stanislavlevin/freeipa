@@ -1662,6 +1662,11 @@ class TestIPACommand(IntegrationTest):
         assert result.returncode == 1
         assert 'cannot be deleted or disabled' in result.stderr_text
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_ipa_cacert_manage_prune(self):
         """Test for ipa-cacert-manage prune"""
 

@@ -655,6 +655,11 @@ class TestACMERenew(IntegrationTest):
         tasks.install_client(cls.master, cls.clients[0])
 
     @pytest.mark.skipif(skip_certbot_tests, reason='certbot not available')
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_renew(self, issue_and_expire_acme_cert):
         """Test if ACME renews the issued cert with cerbot
 
@@ -829,6 +834,11 @@ class TestACMEPrune(IntegrationTest):
         assert result.returncode == 1
         assert "1-5 ranges are not supported" in result.stderr_text
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_prune_cert_manual(self, issue_and_expire_acme_cert):
         """Test to prune expired certificate by manual run"""
         if (tasks.get_pki_version(self.master)
@@ -858,6 +868,11 @@ class TestACMEPrune(IntegrationTest):
         )
         assert f'CN={self.clients[0].hostname}' not in result.stdout_text
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_prune_cert_cron(self, issue_and_expire_acme_cert):
         """Test to prune expired certificate by cron job"""
         if (tasks.get_pki_version(self.master)
@@ -903,6 +918,11 @@ class TestACMEPrune(IntegrationTest):
         )
         assert f'CN={self.clients[0].hostname}' not in result.stdout_text
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_prune_cert_retention_unit(self, issue_and_expire_acme_cert):
         """Test to prune expired certificate with retention unit option"""
         if (tasks.get_pki_version(self.master)
@@ -936,6 +956,11 @@ class TestACMEPrune(IntegrationTest):
         )
         assert f'CN={self.clients[0].hostname}' not in result.stdout_text
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_prune_cert_search_size_limit(self, issue_and_expire_acme_cert):
         """Test to prune expired certificate with search size limit option"""
         if (tasks.get_pki_version(self.master)
