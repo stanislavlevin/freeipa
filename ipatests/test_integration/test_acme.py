@@ -567,6 +567,11 @@ class TestACMERenew(IntegrationTest):
     @pytest.fixture
     def issue_and_expire_cert(self):
         """Fixture to expire cert by moving date past expiry of acme cert"""
+        if osinfo.container is not None:
+            pytest.skip(
+                "Linux kernel(5.6+) supports time namespaces, but Docker "
+                "doesn't. See https://github.com/moby/moby/issues/39163."
+            )
         # enable the ACME service on master
         self.master.run_command(['ipa-acme-manage', 'enable'])
 
