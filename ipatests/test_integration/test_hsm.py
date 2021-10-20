@@ -657,6 +657,11 @@ class TestHSMcertFix(BaseHSMTest):
         check_version(cls.master)
         delete_hsm_token([cls.master] + cls.replicas, cls.token_name)
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_hsm_renew_expired_cert_on_master(self, expire_cert_critical):
         check_version(self.master)
         expire_cert_critical(self.master)
@@ -689,6 +694,11 @@ class TestHSMcertFixKRA(BaseHSMTest):
         check_version(cls.master)
         delete_hsm_token([cls.master] + cls.replicas, cls.token_name)
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_hsm_renew_expired_cert_with_kra(self, expire_cert_critical):
         check_version(self.master)
         expire_cert_critical(self.master)
@@ -739,6 +749,11 @@ class TestHSMcertFixReplica(BaseHSMTest):
             tasks.uninstall_master(host)
             tasks.move_date(host, 'start', '-3years-1days')
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_hsm_renew_expired_cert_replica(self, expire_certs):
         check_version(self.master)
         # wait for cert expiry
@@ -1207,6 +1222,11 @@ class TestHSMACMEPrune(IntegrationTest):
         super(TestHSMACMEPrune, cls).uninstall(mh)
         delete_hsm_token([cls.master], cls.token_name)
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_hsm_prune_cert_manual(self, issue_and_expire_acme_cert):
         """Test to prune expired certificate by manual run"""
         if (tasks.get_pki_version(self.master)
@@ -1241,6 +1261,11 @@ class TestHSMACMEPrune(IntegrationTest):
         )
         assert f'CN={self.clients[0].hostname}' not in result.stdout_text
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_hsm_prune_cert_cron(self, issue_and_expire_acme_cert):
         """Test to prune expired certificate by cron job"""
         if (tasks.get_pki_version(self.master)
