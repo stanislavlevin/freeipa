@@ -2240,6 +2240,11 @@ class TestIPACommandWithoutReplica(IntegrationTest):
         self.master.run_command(['ipa', 'config-mod', "--ipaconfigstring="])
         self.master.run_command(['ipa', 'subid-stats'])
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_ipa_cacert_manage_prune(self):
         """Test for ipa-cacert-manage prune
 
