@@ -583,6 +583,11 @@ class TestACMEwithExternalCA(TestACME):
 def issue_and_expire_acme_cert():
     """Fixture to expire cert by moving date past expiry of acme cert"""
     hosts = []
+    if osinfo.container is not None:
+        pytest.skip(
+            "Linux kernel(5.6+) supports time namespaces, but Docker "
+            "doesn't. See https://github.com/moby/moby/issues/39163."
+        )
 
     def _issue_and_expire_acme_cert(
         master, client,
