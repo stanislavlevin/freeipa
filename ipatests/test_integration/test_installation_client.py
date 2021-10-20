@@ -73,7 +73,7 @@ class TestInstallClient(IntegrationTest):
         """
         tasks.install_client(self.master, self.clients[0],
                              extra_args=['--ssh-trust-dns'])
-        result = self.clients[0].run_command(['cat', '/etc/ssh/ssh_config'])
+        result = self.clients[0].run_command(['cat', paths.SSH_CONFIG])
         assert 'HostKeyAlgorithms' not in result.stdout_text
 
     def test_client_install_with_krb5(self):
