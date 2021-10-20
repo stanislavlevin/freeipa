@@ -881,6 +881,9 @@ def setup_named_debugging(host):
     )
     service_name = result.stdout_text.strip()
     host.run_command(["systemctl", "restart", service_name])
+    # ALT-specific problem: due to caps dropping of named it is expected that
+    # LDAP connection can be failed, there are 3 attempts every 5sec
+    time.sleep(10)
 
 
 @contextmanager
