@@ -10,6 +10,7 @@ import time
 
 import logging
 from ipaplatform.paths import paths
+from ipaplatform.osinfo import osinfo
 from ipatests.pytest_ipa.integration import tasks
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.test_integration.test_caless import CALessBase, ipa_certs_cleanup
@@ -64,6 +65,11 @@ def expire_cert_critical():
     Fixture to expire the certs by moving the system date using
     date -s command and revert it back
     """
+    if osinfo.container is not None:
+        pytest.skip(
+            "Linux kernel(5.6+) supports time namespaces, but Docker doesn't. "
+            "See https://github.com/moby/moby/issues/39163."
+        )
 
     hosts = dict()
 
@@ -94,6 +100,12 @@ class TestIpaCertFix(IntegrationTest):
 
     @pytest.fixture
     def expire_ca_cert(self):
+        if osinfo.container is not None:
+            pytest.skip(
+                "Linux kernel(5.6+) supports time namespaces, but Docker "
+                "doesn't. See https://github.com/moby/moby/issues/39163."
+            )
+
         tasks.install_master(self.master, setup_dns=False,
                              extra_args=['--no-ntp'])
         move_date(self.master, 'stop', '+20Years+1day')
