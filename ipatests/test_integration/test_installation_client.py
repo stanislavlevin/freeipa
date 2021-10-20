@@ -8,10 +8,12 @@ Module provides tests for various options of ipa-client-install.
 
 from __future__ import absolute_import
 
-import pytest
+import os
 import re
 import shlex
 import textwrap
+
+import pytest
 
 from ipaplatform.paths import paths
 from ipatests.test_integration.base import IntegrationTest
@@ -161,9 +163,17 @@ class TestClientInstallBind(IntegrationTest):
             bindserverip=bindserver.ip,
             zoneupper=bindserver.domain.name.upper()
         )
-        bindserverdb = "/var/named/{0}.db".format(bindserver.domain.name)
+        bindserverdb = os.path.join(
+            paths.NAMED_VAR_DIR, f"{bindserver.domain.name}.db"
+        )
         bindserver.put_file_contents(bindserverdb, add_records)
-        bindserver.run_command(['systemctl', 'start', 'named'])
+        bindserver.run_command(
+            [
+                "systemctl",
+                "restart",
+                tasks.remote_service_name(bindserver, "named"),
+            ]
+        )
         Firewall(bindserver).enable_services(["dns"])
         yield
         named_conf_backup.restore()
