@@ -341,7 +341,7 @@ class TestInstallCA(IntegrationTest):
 
         # add softhsm lib
         cmd_args = ['modutil', '-dbdir', paths.NSS_DB_DIR, '-add',
-                    'softhsm', '-libfile', '/usr/lib64/softhsm/libsofthsm.so']
+                    'softhsm', '-libfile', paths.LIBSOFTHSM2_SO]
         self.master.run_command(cmd_args, stdin_text="\n\n")
 
         # create a token
