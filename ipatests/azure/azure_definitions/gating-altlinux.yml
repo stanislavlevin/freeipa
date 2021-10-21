@@ -102,12 +102,6 @@ vms:
     tests:
     - test_integration/test_external_ca.py::TestExternalCA
 
-  # requires nothing, installs nothing
-  - container_job: topologies_and_testconfig
-    tests:
-    - test_integration/test_topologies.py
-    - test_integration/test_testconfig.py
-
   - container_job: external_ca_ExternalCAConstraints
     containers:
       clients: 1
@@ -136,6 +130,12 @@ vms:
   - container_job: membermanager
     tests:
     - test_integration/test_membermanager.py
+
+  # requires nothing, installs nothing
+  - container_job: topologies_and_testconfig
+    tests:
+    - test_integration/test_topologies.py
+    - test_integration/test_testconfig.py
 
 - vm_jobs:
   - container_job: ServerReplicaCALessToCAFull
