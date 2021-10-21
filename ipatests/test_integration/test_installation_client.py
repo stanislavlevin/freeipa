@@ -16,6 +16,7 @@ import textwrap
 import pytest
 
 from ipaplatform.paths import paths
+from ipaplatform.constants import constants
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.pytest_ipa.integration import tasks
 from ipatests.pytest_ipa.integration.firewall import Firewall
@@ -115,11 +116,23 @@ class TestClientInstallBind(IntegrationTest):
         bindserver = self.master
         named_conf_backup = tasks.FileBackup(self.master, paths.NAMED_CONF)
         # create a zone in the BIND server that is identical to the IPA
+        zonefile = f"{bindserver.domain.name}.db"
+        platform = tasks.get_platform(bindserver)
+        if platform == "altlinux":
+            # for bind 9.11 working directory(/etc/bind/zone) is readonly,
+            # so writable for group 'named' subdir must be created
+            zonefile = f"nsupdate/{bindserver.domain.name}.db"
+            zonedir_abs = os.path.join(paths.NAMED_VAR_DIR, "nsupdate")
+            bindserver.run_command(["mkdir", "-m", "0770", zonedir_abs])
+            bindserver.run_command(
+                ["chown", f":{constants.NAMED_GROUP.gid}", zonedir_abs]
+            )
+
         add_zone = textwrap.dedent("""
         zone "{domain}" IN {{ type master;
-        file "{domain}.db"; allow-query {{ any; }};
+        file "{zonefile}"; allow-query {{ any; }};
         allow-update {{ any; }}; }};
-        """).format(domain=bindserver.domain.name)
+        """).format(domain=bindserver.domain.name, zonefile=zonefile)
 
         namedcfg = bindserver.get_file_contents(
             paths.NAMED_CONF, encoding='utf-8')
@@ -163,9 +176,7 @@ class TestClientInstallBind(IntegrationTest):
             bindserverip=bindserver.ip,
             zoneupper=bindserver.domain.name.upper()
         )
-        bindserverdb = os.path.join(
-            paths.NAMED_VAR_DIR, f"{bindserver.domain.name}.db"
-        )
+        bindserverdb = os.path.join(paths.NAMED_VAR_DIR, zonefile)
         bindserver.put_file_contents(bindserverdb, add_records)
         bindserver.run_command(
             [
