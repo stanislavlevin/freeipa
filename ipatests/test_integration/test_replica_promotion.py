@@ -947,10 +947,11 @@ class TestHiddenReplicaPromotion(IntegrationTest):
 
     @classmethod
     def install(cls, mh):
-        for srv in (cls.master, cls.replicas[0]):
-            tasks.install_packages(srv, HEALTHCHECK_PKG)
         # master with DNSSEC master
         tasks.install_master(cls.master, setup_dns=True, setup_kra=True)
+        for srv in (cls.master, cls.replicas[0]):
+            tasks.install_packages(srv, HEALTHCHECK_PKG)
+
         cls.master.run_command([
             "ipa-dns-install",
             "--dnssec-master",
