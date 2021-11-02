@@ -1,0 +1,400 @@
+name: FreeIPA CI [p10]
+
+on:
+  push:
+    branches:
+      - p10-ci
+  schedule:
+    # every day at 4 UTC
+    - cron: '0 7 * * *'
+
+env:
+  # vars work only on steps level for now
+  IPA_TESTS_SCRIPTS: '.github/workflows/scripts'
+  SHELL_CMD: '/bin/bash --noprofile --norc -eux'
+  SHELL_CMD_NODEBUG: '/bin/bash --noprofile --norc -eu'
+  GHA_USER: gha_user
+  IPA_TESTS_DOCKERFILES: '.github/workflows/Dockerfiles'
+  # Docker image name built during CI and used for integration/base tests
+  IPA_DOCKER_IMAGE: 'freeipa-ci-builder'
+  MAX_CONTAINER_ENVS: 5
+  IPA_TESTS_ENV_WORKING_DIR: ${{ github.workspace }}/ipa_envs
+  # path to freeipa git repo inside container
+  IPA_TESTS_REPO_PATH: '/freeipa'
+  CI_RUNNER_LOGS_DIR: 'logs'
+  RUN_AS_GHA_USER: "runuser -u $GHA_USER -- "
+  # checkout branch for scheduled runs
+  GHA_TARGET_REF: "${{ github.event_name == 'schedule' && 'p10-ci' || github.sha }}"
+
+jobs:
+  build:
+    name: Build packages and Docker image
+    runs-on: ubuntu-latest
+    container:
+      # job level is not supported by env, only step level
+      image: stanislavlevin/freeipa-build-altlinux:p10
+      options: --privileged --env container=docker
+    outputs:
+      tests_matrix: ${{ steps.tests_matrix.outputs.matrix }}
+
+    steps:
+    - name: Install git
+      # git is required for git clone otherwise there will be no .git dir
+      run: |
+        apt-get update
+        apt-get install -y git-core gzip
+
+    - name: Checkout sources
+      uses: actions/checkout@v2
+      with:
+        # fetch all tags
+        fetch-depth: 0
+        ref: ${{ env.GHA_TARGET_REF }}
+
+    - name: Print Host environment
+      run: env | sort
+
+    - name: Install base build environment
+      run: |
+        set -eu
+        useradd -m ${{ env.GHA_USER }}
+        # for build as unprivileged user
+        [ $(id -u) -eq 0 ] && chmod -R o+wrX .
+        ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-build.sh
+
+    - name: Run autoconf
+      run: |
+        ${{ env.RUN_AS_GHA_USER }} \
+            ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/autoconf.sh
+
+    - name: Build packages
+      run: |
+        ${{ env.RUN_AS_GHA_USER }} \
+            ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/build-packages.sh
+
+    - name: Upload packages
+      uses: actions/upload-artifact@v2
+      with:
+        name: packages-${{ github.run_number }}-${{ github.run_attempt }}
+        if-no-files-found: error
+        path: ${{ github.workspace }}/dist/
+
+    - name: Create Docker image for tests
+      run: |
+        ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}//build-docker-image.sh
+
+    - name: Upload Docker image
+      uses: actions/upload-artifact@v2
+      with:
+        name: docker-image-${{ github.run_number }}-${{ github.run_attempt }}
+        if-no-files-found: error
+        path: ${{ github.workspace }}/${{ env.IPA_DOCKER_IMAGE }}-image.tar.gz
+
+    - name: Generate Matrix for Base/Integration tests
+      id: tests_matrix
+      run: |
+        set -eu
+        python3 \
+            ${{ env.IPA_TESTS_SCRIPTS }}/generate-matrix.py \
+            'ipatests/azure/azure_definitions/base.yml' \
+            'ipatests/azure/azure_definitions/gating.yml' \
+            'ipatests/azure/azure_definitions/nightly.yml' \
+            ${{ env.MAX_CONTAINER_ENVS }}
+
+    - name: Check for consistency with PR-CI
+      run: |
+        python3 ${{ env.IPA_TESTS_SCRIPTS }}/gating_compare.py
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    container:
+      image: stanislavlevin/freeipa-build-altlinux:p10
+      options: --privileged --env container=docker
+
+    steps:
+    - name: Install git
+      # git is required for git clone otherwise there will be no .git dir
+      run: |
+        apt-get update
+        apt-get install -y git-core gzip
+
+    - name: Checkout sources
+      uses: actions/checkout@v2
+      with:
+        # fetch all tags
+        fetch-depth: 0
+        ref: ${{ env.GHA_TARGET_REF }}
+
+    - name: Install base build environment
+      run: |
+        set -eu
+        useradd -m ${{ env.GHA_USER }}
+        # for build as unprivileged user
+        [ $(id -u) -eq 0 ] && chmod -R o+wrX .
+        ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-build.sh
+
+    - name: Install Lint dependencies
+      run: ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-lint.sh
+
+    - name: Run autoconf
+      run: |
+        ${{ env.RUN_AS_GHA_USER }} \
+            ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/autoconf.sh
+
+    - name: Lint sources
+      run: ${{ env.RUN_AS_GHA_USER }} make V=0 lint
+
+    - name: Quick code style check
+      if: github.event_name == 'pull_request'
+      run: |
+        set -eu
+        ${{ env.RUN_AS_GHA_USER }} git update-ref \
+            "refs/heads/${{ github.base_ref }}" "origin/${{ github.base_ref }}"
+        ${{ env.RUN_AS_GHA_USER }} \
+            make V=0 "GIT_BRANCH=${{ github.base_ref }}" fastcodestyle
+
+  tests:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.build.outputs.tests_matrix) }}
+      fail-fast: false
+    name: ${{ matrix.ipa_tests_job_name }}
+    env: ${{ matrix.ipa_tests_env }}
+
+    steps:
+    - name: Checkout sources
+      uses: actions/checkout@v2
+      with:
+        # fetch all tags
+        fetch-depth: 0
+        ref: ${{ env.GHA_TARGET_REF }}
+
+    - uses: actions/download-artifact@v2
+      with:
+        name: packages-${{ github.run_number }}-${{ github.run_attempt }}
+        path: ${{ github.workspace }}/dist
+
+    - uses: actions/download-artifact@v2
+      with:
+        name: docker-image-${{ github.run_number }}-${{ github.run_attempt }}
+        path: ${{ github.workspace }}
+
+    - name: Print Host environment
+      run: env | sort
+
+    - name: Prepare Host
+      run: ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-ci-host.sh
+
+    - name: Run tests
+      run: ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/runner.sh
+
+    # hack: GHA doesn't provide browser for artifacts
+    # it is convenient to check runner's log without downloading of huge zip
+    # there is no loop in GHA atm, so it is assumed max env = 5
+    - name: Runners log ${{ matrix.ipa_tests_env_name_1 }}
+      if: always()
+      run: |
+        cat ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/${{ matrix.ipa_tests_env_name_1 }}/runner_*.log ||:
+
+    - name: Runners log ${{ matrix.ipa_tests_env_name_2 }}
+      if: always()
+      run: |
+        cat ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/${{ matrix.ipa_tests_env_name_2 }}/runner_*.log ||:
+
+    - name: Runners log ${{ matrix.ipa_tests_env_name_3 }}
+      if: always()
+      run: |
+        cat ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/${{ matrix.ipa_tests_env_name_3 }}/runner_*.log ||:
+
+    - name: Runners log ${{ matrix.ipa_tests_env_name_4 }}
+      if: always()
+      run: |
+        cat ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/${{ matrix.ipa_tests_env_name_4 }}/runner_*.log ||:
+
+    - name: Runners log ${{ matrix.ipa_tests_env_name_5 }}
+      if: always()
+      run: |
+        cat ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/${{ matrix.ipa_tests_env_name_5 }}/runner_*.log ||:
+    # end of hack
+
+    - name: Host's memory statistics
+      if: always()
+      run: |
+        set -x
+        free -m
+        cat /sys/fs/cgroup/memory/memory.memsw.max_usage_in_bytes
+        cat /sys/fs/cgroup/memory/memory.max_usage_in_bytes
+        cat /proc/sys/vm/swappiness
+
+    - name: Host's systemd journal
+      if: always()
+      run: |
+        set -eu
+        HOST_JOURNAL=host_journal.log
+        HOST_JOURNAL_PATH="${IPA_TESTS_ENV_WORKING_DIR}/${HOST_JOURNAL}.tar.gz"
+        sudo journalctl -b | tee "$HOST_JOURNAL"
+
+        function emit_warning() {
+            printf "::warning ::%s\n" "$1"
+        }
+
+        printf "AVC:\n"
+        grep 'AVC apparmor="DENIED"' "$HOST_JOURNAL" && \
+            emit_warning "There are Host's AVCs. Please, check the logs."
+        printf "SECCOMP:\n"
+        grep ' SECCOMP ' "$HOST_JOURNAL" && \
+            emit_warning "There are reported SECCOMP syscalls. Please, check the logs."
+        tar -czf "$HOST_JOURNAL_PATH" "$HOST_JOURNAL"
+
+    - name: Check for coredumps
+      if: always()
+      run:
+        ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/check-coredumps.sh
+
+    - name: Collect logs
+      if: always()
+      uses: actions/upload-artifact@v2
+      with:
+        name: logs-${{ matrix.ipa_tests_job_name }}-${{ github.run_number }}-${{ github.run_attempt }}
+        path: |
+          ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/coredumps/*.core.tar.gz
+          ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/coredumps/*.stacktrace.tar.gz
+          ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/*/logs/**
+          ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/*/*.yml
+          ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/*/*.yaml
+          ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/*/*.log
+          ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/*/systemd_boot_logs/*.log
+          ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/*/installed_packages/*.log
+          ${{ env.IPA_TESTS_ENV_WORKING_DIR }}/*.tar.gz
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    container:
+      image: stanislavlevin/freeipa-build-altlinux:p10
+      options: --privileged --env container=docker
+
+    steps:
+    - name: Install git
+      # git is required for git clone otherwise there will be no .git dir
+      run: |
+        apt-get update
+        apt-get install -y git-core gzip
+
+    - name: Checkout sources
+      uses: actions/checkout@v2
+      with:
+        # fetch all tags
+        fetch-depth: 0
+        ref: ${{ env.GHA_TARGET_REF }}
+
+    - name: Install base build environment
+      run: |
+        set -eu
+        useradd -m ${{ env.GHA_USER }}
+        # for build as unprivileged user
+        [ $(id -u) -eq 0 ] && chmod -R o+wrX .
+        ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-build.sh
+
+    - name: Run autoconf
+      run: |
+        ${{ env.RUN_AS_GHA_USER }} \
+            ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/autoconf.sh
+
+    - name: Build documentation
+      run: |
+        ${{ env.RUN_AS_GHA_USER }} \
+            ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/build-docs.sh
+
+    - name: Publish documentation
+      uses: actions/upload-artifact@v2
+      with:
+        name: docs-${{ github.run_number }}-${{ github.run_attempt }}
+        if-no-files-found: error
+        path: ${{ github.workspace }}/doc/_build/html/
+
+  tox:
+    name: Tox
+    runs-on: ubuntu-latest
+    container:
+      image: stanislavlevin/freeipa-build-altlinux:p10
+      options: --privileged --env container=docker
+
+    steps:
+    - name: Install git
+      # git is required for git clone otherwise there will be no .git dir
+      run: |
+        apt-get update
+        apt-get install -y git-core gzip
+
+    - name: Checkout sources
+      uses: actions/checkout@v2
+      with:
+        # fetch all tags
+        fetch-depth: 0
+        ref: ${{ env.GHA_TARGET_REF }}
+
+    - name: Install base build environment
+      run: |
+        set -eu
+        useradd -m ${{ env.GHA_USER }}
+        # for build as unprivileged user
+        [ $(id -u) -eq 0 ] && chmod -R o+wrX .
+        ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-build.sh
+
+    - name: Install Tox prerequisites
+      run: ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-tox.sh
+
+    - name: Run autoconf
+      run: |
+        ${{ env.RUN_AS_GHA_USER }} \
+            ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/autoconf.sh
+
+    - name: Tox
+      run: |
+        ${{ env.RUN_AS_GHA_USER }} \
+            ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/run-tox.sh
+
+  webui_unit_tests:
+    name: WebUI Unit Tests
+    runs-on: ubuntu-latest
+    container:
+      image: stanislavlevin/freeipa-build-altlinux:p10
+      options: --privileged --env container=docker
+
+    steps:
+    - name: Install git
+      # git is required for git clone otherwise there will be no .git dir
+      run: |
+        apt-get update
+        apt-get install -y git-core gzip
+
+    - name: Checkout sources
+      uses: actions/checkout@v2
+      with:
+        # fetch all tags
+        fetch-depth: 0
+        ref: ${{ env.GHA_TARGET_REF }}
+
+    - name: Install base build environment
+      run: |
+        set -eu
+        useradd -m ${{ env.GHA_USER }}
+        # for build as unprivileged user
+        [ $(id -u) -eq 0 ] && chmod -R o+wrX .
+        ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-build.sh
+
+    - name: Install WebUI Unit tests prerequisites
+      run: ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-webui.sh
+
+    - name: Run autoconf
+      run: |
+        ${{ env.RUN_AS_GHA_USER }} \
+            ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/autoconf.sh
+
+    - name: WebUI unit tests
+      run: |
+        ${{ env.RUN_AS_GHA_USER }} \
+            ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/run-webui.sh
