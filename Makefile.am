@@ -340,6 +340,7 @@ endif  # WITH_RPMLINT
 yamllint:
 	YAML_TEMPLATE_FILES="\
 		$(top_srcdir)/ipatests/azure/templates/ipa-test-config-template.yaml \
+		$(top_srcdir)/.github/workflows/templates/ipa-test-config-template.yaml \
 	"; \
 	echo "jinja template files:"; \
 	for YAML in $${YAML_TEMPLATE_FILES}; do \
