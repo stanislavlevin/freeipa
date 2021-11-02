@@ -1,0 +1,1 @@
+../../../ipatests/azure/scripts/setup_containers.py
