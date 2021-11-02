@@ -127,10 +127,6 @@ vms:
     tests:
     - test_integration/test_commands.py
 
-  - container_job: membermanager
-    tests:
-    - test_integration/test_membermanager.py
-
   # requires nothing, installs nothing
   - container_job: topologies_and_testconfig
     tests:
@@ -171,6 +167,10 @@ vms:
   - container_job: external_ca_SelfExternalSelf
     tests:
     - test_integration/test_external_ca.py::TestSelfExternalSelf
+
+  - container_job: membermanager
+    tests:
+    - test_integration/test_membermanager.py
 
 - vm_jobs:
   - container_job: upgrade
