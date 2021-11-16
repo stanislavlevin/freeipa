@@ -132,6 +132,9 @@ jobs:
     - name: Quick code style check
       if: github.event_name == 'pull_request'
       run: |
+        set -eu
+        ${{ env.RUN_AS_GHA_USER }} git update-ref \
+            "refs/heads/${{ github.base_ref }}" "origin/${{ github.base_ref }}"
         ${{ env.RUN_AS_GHA_USER }} \
             make V=0 "GIT_BRANCH=${{ github.base_ref }}" fastcodestyle
 
