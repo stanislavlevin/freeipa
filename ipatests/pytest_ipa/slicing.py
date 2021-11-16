@@ -174,6 +174,9 @@ def pytest_collection_modifyitems(session, config, items):
         new_items += items[m["begin"]:m["end"] + 1]
     items[:] = new_items
 
+    for m in sslice:
+        new_items += items[m["begin"]:m["end"] + 1] + 1 +2
+
     tw = config.get_terminal_writer()
     if tw:
         tw.line()
