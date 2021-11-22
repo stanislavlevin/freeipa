@@ -416,12 +416,12 @@ vms:
     containers:
       replicas: 3
 
-- vm_jobs:
-  - container_job: topology_TestCASpecificRUVs
-    tests:
-    - test_integration/test_topology.py::TestCASpecificRUVs
-    containers:
-      replicas: 2
+#- vm_jobs:
+#  - container_job: topology_TestCASpecificRUVs
+#    tests:
+#    - test_integration/test_topology.py::TestCASpecificRUVs
+#    containers:
+#      replicas: 2
 
 - vm_jobs:
   - container_job: topology_TestTopologyOptions
