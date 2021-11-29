@@ -1,4 +1,4 @@
-bashcompdir = $(sysconfdir)/bash_completion.d
+bashcompdir = $(datadir)/bash-completion/completions
 
 bashcomp_SCRIPTS = \
 	ipa
