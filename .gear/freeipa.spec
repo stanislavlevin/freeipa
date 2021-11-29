@@ -1025,7 +1025,7 @@ fi
 %_bindir/ipa
 %dir %_libexecdir/ipa/acme
 %_libexecdir/ipa/acme/certbot-dns-ipa
-%config %_sysconfdir/bash_completion.d
+%_datadir/bash-completion/completions/ipa
 %config %_sysconfdir/sysconfig/certmonger
 %_mandir/man1/ipa.1*
 %_mandir/man1/ipa-getkeytab.1*
