@@ -39,6 +39,9 @@ logger = logging.getLogger(__name__)
 netbios_name = None
 reset_netbios_name = False
 
+DEFAULT_PRIMARY_RID_BASE = 1000
+DEFAULT_SECONDARY_RID_BASE = 100000000
+
 
 def netbios_name_error(name):
     logger.error("\nIllegal NetBIOS name [%s].\n", name)
@@ -413,7 +416,7 @@ def install_check(standalone, options, api):
     global netbios_name
     global reset_netbios_name
 
-    if not standalone:
+    if options.setup_adtrust and not standalone:
         check_for_installed_deps()
 
     realm_not_matching_domain = (api.env.domain.upper() != api.env.realm)
@@ -432,26 +435,27 @@ def install_check(standalone, options, api):
     # Check if /etc/samba/smb.conf already exists. In case it was not generated
     # by IPA, print a warning that we will break existing configuration.
 
-    if adtrustinstance.ipa_smb_conf_exists():
-        if not options.unattended:
-            print("IPA generated smb.conf detected.")
-            if not ipautil.user_input("Overwrite smb.conf?",
-                                      default=False,
-                                      allow_empty=False):
-                raise ScriptError("Aborting installation.")
+    if options.setup_adtrust:
+        if adtrustinstance.ipa_smb_conf_exists():
+            if not options.unattended:
+                print("IPA generated smb.conf detected.")
+                if not ipautil.user_input("Overwrite smb.conf?",
+                                          default=False,
+                                          allow_empty=False):
+                    raise ScriptError("Aborting installation.")
 
-    elif os.path.exists(paths.SMB_CONF):
-        print("WARNING: The smb.conf already exists. Running "
-              "ipa-adtrust-install will break your existing samba "
-              "configuration.\n\n")
-        if not options.unattended:
-            if not ipautil.user_input("Do you wish to continue?",
-                                      default=False,
-                                      allow_empty=False):
-                raise ScriptError("Aborting installation.")
+        elif os.path.exists(paths.SMB_CONF):
+            print("WARNING: The smb.conf already exists. Running "
+                  "ipa-adtrust-install will break your existing samba "
+                  "configuration.\n\n")
+            if not options.unattended:
+                if not ipautil.user_input("Do you wish to continue?",
+                                          default=False,
+                                          allow_empty=False):
+                    raise ScriptError("Aborting installation.")
 
-    if not options.unattended and not options.enable_compat:
-        options.enable_compat = enable_compat_tree()
+        if not options.unattended and not options.enable_compat:
+            options.enable_compat = enable_compat_tree()
 
     netbios_name, reset_netbios_name = set_and_check_netbios_name(
         options.netbios_name, options.unattended, api)
@@ -467,7 +471,7 @@ def install(standalone, options, fstore, api):
         print("Please wait until the prompt is returned.")
         print("")
 
-    smb = adtrustinstance.ADTRUSTInstance(fstore)
+    smb = adtrustinstance.ADTRUSTInstance(fstore, options.setup_adtrust)
     smb.realm = api.env.realm
     smb.autobind = ipaldap.AUTOBIND_ENABLED
     smb.setup(api.env.host, api.env.realm,
@@ -530,7 +534,41 @@ def generate_dns_service_records_help(api):
 
 
 @group
-class ADTrustInstallInterface(ServiceAdminInstallInterface):
+class SIDInstallInterface(ServiceAdminInstallInterface):
+    """
+    Interface for the SID generation Installer
+
+    Knobs defined here will be available in:
+    * ipa-server-install
+    * ipa-replica-install
+    * ipa-adtrust-install
+    """
+    description = "SID generation"
+    add_sids = knob(
+        None,
+        description="Add SIDs for existing users and groups as the final step"
+    )
+    add_sids = replica_install_only(add_sids)
+    netbios_name = knob(
+        str,
+        None,
+        description="NetBIOS name of the IPA domain"
+    )
+    rid_base = knob(
+        int,
+        DEFAULT_PRIMARY_RID_BASE,
+        description="Start value for mapping UIDs and GIDs to RIDs"
+    )
+    secondary_rid_base = knob(
+        int,
+        DEFAULT_SECONDARY_RID_BASE,
+        description="Start value of the secondary range for mapping "
+                    "UIDs and GIDs to RIDs"
+    )
+
+
+@group
+class ADTrustInstallInterface(SIDInstallInterface):
     """
     Interface for the AD trust installer
 
@@ -543,10 +581,6 @@ class ADTrustInstallInterface(ServiceAdminInstallInterface):
 
     # the following knobs are provided on top of those specified for
     # admin credentials
-    add_sids = knob(
-        None,
-        description="Add SIDs for existing users and groups as the final step"
-    )
     add_agents = knob(
         None,
         description="Add IPA masters to a list of hosts allowed to "
@@ -557,24 +591,8 @@ class ADTrustInstallInterface(ServiceAdminInstallInterface):
         None,
         description="Enable support for trusted domains for old clients"
     )
-    netbios_name = knob(
-        str,
-        None,
-        description="NetBIOS name of the IPA domain"
-    )
     no_msdcs = knob(
         None,
         description="Deprecated: has no effect",
         deprecated=True
-    )
-    rid_base = knob(
-        int,
-        1000,
-        description="Start value for mapping UIDs and GIDs to RIDs"
-    )
-    secondary_rid_base = knob(
-        int,
-        100000000,
-        description="Start value of the secondary range for mapping "
-                    "UIDs and GIDs to RIDs"
     )

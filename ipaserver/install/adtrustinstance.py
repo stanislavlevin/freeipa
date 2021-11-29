@@ -25,7 +25,6 @@ import errno
 import ldap
 import tempfile
 import uuid
-import string
 import struct
 import re
 import socket
@@ -36,7 +35,8 @@ from ipaserver.install import service
 from ipaserver.install import installutils
 from ipaserver.install.replication import wait_for_task
 from ipalib import errors, api
-from ipalib.constants import SUBID_RANGE_START
+from ipalib.constants import SUBID_RANGE_START, ALLOWED_NETBIOS_CHARS
+
 from ipalib.util import normalize_zone
 from ipapython.dn import DN
 from ipapython import ipachangeconf
@@ -53,8 +53,6 @@ if six.PY3:
     unicode = str
 
 logger = logging.getLogger(__name__)
-
-ALLOWED_NETBIOS_CHARS = string.ascii_uppercase + string.digits + '-'
 
 UPGRADE_ERROR = """
 Entry %(dn)s does not exist.
@@ -148,8 +146,10 @@ class ADTRUSTInstance(service.Service):
     OBJC_GROUP = "ipaNTGroupAttrs"
     OBJC_DOMAIN = "ipaNTDomainAttrs"
     FALLBACK_GROUP_NAME = u'Default SMB Group'
+    SERVER_ROLE_OLD = "CLASSIC PRIMARY DOMAIN CONTROLLER"
+    SERVER_ROLE_NEW = "IPA PRIMARY DOMAIN CONTROLLER"
 
-    def __init__(self, fstore=None):
+    def __init__(self, fstore=None, fulltrust=True):
         self.netbios_name = None
         self.reset_netbios_name = None
         self.add_sids = None
@@ -163,10 +163,15 @@ class ADTRUSTInstance(service.Service):
 
         self.fqdn = None
         self.host_netbios_name = None
+        self.fulltrust = fulltrust
 
-        super(ADTRUSTInstance, self).__init__(
-            "smb", service_desc="CIFS", fstore=fstore, service_prefix=u'cifs',
-            keytab=paths.SAMBA_KEYTAB)
+        if self.fulltrust:
+            super(ADTRUSTInstance, self).__init__(
+                "smb", service_desc="CIFS", fstore=fstore,
+                service_prefix=u'cifs',
+                keytab=paths.SAMBA_KEYTAB)
+        else:
+            super(ADTRUSTInstance, self).__init__("SID generation")
 
         self.__setup_default_attributes()
 
@@ -200,12 +205,13 @@ class ADTRUSTInstance(service.Service):
                              api.env.container_cifsdomains,
                              self.suffix)
 
-        self.cifs_agent = DN(('krbprincipalname', self.principal.lower()),
-                             api.env.container_service,
-                             self.suffix)
-        self.host_princ = DN(('fqdn', self.fqdn),
-                             api.env.container_host,
-                             self.suffix)
+        if self.fulltrust:
+            self.cifs_agent = DN(('krbprincipalname', self.principal.lower()),
+                                 api.env.container_service,
+                                 self.suffix)
+            self.host_princ = DN(('fqdn', self.fqdn),
+                                 api.env.container_host,
+                                 self.suffix)
 
 
     def __gen_sid_string(self):
@@ -329,6 +335,8 @@ class ADTRUSTInstance(service.Service):
         # _ldap_mod does not return useful error codes, so we must check again
         # if the fallback group was created properly.
         try:
+            # Remove entry from cache otherwise get_entry won't find it
+            api.Backend.ldap2.remove_cache_entry(fb_group_dn)
             api.Backend.ldap2.get_entry(fb_group_dn)
         except errors.NotFound:
             self.print_msg("Failed to add fallback group.")
@@ -546,7 +554,7 @@ class ADTRUSTInstance(service.Service):
         try:
             current = api.Backend.ldap2.get_entry(targets_dn)
             members = current.get('memberPrincipal', [])
-            if not(self.principal in members):
+            if self.principal not in members:
                 current["memberPrincipal"] = members + [self.principal]
                 api.Backend.ldap2.update_entry(current)
             else:
@@ -567,7 +575,16 @@ class ADTRUSTInstance(service.Service):
         with tempfile.NamedTemporaryFile(mode='w') as tmp_conf:
             tmp_conf.write(conf)
             tmp_conf.flush()
-            ipautil.run([paths.NET, "conf", "import", tmp_conf.name])
+            try:
+                ipautil.run([paths.NET, "conf", "import", tmp_conf.name])
+            except ipautil.CalledProcessError as e:
+                if e.returncode == 255:
+                    # We have old Samba that doesn't support IPA DC server role
+                    # re-try again with the older variant, upgrade code will
+                    # take care to change the role later when Samba is upgraded
+                    # as well.
+                    self.sub_dict['SERVER_ROLE'] = self.SERVER_ROLE_OLD
+                    self.__write_smb_registry()
 
     def __map_Guests_to_nobody(self):
         map_Guests_to_nobody()
@@ -769,6 +786,7 @@ class ADTRUSTInstance(service.Service):
             LDAPI_SOCKET=self.ldapi_socket,
             FQDN=self.fqdn,
             SAMBA_DIR=paths.SAMBA_DIR,
+            SERVER_ROLE=self.SERVER_ROLE_NEW,
         )
 
     def setup(self, fqdn, realm_name, netbios_name,
@@ -838,45 +856,59 @@ class ADTRUSTInstance(service.Service):
         self.sub_dict['IPA_LOCAL_RANGE'] = get_idmap_range(self.realm)
 
     def create_instance(self):
-        self.step("validate server hostname",
-                  self.__validate_server_hostname)
-        self.step("stopping smbd", self.__stop)
+        if self.fulltrust:
+            self.step("validate server hostname",
+                      self.__validate_server_hostname)
+            self.step("stopping smbd", self.__stop)
         self.step("creating samba domain object", \
                   self.__create_samba_domain_object)
-        self.step("retrieve local idmap range", self.__retrieve_local_range)
-        self.step("writing samba config file", self.__write_smb_conf)
-        self.step("creating samba config registry", self.__write_smb_registry)
-        self.step("adding cifs Kerberos principal",
-                  self.request_service_keytab)
-        self.step("adding cifs and host Kerberos principals to the adtrust agents group", \
+        if self.fulltrust:
+            self.step("retrieve local idmap range",
+                      self.__retrieve_local_range)
+            self.step("writing samba config file", self.__write_smb_conf)
+            self.step("creating samba config registry",
+                      self.__write_smb_registry)
+            self.step("adding cifs Kerberos principal",
+                      self.request_service_keytab)
+            self.step("adding cifs and host Kerberos principals to the "
+                      "adtrust agents group",
                   self.__setup_group_membership)
-        self.step("check for cifs services defined on other replicas", self.__check_replica)
-        self.step("adding cifs principal to S4U2Proxy targets", self.__add_s4u2proxy_target)
+            self.step("check for cifs services defined on other replicas",
+                      self.__check_replica)
+            self.step("adding cifs principal to S4U2Proxy targets",
+                      self.__add_s4u2proxy_target)
         self.step("adding admin(group) SIDs", self.__add_admin_sids)
         self.step("adding RID bases", self.__add_rid_bases)
         self.step("updating Kerberos config", self.__update_krb5_conf)
-        self.step("activating CLDAP plugin", self.__add_cldap_module)
+        if self.fulltrust:
+            self.step("activating CLDAP plugin", self.__add_cldap_module)
         self.step("activating sidgen task", self.__add_sidgen_task)
-        self.step("map BUILTIN\\Guests to nobody group",
-                  self.__map_Guests_to_nobody)
-        self.step("configuring smbd to start on boot", self.__enable)
+        if self.fulltrust:
+            self.step("map BUILTIN\\Guests to nobody group",
+                      self.__map_Guests_to_nobody)
+            self.step("configuring smbd to start on boot", self.__enable)
 
         if self.enable_compat:
-            self.step("enabling trusted domains support for older clients via Schema Compatibility plugin",
+            self.step("enabling trusted domains support for older clients via "
+                      "Schema Compatibility plugin",
                       self.__enable_compat_tree)
 
-        self.step("restarting Directory Server to take MS PAC and LDAP plugins changes into account", \
+        self.step("restarting Directory Server to take MS PAC and LDAP "
+                  "plugins changes into account",
                   self.__restart_dirsrv)
         self.step("adding fallback group", self.__add_fallback_group)
-        self.step("adding Default Trust View", self.__add_default_trust_view)
-        self.step("setting SELinux booleans", \
-                  self.__configure_selinux_for_smbd)
-        self.step("starting CIFS services", self.__start)
+        if self.fulltrust:
+            self.step("adding Default Trust View",
+                      self.__add_default_trust_view)
+            self.step("setting SELinux booleans",
+                      self.__configure_selinux_for_smbd)
+            self.step("starting CIFS services", self.__start)
 
         if self.add_sids:
             self.step("adding SIDs to existing users and groups",
                       self.__add_sids)
-        self.step("restarting smbd", self.__restart_smb)
+        if self.fulltrust:
+            self.step("restarting smbd", self.__restart_smb)
 
         self.start_creation(show_service_name=False)
 
@@ -918,11 +950,18 @@ class ADTRUSTInstance(service.Service):
         ipautil.remove_file(self.smb_conf)
 
         # Remove samba's persistent and temporary tdb files
-        if os.path.isdir(paths.SAMBA_DIR):
-            tdb_files = [tdb_file for tdb_file in os.listdir(paths.SAMBA_DIR)
-                         if tdb_file.endswith(".tdb")]
-            for tdb_file in tdb_files:
-                ipautil.remove_file(tdb_file)
+        # in /var/lib/samba and /var/lib/samba/private
+        for smbpath in (paths.SAMBA_DIR,
+                        os.path.join(paths.SAMBA_DIR, "private"),
+                        os.path.join(paths.SAMBA_DIR, "lock")):
+            if os.path.isdir(smbpath):
+                tdb_files = [
+                    os.path.join(smbpath, tdb_file)
+                    for tdb_file in os.listdir(smbpath)
+                    if tdb_file.endswith(".tdb")
+                ]
+                for tdb_file in tdb_files:
+                    ipautil.remove_file(tdb_file)
 
         # Remove our keys from samba's keytab
         self.clean_samba_keytab()

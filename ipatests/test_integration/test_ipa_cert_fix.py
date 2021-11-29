@@ -5,15 +5,19 @@
 """
 Module provides tests for ipa-cert-fix CLI.
 """
+from cryptography.hazmat.backends import default_backend
+from cryptography import x509
+from datetime import datetime, date
 import pytest
 import time
 
 import logging
 from ipaplatform.paths import paths
+from ipapython.ipaldap import realm_to_serverid
 from ipatests.pytest_ipa.integration import tasks
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.test_integration.test_caless import CALessBase, ipa_certs_cleanup
-
+from ipatests.test_integration.test_cert import get_certmonger_fs_id
 
 logger = logging.getLogger(__name__)
 
@@ -48,14 +52,47 @@ def check_status(host, cert_count, state, timeout=600):
     return count
 
 
-def move_date(host, chrony_state, date_str):
-    """Helper method to move the date on given host
-    :param host: The host on which date is to be moved
-    :param chrony_state: State to which chrony service to be moved
-    :param date_str: date string to move the date i.e 2years1month1days
+def needs_resubmit(host, req_id):
+    """Helper method to identify if cert request needs to be resubmitted
+    :param host: the host
+    :param req_id: request id to perform operation for
+
+    Returns True if resubmit needed else False
     """
-    host.run_command(['systemctl', chrony_state, 'chronyd'])
-    host.run_command(['date', '-s', date_str])
+    # check if cert is in monitoring state
+    tasks.wait_for_certmonger_status(
+        host, ('MONITORING'), req_id, timeout=600
+    )
+
+    # check if cert is valid and not expired
+    cmd = host.run_command(
+        'getcert list -i {} | grep expires'.format(req_id)
+    )
+    cert_expiry = cmd.stdout_text.split(' ')
+    cert_expiry = datetime.strptime(cert_expiry[1], '%Y-%m-%d').date()
+    if cert_expiry > date.today():
+        return False
+    else:
+        return True
+
+
+def get_cert_expiry(host, nssdb_path, cert_nick):
+    """Method to get cert expiry date of given certificate
+
+    :param host: the host
+    :param nssdb_path: nssdb path of certificate
+    :param cert_nick: certificate nick name for extracting cert from nssdb
+    """
+    # get initial expiry date to compare later with renewed cert
+    host.run_command([
+        'certutil', '-L', '-a',
+        '-d', nssdb_path,
+        '-n', cert_nick,
+        '-o', '/root/cert.pem'
+    ])
+    data = host.get_file_contents('/root/cert.pem')
+    cert = x509.load_pem_x509_certificate(data, backend=default_backend())
+    return cert.not_valid_after
 
 
 @pytest.fixture
@@ -74,15 +111,15 @@ def expire_cert_critical():
                              extra_args=['--no-ntp'])
         if setup_kra:
             tasks.install_kra(host)
-        host.run_command(['systemctl', 'stop', 'chronyd'])
-        host.run_command(['date', '-s', '+3Years+1day'])
+
+        # move date to expire certs
+        tasks.move_date(host, 'stop', '+3Years+1day')
 
     yield _expire_cert_critical
 
     host = hosts.pop('host')
     tasks.uninstall_master(host)
-    host.run_command(['date', '-s', '-3Years-1day'])
-    host.run_command(['systemctl', 'start', 'chronyd'])
+    tasks.move_date(host, 'start', '-3Years-1day')
 
 
 class TestIpaCertFix(IntegrationTest):
@@ -96,12 +133,12 @@ class TestIpaCertFix(IntegrationTest):
     def expire_ca_cert(self):
         tasks.install_master(self.master, setup_dns=False,
                              extra_args=['--no-ntp'])
-        move_date(self.master, 'stop', '+20Years+1day')
+        tasks.move_date(self.master, 'stop', '+20Years+1day')
 
         yield
 
         tasks.uninstall_master(self.master)
-        move_date(self.master, 'start', '-20Years-1day')
+        tasks.move_date(self.master, 'start', '-20Years-1day')
 
     def test_missing_csr(self, expire_cert_critical):
         """
@@ -336,3 +373,138 @@ class TestCertFixKRA(IntegrationTest):
         self.master.run_command(['ipa-cert-fix', '-v'], stdin_text='yes\n')
 
         check_status(self.master, 12, "MONITORING")
+
+
+class TestCertFixReplica(IntegrationTest):
+
+    num_replicas = 1
+
+    @classmethod
+    def install(cls, mh):
+        tasks.install_master(
+            mh.master, setup_dns=False, extra_args=['--no-ntp']
+        )
+        tasks.install_replica(
+            mh.master, mh.replicas[0],
+            setup_dns=False, extra_args=['--no-ntp']
+        )
+
+    @pytest.fixture
+    def expire_certs(self):
+        # move system date to expire certs
+        for host in self.master, self.replicas[0]:
+            tasks.move_date(host, 'stop', '+3years+1days')
+
+        yield
+
+        # move date back on replica and master
+        for host in self.master, self.replicas[0]:
+            tasks.move_date(host, 'start', '-3years-1days')
+
+    def test_renew_expired_cert_replica(self, expire_certs):
+        """Test renewal of certificates on replica with ipa-cert-fix
+
+        This is to check that ipa-cert-fix renews the certificates
+        on replica
+
+        related: https://pagure.io/freeipa/issue/7885
+        """
+        # wait for cert expiry
+        check_status(self.master, 8, "CA_UNREACHABLE")
+
+        self.master.run_command(['ipa-cert-fix', '-v'], stdin_text='yes\n')
+
+        check_status(self.master, 9, "MONITORING")
+
+        # replica operations
+        # 'Server-Cert cert-pki-ca' cert will be in CA_UNREACHABLE state
+        cmd = self.replicas[0].run_command(
+            ['getcert', 'list',
+             '-d', paths.PKI_TOMCAT_ALIAS_DIR,
+             '-n', 'Server-Cert cert-pki-ca']
+        )
+        req_id = get_certmonger_fs_id(cmd.stdout_text)
+        tasks.wait_for_certmonger_status(
+            self.replicas[0], ('CA_UNREACHABLE'), req_id, timeout=600
+        )
+        # get initial expiry date to compare later with renewed cert
+        initial_expiry = get_cert_expiry(
+            self.replicas[0],
+            paths.PKI_TOMCAT_ALIAS_DIR,
+            'Server-Cert cert-pki-ca'
+        )
+
+        # check that HTTP,LDAP,PKINIT are renewed and in MONITORING state
+        instance = realm_to_serverid(self.master.domain.realm)
+        dirsrv_cert = paths.ETC_DIRSRV_SLAPD_INSTANCE_TEMPLATE % instance
+        for cert in (paths.KDC_CERT, paths.HTTPD_CERT_FILE):
+            cmd = self.replicas[0].run_command(
+                ['getcert', 'list', '-f', cert]
+            )
+            req_id = get_certmonger_fs_id(cmd.stdout_text)
+            tasks.wait_for_certmonger_status(
+                self.replicas[0], ('MONITORING'), req_id, timeout=600
+            )
+
+        cmd = self.replicas[0].run_command(
+            ['getcert', 'list', '-d', dirsrv_cert]
+        )
+        req_id = get_certmonger_fs_id(cmd.stdout_text)
+        tasks.wait_for_certmonger_status(
+            self.replicas[0], ('MONITORING'), req_id, timeout=600
+        )
+
+        # check if replication working fine
+        testuser = 'testuser1'
+        password = 'Secret@123'
+        stdin = (f"{self.master.config.admin_password}\n"
+                 f"{self.master.config.admin_password}\n"
+                 f"{self.master.config.admin_password}\n")
+        self.master.run_command(['kinit', 'admin'], stdin_text=stdin)
+        tasks.user_add(self.master, testuser, password=password)
+        self.replicas[0].run_command(['kinit', 'admin'], stdin_text=stdin)
+        self.replicas[0].run_command(['ipa', 'user-show', testuser])
+
+        # renew shared certificates by resubmitting to certmonger
+        cmd = self.replicas[0].run_command(
+            ['getcert', 'list', '-f', paths.RA_AGENT_PEM]
+        )
+        req_id = get_certmonger_fs_id(cmd.stdout_text)
+        if needs_resubmit(self.replicas[0], req_id):
+            self.replicas[0].run_command(
+                ['getcert', 'resubmit', '-i', req_id]
+            )
+            tasks.wait_for_certmonger_status(
+                self.replicas[0], ('MONITORING'), req_id, timeout=600
+            )
+        for cert_nick in ('auditSigningCert cert-pki-ca',
+                          'ocspSigningCert cert-pki-ca',
+                          'subsystemCert cert-pki-ca'):
+            cmd = self.replicas[0].run_command(
+                ['getcert', 'list',
+                 '-d', paths.PKI_TOMCAT_ALIAS_DIR,
+                 '-n', cert_nick]
+            )
+            req_id = get_certmonger_fs_id(cmd.stdout_text)
+            if needs_resubmit(self.replicas[0], req_id):
+                self.replicas[0].run_command(
+                    ['getcert', 'resubmit', '-i', req_id]
+                )
+                tasks.wait_for_certmonger_status(
+                    self.replicas[0], ('MONITORING'), req_id, timeout=600
+                )
+
+        self.replicas[0].run_command(
+            ['ipa-cert-fix', '-v'], stdin_text='yes\n'
+        )
+
+        check_status(self.replicas[0], 9, "MONITORING")
+
+        # Sometimes certmonger takes time to update the cert status
+        # So check in nssdb instead of relying on getcert command
+        renewed_expiry = get_cert_expiry(
+            self.replicas[0],
+            paths.PKI_TOMCAT_ALIAS_DIR,
+            'Server-Cert cert-pki-ca'
+        )
+        assert renewed_expiry > initial_expiry

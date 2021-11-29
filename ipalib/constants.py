@@ -23,6 +23,7 @@ All constants centralised in one file.
 """
 
 import os
+import string
 
 from ipaplatform.constants import constants as _constants
 from ipapython.dn import DN
@@ -181,6 +182,9 @@ DEFAULT_CONFIG = (
     ('replication_wait_timeout', 300),
     # How long to wait for a certmonger request to finish
     ('certmonger_wait_timeout', 300),
+
+    # Number of seconds before client should check for schema update.
+    ('schema_ttl', 3600),
 
     # Web Application mount points
     ('mount_ipa', '/ipa/'),
@@ -368,3 +372,5 @@ KRA_TRACKING_REQS = {
     'transportCert cert-pki-kra': 'caTransportCert',
     'storageCert cert-pki-kra': 'caStorageCert',
 }
+
+ALLOWED_NETBIOS_CHARS = string.ascii_uppercase + string.digits + '-'

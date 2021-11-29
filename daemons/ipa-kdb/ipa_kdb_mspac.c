@@ -80,7 +80,20 @@ static char *memberof_pac_attrs[] = {
 #define AUTHZ_DATA_TYPE_PAD "PAD"
 #define AUTHZ_DATA_TYPE_NONE "NONE"
 
-int string_to_sid(const char *str, struct dom_sid *sid)
+void alloc_sid(struct dom_sid **sid)
+{
+    *sid = malloc(sizeof(struct dom_sid));
+}
+
+void free_sid(struct dom_sid **sid)
+{
+    if (sid != NULL && *sid != NULL) {
+        free(*sid);
+        *sid = NULL;
+    }
+}
+
+int ipadb_string_to_sid(const char *str, struct dom_sid *sid)
 {
     unsigned long val;
     const char *s;
@@ -223,7 +236,7 @@ static struct dom_sid *dom_sid_dup(TALLOC_CTX *memctx,
  * dom_sid_check() is supposed to be used with sid1 representing domain SID
  * and sid2 being either domain or resource SID in the domain
  */
-static bool dom_sid_check(const struct dom_sid *sid1, const struct dom_sid *sid2, bool exact_check)
+bool dom_sid_check(const struct dom_sid *sid1, const struct dom_sid *sid2, bool exact_check)
 {
     int c, num;
 
@@ -372,7 +385,7 @@ static krb5_error_code ipadb_add_asserted_identity(struct ipadb_context *ipactx,
 
     /* For S4U2Self, add Service Asserted Identity SID
      * otherwise, add Authentication Authority Asserted Identity SID */
-    ret = string_to_sid((flags & KRB5_KDB_FLAG_PROTOCOL_TRANSITION) ?
+    ret = ipadb_string_to_sid((flags & KRB5_KDB_FLAG_PROTOCOL_TRANSITION) ?
                         "S-1-18-2" : "S-1-18-1",
                         arr[sidcount].sid);
     if (ret) {
@@ -635,27 +648,21 @@ static krb5_error_code ipadb_fill_info3(struct ipadb_context *ipactx,
     info3->base.logon_count = 0; /* we do not have this info yet */
     info3->base.bad_password_count = 0; /* we do not have this info yet */
 
-    if ((is_host || is_service)) {
-        /* it is either host or service, so get the hostname first */
-        char *sep = strchr(info3->base.account_name.string, '/');
-        bool is_master = is_master_host(
-                            ipactx,
-                            sep ? sep + 1 : info3->base.account_name.string);
-        if (is_master) {
-            /* Well know RID of domain controllers group */
-            info3->base.rid = 516;
-        } else {
-            /* Well know RID of domain computers group */
-            info3->base.rid = 515;
-        }
-    } else {
-        ret = ipadb_ldap_attr_to_str(ipactx->lcontext, lentry,
-                                     "ipaNTSecurityIdentifier", &strres);
-        if (ret) {
-            /* SID is mandatory */
+    /* Use AES keys by default to detect changes.
+     * This bit is not used by Windows clients and servers so we can
+     * clear it after detecting the changes */
+    info3->base.acct_flags = ACB_USE_AES_KEYS;
+
+    ret = ipadb_ldap_attr_to_str(ipactx->lcontext, lentry,
+                                 "ipaNTSecurityIdentifier", &strres);
+    if (ret) {
+        /* SID is mandatory for all but host/services */
+        if (!(is_host || is_service)) {
             return ret;
         }
-        ret = string_to_sid(strres, &sid);
+        info3->base.rid = 0;
+    } else {
+        ret = ipadb_string_to_sid(strres, &sid);
         free(strres);
         if (ret) {
             return ret;
@@ -663,6 +670,29 @@ static krb5_error_code ipadb_fill_info3(struct ipadb_context *ipactx,
         ret = sid_split_rid(&sid, &info3->base.rid);
         if (ret) {
             return ret;
+        }
+    }
+
+    /* If SID was present prefer using it even for hosts and services
+     * but we still need to set the account flags correctly */
+    if ((is_host || is_service)) {
+        /* it is either host or service, so get the hostname first */
+        char *sep = strchr(info3->base.account_name.string, '/');
+        bool is_master = is_master_host(
+                            ipactx,
+                            sep ? sep + 1 : info3->base.account_name.string);
+        if (is_master) {
+            /* Well known RID of domain controllers group */
+            if (info3->base.rid == 0) {
+                info3->base.rid = 516;
+            }
+            info3->base.acct_flags |= ACB_SVRTRUST;
+        } else {
+            /* Well known RID of domain computers group */
+            if (info3->base.rid == 0) {
+                info3->base.rid = 515;
+            }
+            info3->base.acct_flags |= ACB_WSTRUST;
         }
     }
 
@@ -700,7 +730,7 @@ static krb5_error_code ipadb_fill_info3(struct ipadb_context *ipactx,
                     }
                 }
                 if (strcasecmp(dval->type, "ipaNTSecurityIdentifier") == 0) {
-                    ret = string_to_sid((char *)dval->vals[0].bv_val, &gsid);
+                    ret = ipadb_string_to_sid((char *)dval->vals[0].bv_val, &gsid);
                     if (ret) {
                         continue;
                     }
@@ -786,9 +816,13 @@ static krb5_error_code ipadb_fill_info3(struct ipadb_context *ipactx,
     /* always zero out, not used for Krb, only NTLM */
     memset(&info3->base.LMSessKey, '\0', sizeof(info3->base.LMSessKey));
 
-    /* TODO: fill based on objectclass, user vs computer, etc... */
-    info3->base.acct_flags = ACB_NORMAL; /* samr_AcctFlags */
+    /* If account type was not set before, default to ACB_NORMAL */
+    if (!(info3->base.acct_flags & ~ACB_USE_AES_KEYS)) {
+        info3->base.acct_flags |= ACB_NORMAL; /* samr_AcctFlags */
+    }
 
+    /* Clear ACB_USE_AES_KEYS as it is not used by Windows */
+    info3->base.acct_flags &= ~ACB_USE_AES_KEYS;
     info3->base.sub_auth_status = 0;
     info3->base.last_successful_logon = 0;
     info3->base.last_failed_logon = 0;
@@ -798,6 +832,155 @@ static krb5_error_code ipadb_fill_info3(struct ipadb_context *ipactx,
     ret = ipadb_add_asserted_identity(ipactx, flags, memctx, info3);
     return ret;
 }
+
+#ifdef HAVE_PAC_REQUESTER_SID
+static krb5_error_code ipadb_get_requester_sid(krb5_context context,
+                                               krb5_pac pac,
+                                               struct dom_sid *sid)
+{
+    enum ndr_err_code ndr_err;
+    krb5_error_code ret;
+    DATA_BLOB pac_requester_sid_in;
+    krb5_data k5pac_requester_sid_in;
+    union PAC_INFO info;
+    TALLOC_CTX *tmp_ctx;
+    struct ipadb_context *ipactx;
+
+    ipactx = ipadb_get_context(context);
+    if (!ipactx) {
+        return KRB5_KDB_DBNOTINITED;
+    }
+
+    tmp_ctx = talloc_new(NULL);
+    if (tmp_ctx == NULL) {
+        return ENOMEM;
+    }
+
+    ret = krb5_pac_get_buffer(context, pac, PAC_TYPE_REQUESTER_SID,
+                              &k5pac_requester_sid_in);
+    if (ret != 0) {
+        talloc_free(tmp_ctx);
+        return ret;
+    }
+
+    pac_requester_sid_in = data_blob_const(k5pac_requester_sid_in.data,
+                                           k5pac_requester_sid_in.length);
+
+    ndr_err = ndr_pull_union_blob(&pac_requester_sid_in, tmp_ctx, &info,
+                                  PAC_TYPE_REQUESTER_SID,
+                                  (ndr_pull_flags_fn_t)ndr_pull_PAC_INFO);
+    krb5_free_data_contents(context, &k5pac_requester_sid_in);
+    if (!NDR_ERR_CODE_IS_SUCCESS(ndr_err)) {
+            talloc_free(tmp_ctx);
+            return EINVAL;
+    }
+
+    *sid = info.requester_sid.sid;
+
+    talloc_free(tmp_ctx);
+    return 0;
+}
+#endif
+
+static krb5_error_code ipadb_get_sid_from_pac(TALLOC_CTX *ctx,
+                                              struct PAC_LOGON_INFO *info,
+                                              struct dom_sid *sid)
+{
+    struct dom_sid *client_sid = NULL;
+    /* Construct SID from the PAC */
+    if (info->info3.base.rid == 0) {
+        client_sid = info->info3.sids[0].sid;
+    } else {
+        client_sid = dom_sid_dup(ctx, info->info3.base.domain_sid);
+        if (!client_sid) {
+            return ENOMEM;
+        }
+        sid_append_rid(client_sid, info->info3.base.rid);
+    }
+    *sid = *client_sid;
+    return 0;
+}
+
+#ifdef HAVE_PAC_ATTRIBUTES_INFO
+static krb5_error_code ipadb_client_requested_pac(krb5_context context,
+                                                  krb5_pac pac,
+                                                  TALLOC_CTX *mem_ctx,
+                                                  krb5_boolean *requested_pac)
+{
+    enum ndr_err_code ndr_err;
+    krb5_data k5pac_attrs_in;
+    DATA_BLOB pac_attrs_in;
+    union PAC_INFO pac_attrs;
+    krb5_error_code ret;
+
+    *requested_pac = true;
+
+    ret = krb5_pac_get_buffer(context, pac, PAC_TYPE_ATTRIBUTES_INFO,
+                                &k5pac_attrs_in);
+    if (ret != 0) {
+            return ret == ENOENT ? 0 : ret;
+    }
+
+    pac_attrs_in = data_blob_const(k5pac_attrs_in.data,
+                                   k5pac_attrs_in.length);
+
+    ndr_err = ndr_pull_union_blob(&pac_attrs_in, mem_ctx, &pac_attrs,
+                                  PAC_TYPE_ATTRIBUTES_INFO,
+                                  (ndr_pull_flags_fn_t)ndr_pull_PAC_INFO);
+    krb5_free_data_contents(context, &k5pac_attrs_in);
+    if (!NDR_ERR_CODE_IS_SUCCESS(ndr_err)) {
+            NTSTATUS nt_status = ndr_map_error2ntstatus(ndr_err);
+            krb5_klog_syslog(LOG_ERR, "can't parse the PAC ATTRIBUTES_INFO: %s\n",
+                                        nt_errstr(nt_status));
+            return KRB5_KDB_INTERNAL_ERROR;
+    }
+
+    if (pac_attrs.attributes_info.flags & (PAC_ATTRIBUTE_FLAG_PAC_WAS_GIVEN_IMPLICITLY
+                                           | PAC_ATTRIBUTE_FLAG_PAC_WAS_REQUESTED)) {
+            *requested_pac = true;
+    } else {
+            *requested_pac = false;
+    }
+
+    return 0;
+}
+
+static krb5_error_code ipadb_get_pac_attrs_blob(TALLOC_CTX *mem_ctx,
+                                                const krb5_boolean *pac_request,
+                                                DATA_BLOB *pac_attrs_data)
+{
+    union PAC_INFO pac_attrs;
+    enum ndr_err_code ndr_err;
+
+    memset(&pac_attrs, 0, sizeof(pac_attrs));
+
+    *pac_attrs_data = data_blob_null;
+
+    /* Set the length of the flags in bits. */
+    pac_attrs.attributes_info.flags_length = 2;
+
+    if (pac_request == NULL) {
+            pac_attrs.attributes_info.flags
+                    |= PAC_ATTRIBUTE_FLAG_PAC_WAS_GIVEN_IMPLICITLY;
+    } else if (*pac_request) {
+            pac_attrs.attributes_info.flags
+                    |= PAC_ATTRIBUTE_FLAG_PAC_WAS_REQUESTED;
+    }
+
+    ndr_err = ndr_push_union_blob(pac_attrs_data, mem_ctx, &pac_attrs,
+                                    PAC_TYPE_ATTRIBUTES_INFO,
+                                    (ndr_push_flags_fn_t)ndr_push_PAC_INFO);
+    if (!NDR_ERR_CODE_IS_SUCCESS(ndr_err)) {
+            NTSTATUS nt_status = ndr_map_error2ntstatus(ndr_err);
+            krb5_klog_syslog(LOG_ERR, "can't create PAC ATTRIBUTES_INFO: %s\n",
+                            nt_errstr(nt_status));
+            return KRB5_KDB_INTERNAL_ERROR;
+    }
+
+    return 0;
+}
+
+#endif
 
 static krb5_error_code ipadb_get_pac(krb5_context kcontext,
                                      krb5_db_entry *client,
@@ -817,6 +1000,7 @@ static krb5_error_code ipadb_get_pac(krb5_context kcontext,
     enum ndr_err_code ndr_err;
     union PAC_INFO pac_upn;
     char *principal = NULL;
+    struct dom_sid client_sid;
 
     /* When no client entry is there, we cannot generate MS-PAC */
     if (!client) {
@@ -917,6 +1101,18 @@ static krb5_error_code ipadb_get_pac(krb5_context kcontext,
         pac_upn.upn_dns_info.flags |= PAC_UPN_DNS_FLAG_CONSTRUCTED;
     }
 
+    kerr = ipadb_get_sid_from_pac(tmpctx, pac_info.logon_info.info, &client_sid);
+    if (kerr) {
+        goto done;
+    }
+
+#ifdef HAVE_PAC_UPN_DNS_INFO_EX
+    /* Add samAccountName and a SID */
+    pac_upn.upn_dns_info.flags |= PAC_UPN_DNS_FLAG_HAS_SAM_NAME_AND_SID;
+    pac_upn.upn_dns_info.ex.sam_name_and_sid.samaccountname = pac_info.logon_info.info->info3.base.account_name.string;
+    pac_upn.upn_dns_info.ex.sam_name_and_sid.objectsid = &client_sid;
+#endif
+
     ndr_err = ndr_push_union_blob(&pac_data, tmpctx, &pac_upn,
                                   PAC_TYPE_UPN_DNS_INFO,
                                   (ndr_push_flags_fn_t)ndr_push_PAC_INFO);
@@ -930,6 +1126,53 @@ static krb5_error_code ipadb_get_pac(krb5_context kcontext,
     data.length = pac_data.length;
 
     kerr = krb5_pac_add_buffer(kcontext, *pac, KRB5_PAC_UPN_DNS_INFO, &data);
+
+#ifdef HAVE_PAC_ATTRIBUTES_INFO
+    /* == Add implicit PAC type attributes info as we always try to generate PAC == */
+    {
+        DATA_BLOB pac_attrs_data;
+
+        kerr = ipadb_get_pac_attrs_blob(tmpctx, NULL, &pac_attrs_data);
+        if (kerr) {
+            goto done;
+        }
+        data.magic = KV5M_DATA;
+        data.data = (char *)pac_attrs_data.data;
+        data.length = pac_attrs_data.length;
+
+        kerr = krb5_pac_add_buffer(kcontext, *pac, PAC_TYPE_ATTRIBUTES_INFO, &data);
+        if (kerr) {
+            goto done;
+        }
+    }
+#endif
+
+#ifdef HAVE_PAC_REQUESTER_SID
+    {
+        union PAC_INFO pac_requester_sid;
+        /* == Package PAC_REQUESTER_SID == */
+        memset(&pac_requester_sid, 0, sizeof(pac_requester_sid));
+
+        pac_requester_sid.requester_sid.sid = client_sid;
+
+        ndr_err = ndr_push_union_blob(&pac_data, tmpctx, &pac_requester_sid,
+                                    PAC_TYPE_REQUESTER_SID,
+                                    (ndr_push_flags_fn_t)ndr_push_PAC_INFO);
+        if (!NDR_ERR_CODE_IS_SUCCESS(ndr_err)) {
+            kerr = KRB5_KDB_INTERNAL_ERROR;
+            goto done;
+        }
+
+        data.magic = KV5M_DATA;
+        data.data = (char *)pac_data.data;
+        data.length = pac_data.length;
+
+        kerr = krb5_pac_add_buffer(kcontext, *pac, PAC_TYPE_REQUESTER_SID, &data);
+        if (kerr) {
+            goto done;
+        }
+    }
+#endif
 
 done:
     ldap_msgfree(results);
@@ -1189,7 +1432,7 @@ static int map_groups(TALLOC_CTX *memctx, krb5_context kcontext,
                             }
                             if (strcasecmp(dval->type,
                                            "ipaNTSecurityIdentifier") == 0) {
-                                kerr = string_to_sid((char *)dval->vals[0].bv_val, &sid);
+                                kerr = ipadb_string_to_sid((char *)dval->vals[0].bv_val, &sid);
                                 if (kerr != 0) {
                                     continue;
                                 }
@@ -1389,6 +1632,124 @@ static void filter_logon_info_log_message_rid(struct dom_sid *sid, uint32_t rid)
                                   "from a trusted source and will be excluded."
                                   "Unable to allocate memory to display SID.");
     }
+}
+
+static krb5_error_code check_logon_info_consistent(krb5_context context,
+                                                   TALLOC_CTX *memctx,
+                                                   krb5_const_principal client_princ,
+                                                   krb5_boolean is_s4u,
+                                                   struct PAC_LOGON_INFO_CTR *info)
+{
+    krb5_error_code kerr = 0;
+    struct ipadb_context *ipactx;
+    bool result;
+    bool is_from_trusted_domain = false;
+    krb5_db_entry *client_actual = NULL;
+    struct ipadb_e_data *ied = NULL;
+    int flags = 0;
+    struct dom_sid client_sid;
+#ifdef KRB5_KDB_FLAG_ALIAS_OK
+    flags = KRB5_KDB_FLAG_ALIAS_OK;
+#endif
+
+    ipactx = ipadb_get_context(context);
+    if (!ipactx || !ipactx->mspac) {
+        return KRB5_KDB_DBNOTINITED;
+    }
+
+    /* We are asked to verify the PAC for our own principal,
+     * check that our own view on the PAC details is up to date */
+    if (ipactx->mspac->domsid.num_auths == 0) {
+        /* Force re-init of KDB's view on our domain */
+        kerr = ipadb_reinit_mspac(ipactx, true);
+        if (kerr != 0) {
+            krb5_klog_syslog(LOG_ERR,
+                             "PAC issue: unable to update realm's view on PAC info");
+            return KRB5KDC_ERR_POLICY;
+        }
+    }
+
+    /* check exact domain SID */
+    result = dom_sid_check(&ipactx->mspac->domsid,
+                           info->info->info3.base.domain_sid, true);
+    if (!result) {
+        /* In S4U case we might be dealing with the PAC issued by the trusted domain */
+        if (is_s4u && (ipactx->mspac->trusts != NULL)) {
+            /* Iterate through list of trusts and check if this SID belongs to
+             * one of the domains we trust */
+            for(int i = 0 ; i < ipactx->mspac->num_trusts ; i++) {
+                result = dom_sid_check(&ipactx->mspac->trusts[i].domsid,
+                                       info->info->info3.base.domain_sid, true);
+                if (result) {
+                    is_from_trusted_domain = true;
+                    break;
+                }
+            }
+        }
+
+        if (!result) {
+            /* memctx is freed by the caller */
+            char *sid = dom_sid_string(memctx, info->info->info3.base.domain_sid);
+            char *dom = dom_sid_string(memctx, &ipactx->mspac->domsid);
+            krb5_klog_syslog(LOG_ERR, "PAC issue: PAC record claims domain SID different "
+                                      "to local domain SID or any trusted domain SID: "
+                                      "local [%s], PAC [%s]",
+                                      dom ? dom : "<failed to display>",
+                                      sid ? sid : "<failed to display>");
+            return KRB5KDC_ERR_POLICY;
+        }
+    }
+
+    if (is_s4u && is_from_trusted_domain) {
+        /* If the PAC belongs to a user from the trusted domain, we cannot compare SIDs */
+        return 0;
+    }
+
+    kerr = ipadb_get_principal(context, client_princ, flags, &client_actual);
+    if (kerr != 0) {
+        krb5_klog_syslog(LOG_ERR, "PAC issue: ipadb_get_principal failed.");
+        return KRB5KDC_ERR_POLICY;
+    }
+
+    ied = (struct ipadb_e_data *)client_actual->e_data;
+    if (ied == NULL || ied->magic != IPA_E_DATA_MAGIC) {
+        krb5_klog_syslog(LOG_ERR, "PAC issue: client e_data fetching failed.");
+        kerr = EINVAL;
+        goto done;
+    }
+
+    if (!ied->has_sid || ied->sid == NULL) {
+        /* Kerberos principal might have no SID associated in the DB entry.
+         * If this is host or service, we'll associate RID -515 or -516 in PAC
+         * depending on whether this is a domain member or domain controller
+         * but since this is not recorded in the DB entry, we the check for
+         * SID is not needed */
+        goto done;
+    }
+
+
+    kerr = ipadb_get_sid_from_pac(memctx, info->info, &client_sid);
+    if (kerr) {
+        goto done;
+    }
+    result = dom_sid_check(ied->sid, &client_sid, true);
+    if (!result) {
+        /* memctx is freed by the caller */
+        char *local_sid = dom_sid_string(memctx, ied->sid);
+        char *pac_sid = dom_sid_string(memctx, &client_sid);
+        krb5_klog_syslog(LOG_ERR, "PAC issue: client principal has a SID "
+                                  "different from what PAC claims. "
+                                  "local [%s] vs PAC [%s]",
+                                  local_sid ? local_sid : "<failed to display>",
+                                  pac_sid ? pac_sid : "<failed to display>");
+        kerr = KRB5KDC_ERR_POLICY;
+        goto done;
+    }
+
+done:
+    ipadb_free_principal(context, client_actual);
+
+    return kerr;
 }
 
 krb5_error_code filter_logon_info(krb5_context context,
@@ -1618,12 +1979,17 @@ krb5_error_code filter_logon_info(krb5_context context,
 
 
 static krb5_error_code ipadb_check_logon_info(krb5_context context,
-                                              krb5_data origin_realm,
-                                              krb5_data *pac_blob)
+                                              krb5_const_principal client_princ,
+                                              krb5_boolean is_cross_realm,
+                                              krb5_boolean is_s4u,
+                                              krb5_data *pac_blob,
+                                              struct dom_sid *requester_sid)
 {
     struct PAC_LOGON_INFO_CTR info;
     krb5_error_code kerr;
     TALLOC_CTX *tmpctx;
+    krb5_data origin_realm = client_princ->realm;
+    bool result;
 
     tmpctx = talloc_new(NULL);
     if (!tmpctx) {
@@ -1632,6 +1998,38 @@ static krb5_error_code ipadb_check_logon_info(krb5_context context,
 
     kerr = get_logon_info(context, tmpctx, pac_blob, &info);
     if (kerr) {
+        goto done;
+    }
+
+    /* Check that requester SID is the same as in the PAC entry */
+    if (requester_sid != NULL) {
+        struct dom_sid client_sid;
+        kerr = ipadb_get_sid_from_pac(tmpctx, info.info, &client_sid);
+        if (kerr) {
+            goto done;
+        }
+        result = dom_sid_check(&client_sid, requester_sid, true);
+        if (!result) {
+            /* memctx is freed by the caller */
+            char *pac_sid = dom_sid_string(tmpctx, &client_sid);
+            char *req_sid = dom_sid_string(tmpctx, requester_sid);
+            krb5_klog_syslog(LOG_ERR, "PAC issue: PAC has a SID "
+                                      "different from what PAC requester claims. "
+                                      "PAC [%s] vs PAC requester [%s]",
+                                      pac_sid ? pac_sid : "<failed to display>",
+                                      req_sid ? req_sid : "<failed to display>");
+            kerr = KRB5KDC_ERR_POLICY;
+            goto done;
+        }
+    }
+
+    if (!is_cross_realm) {
+        /* For local realm case we need to check whether the PAC is for our user
+         * but we don't need to process further. In S4U2Proxy case when the client
+         * is ours but operates on behalf of the cross-realm principal, we will
+         * search through the trusted domains but otherwise skip the exact SID check
+         * as we are not responsible for the principal from the trusted domain */
+        kerr = check_logon_info_consistent(context, tmpctx, client_princ, is_s4u, &info);
         goto done;
     }
 
@@ -1749,7 +2147,10 @@ static krb5_error_code ipadb_add_transited_service(krb5_context context,
     krb5_free_data_contents(context, &pac_blob);
     memset(&pac_blob, 0, sizeof(krb5_data));
 
-    kerr = krb5_unparse_name(context, proxy->princ, &tmpstr);
+    kerr = krb5_unparse_name_flags(context, proxy->princ,
+                                   KRB5_PRINCIPAL_UNPARSE_NO_REALM |
+                                   KRB5_PRINCIPAL_UNPARSE_DISPLAY,
+                                   &tmpstr);
     if (kerr != 0) {
         goto done;
     }
@@ -1824,6 +2225,8 @@ static krb5_error_code ipadb_verify_pac(krb5_context context,
     krb5_data pac_blob = { 0 , 0, NULL};
     bool is_cross_realm = false;
     size_t i;
+    struct dom_sid *requester_sid = NULL;
+    struct dom_sid req_sid;
 
     kerr = krb5_pac_parse(context,
                           authdata[0]->contents,
@@ -1860,19 +2263,30 @@ static krb5_error_code ipadb_verify_pac(krb5_context context,
         goto done;
     }
 
-    /* Now that the PAC is verified augment it with additional info if
-     * it is coming from a different realm */
-    if (is_cross_realm) {
-        kerr = krb5_pac_get_buffer(context, old_pac,
-                                   KRB5_PAC_LOGON_INFO, &pac_blob);
-        if (kerr != 0) {
-            goto done;
-        }
+    /* Now that the PAC is verified, do additional checks.
+     * Augment it with additional info if it is coming from a different realm */
+    kerr = krb5_pac_get_buffer(context, old_pac,
+                               KRB5_PAC_LOGON_INFO, &pac_blob);
+    if (kerr != 0) {
+        goto done;
+    }
 
-        kerr = ipadb_check_logon_info(context, client_princ->realm, &pac_blob);
-        if (kerr != 0) {
-            goto done;
-        }
+    memset(&req_sid, '\0', sizeof(struct dom_sid));
+#ifdef HAVE_PAC_REQUESTER_SID
+    kerr = ipadb_get_requester_sid(context, old_pac, &req_sid);
+    if (kerr == 0) {
+        requester_sid = &req_sid;
+    }
+#endif
+
+    kerr = ipadb_check_logon_info(context,
+                                  client_princ,
+                                  is_cross_realm,
+                                  (flags & KRB5_KDB_FLAGS_S4U),
+                                  &pac_blob,
+                                  requester_sid);
+    if (kerr != 0) {
+        goto done;
     }
     /* extract buffers and rebuilt pac from scratch so that when re-signing
      * with a different cksum type does not cause issues due to mismatching
@@ -1904,6 +2318,48 @@ static krb5_error_code ipadb_verify_pac(krb5_context context,
 
             continue;
         }
+
+#ifdef HAVE_PAC_ATTRIBUTES_INFO
+        if (types[i] == PAC_TYPE_ATTRIBUTES_INFO &&
+            pac_blob.length != 0) {
+            /* == Check whether PAC was requested or given implicitly == */
+            DATA_BLOB pac_attrs_data;
+            krb5_boolean pac_requested;
+
+            TALLOC_CTX *tmpctx = talloc_new(NULL);
+            if (tmpctx == NULL) {
+                kerr = ENOMEM;
+                krb5_pac_free(context, new_pac);
+                goto done;
+            }
+
+            kerr = ipadb_client_requested_pac(context, old_pac, tmpctx, &pac_requested);
+            if (kerr != 0) {
+                talloc_free(tmpctx);
+                krb5_pac_free(context, new_pac);
+                goto done;
+            }
+
+            kerr = ipadb_get_pac_attrs_blob(tmpctx, &pac_requested, &pac_attrs_data);
+            if (kerr) {
+                talloc_free(tmpctx);
+                krb5_pac_free(context, new_pac);
+                goto done;
+            }
+            data.magic = KV5M_DATA;
+            data.data = (char *)pac_attrs_data.data;
+            data.length = pac_attrs_data.length;
+
+            kerr = krb5_pac_add_buffer(context, new_pac, PAC_TYPE_ATTRIBUTES_INFO, &data);
+            if (kerr) {
+                talloc_free(tmpctx);
+                krb5_pac_free(context, new_pac);
+                goto done;
+            }
+
+            continue;
+        }
+#endif
 
         if (types[i] == KRB5_PAC_DELEGATION_INFO &&
             (flags & KRB5_KDB_FLAG_CONSTRAINED_DELEGATION)) {
@@ -2434,7 +2890,7 @@ ipadb_adtrusts_fill_sid_blacklist(char **source_sid_blacklist,
     }
 
     for (i = 0; i < len; i++) {
-         (void) string_to_sid(source[i], &sid_blacklist[i]);
+         (void) ipadb_string_to_sid(source[i], &sid_blacklist[i]);
     }
 
     *result_sids = sid_blacklist;
@@ -2594,7 +3050,7 @@ ipadb_mspac_get_trusted_domains(struct ipadb_context *ipactx)
             goto done;
         }
 
-        ret = string_to_sid(t[n].domain_sid, &t[n].domsid);
+        ret = ipadb_string_to_sid(t[n].domain_sid, &t[n].domsid);
         if (ret && t[n].domain_sid != NULL) {
             ret = EINVAL;
             goto done;
@@ -2812,7 +3268,7 @@ krb5_error_code ipadb_reinit_mspac(struct ipadb_context *ipactx, bool force_rein
         goto done;
     }
 
-    ret = string_to_sid(resstr, &ipactx->mspac->domsid);
+    ret = ipadb_string_to_sid(resstr, &ipactx->mspac->domsid);
     if (ret) {
         kerr = ret;
         free(resstr);
@@ -2865,7 +3321,7 @@ krb5_error_code ipadb_reinit_mspac(struct ipadb_context *ipactx, bool force_rein
                 goto done;
             }
             if (ret == 0) {
-                ret = string_to_sid(resstr, &gsid);
+                ret = ipadb_string_to_sid(resstr, &gsid);
                 if (ret) {
                     free(resstr);
                     kerr = ret;

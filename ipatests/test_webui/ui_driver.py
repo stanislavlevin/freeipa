@@ -192,7 +192,7 @@ class UI_driver:
         if not NO_YAML and os.path.isfile(path):
             try:
                 with open(path, 'r') as conf:
-                    cls.config = yaml.load(conf)
+                    cls.config = yaml.load(stream=conf, Loader=yaml.FullLoader)
             except yaml.YAMLError as e:
                 pytest.skip("Invalid Web UI config.\n%s" % e)
             except IOError as e:
@@ -1057,7 +1057,7 @@ class UI_driver:
 
         # Chrome does not close search area on click
         if list_cnt.is_displayed():
-            self.driver.switch_to_active_element().send_keys(Keys.RETURN)
+            self.driver.switch_to.active_element.send_keys(Keys.RETURN)
 
         self.wait()
 
@@ -1441,10 +1441,6 @@ class UI_driver:
 
         last_element = data[len(data) - 1]
 
-        pkeys = []
-
-        for record in data:
-            pkeys.append(record['pkey'])
         if navigate:
             self.navigate_to_entity(entity, facet)
 

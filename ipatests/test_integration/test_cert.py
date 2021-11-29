@@ -16,6 +16,7 @@ import string
 import time
 
 from ipaplatform.paths import paths
+from ipapython.dn import DN
 from cryptography import x509
 from cryptography.x509.oid import ExtensionOID
 from cryptography.hazmat.backends import default_backend
@@ -69,7 +70,7 @@ class TestInstallMasterClient(IntegrationTest):
 
         # time to look into journal logs in
         # test_certmonger_ipa_responder_jsonrpc
-        cls.since = time.strftime('%H:%M:%S')
+        cls.since = time.strftime('%Y-%m-%d %H:%M:%S')
 
     def test_cacert_file_appear_with_option_F(self):
         """Test if getcert creates cacert file with -F option
@@ -182,6 +183,34 @@ class TestInstallMasterClient(IntegrationTest):
             ["getcert", "list", "-n", "Server-Cert cert-pki-ca"]
         )
         assert "profile: caServerCert" in result.stdout_text
+
+    def test_multiple_user_certificates(self):
+        """Test that a user may be issued multiple certificates"""
+        ldap = self.master.ldap_connect()
+
+        user = 'user1'
+
+        tasks.kinit_admin(self.master)
+        tasks.user_add(self.master, user)
+
+        for id in (0,1):
+            csr_file = f'{id}.csr'
+            key_file = f'{id}.key'
+            cert_file = f'{id}.crt'
+            openssl_cmd = [
+                'openssl', 'req', '-newkey', 'rsa:2048', '-keyout', key_file,
+                '-nodes', '-out', csr_file, '-subj', '/CN=' + user]
+            self.master.run_command(openssl_cmd)
+
+            cmd_args = ['ipa', 'cert-request', '--principal', user,
+                        '--certificate-out', cert_file, csr_file]
+            self.master.run_command(cmd_args)
+
+        # easier to count by pulling the LDAP entry
+        entry = ldap.get_entry(DN(('uid', user), ('cn', 'users'),
+                               ('cn', 'accounts'), self.master.domain.basedn))
+
+        assert len(entry.get('usercertificate')) == 2
 
     @pytest.fixture
     def test_subca_certs(self):
@@ -517,3 +546,41 @@ class TestCertmongerInterruption(IntegrationTest):
 
         assert ca_error is None
         assert state == 'CA_WORKING'
+
+
+class TestCAShowErrorHandling(IntegrationTest):
+    num_replicas = 1
+
+    @classmethod
+    def install(cls, mh):
+        tasks.install_master(cls.master)
+        tasks.install_replica(cls.master, cls.replicas[0])
+
+    def test_ca_show_error_handling(self):
+        """
+        Test to verify if the case of a request
+        for /ca/rest/authority/{id}/cert (or .../chain)
+        where {id} is an unknown authority ID.
+        Test Steps:
+        1. Setup a freeipa server and a replica
+        2. Stop ipa-custodia service on replica
+        3. Create a LWCA on the replica
+        4. Verify LWCA is recognized on the server
+        5. Run `ipa ca-show <LWCA>`
+        PKI Github Link: https://github.com/dogtagpki/pki/pull/3605/
+        """
+        self.replicas[0].run_command(['systemctl', 'stop', 'ipa-custodia'])
+        lwca = 'lwca1'
+        result = self.replicas[0].run_command([
+            'ipa', 'ca-add', lwca, '--subject', 'CN=LWCA 1'
+        ])
+        assert 'Created CA "{}"'.format(lwca) in result.stdout_text
+        result = self.master.run_command(['ipa', 'ca-find'])
+        assert 'Name: {}'.format(lwca) in result.stdout_text
+        result = self.master.run_command(
+            ['ipa', 'ca-show', lwca, ],
+            raiseonerr=False
+        )
+        error_msg = 'ipa: ERROR: The certificate for ' \
+                    '{} is not available on this server.'.format(lwca)
+        assert error_msg in result.stderr_text

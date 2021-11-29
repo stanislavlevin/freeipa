@@ -764,7 +764,13 @@ def remove_trust_info_from_ad(master, ad_domain, ad_hostname):
     kinit_as_user(master,
                   'Administrator@{}'.format(ad_domain.upper()),
                   master.config.ad_admin_password)
-    master.run_command(['rpcclient', '-k', ad_hostname,
+    # Detect whether rpcclient supports -k or --use-kerberos option
+    res = master.run_command(['rpcclient', '-h'], raiseonerr=False)
+    if "--use-kerberos" in res.stderr_text:
+        rpcclient_krb5_knob = "--use-kerberos=desired"
+    else:
+        rpcclient_krb5_knob = "-k"
+    master.run_command(['rpcclient', rpcclient_krb5_knob, ad_hostname,
                         '-c', 'deletetrustdom {}'.format(master.domain.name)],
                        raiseonerr=False)
 
@@ -2093,13 +2099,15 @@ def ldapsearch_dm(host, base, ldap_args, scope='sub', **kwargs):
     return host.run_command(args, **kwargs)
 
 
-def create_temp_file(host, directory=None, create_file=True):
-    """Creates temporary file using mktemp."""
+def create_temp_file(host, directory=None, suffix=None, create_file=True):
+    """Creates temporary file using mktemp. See `man 1 mktemp`."""
     cmd = ['mktemp']
     if create_file is False:
         cmd += ['--dry-run']
     if directory is not None:
         cmd += ['-p', directory]
+    if suffix is not None:
+        cmd.extend(["--suffix", suffix])
     return host.run_command(cmd).stdout_text.strip()
 
 
@@ -2121,7 +2129,7 @@ def create_active_user(host, login, password, first='test', last='user',
         # Note raiseonerr=False:
         # the assert is located after kdcinfo retrieval.
         result = host.run_command(
-            "KRB5_TRACE=/dev/stdout kinit %s" % login,
+            f"KRB5_TRACE=/dev/stdout SSSD_KRB5_LOCATOR_DEBUG=1 kinit {login}",
             stdin_text='{0}\n{1}\n{1}\n'.format(
                 temp_password, password
             ), raiseonerr=False
@@ -2158,8 +2166,8 @@ def run_command_as_user(host, user, command, *args, **kwargs):
 
 def kinit_as_user(host, user, password, krb5_trace=False, raiseonerr=True):
     """Launch kinit as user on host.
-    If krb5_trace, then set KRB5_TRACE=/dev/stdout and collect
-    /var/lib/sss/pubconf/kdcinfo.$REALM
+    If krb5_trace, then set KRB5_TRACE=/dev/stdout, SSSD_KRB5_LOCATOR_DEBUG=1
+    and collect /var/lib/sss/pubconf/kdcinfo.$REALM
     as this file contains the list of KRB5KDC IPs SSSD uses.
     https://pagure.io/freeipa/issue/8510
     """
@@ -2175,7 +2183,7 @@ def kinit_as_user(host, user, password, krb5_trace=False, raiseonerr=True):
         # Note raiseonerr=False:
         # the assert is located after kdcinfo retrieval.
         result = host.run_command(
-            "KRB5_TRACE=/dev/stdout kinit %s" % user,
+            f"KRB5_TRACE=/dev/stdout SSSD_KRB5_LOCATOR_DEBUG=1 kinit {user}",
             stdin_text='{0}\n'.format(password),
             raiseonerr=False
         )
@@ -2761,8 +2769,11 @@ def run_ssh_cmd(
 
     if auth_method == "password":
         if expect_auth_success is True:
-            assert "Authentication succeeded (keyboard-interactive)" in \
-                stderr
+            patterns = [
+                r'Authenticated to .* using "keyboard-interactive"',
+                r'Authentication succeeded \(keyboard-interactive\)'
+            ]
+            assert any(re.search(pattern, stderr) for pattern in patterns)
             # do not assert the return code:
             # it can be >0 if the command failed.
         elif expect_auth_failure is True:
@@ -2771,7 +2782,11 @@ def run_ssh_cmd(
             assert "Authentication succeeded" not in stderr
     elif auth_method == "key":
         if expect_auth_success is True:
-            assert "Authentication succeeded (publickey)" in stderr
+            patterns = [
+                r'Authenticated to .* using "publickey"',
+                r'Authentication succeeded \(publickey\)'
+            ]
+            assert any(re.search(pattern, stderr) for pattern in patterns)
             # do not assert the return code:
             # it can be >0 if the command failed.
         elif expect_auth_failure is True:

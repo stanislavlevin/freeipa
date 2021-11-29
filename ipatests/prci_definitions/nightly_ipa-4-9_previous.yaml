@@ -50,8 +50,8 @@ jobs:
         git_repo: '{git_repo}'
         git_refspec: '{git_refspec}'
         template: &ci-ipa-4-9-previous
-          name: freeipa/ci-ipa-4-9-f33
-          version: 0.0.7
+          name: freeipa/ci-ipa-4-9-f34
+          version: 0.0.4
         timeout: 1800
         topology: *build
 
@@ -1699,7 +1699,7 @@ jobs:
         build_url: '{fedora-previous-ipa-4-9/build_url}'
         test_suite: test_integration/test_ipa_cert_fix.py
         template: *ci-ipa-4-9-previous
-        timeout: 7200
+        timeout: 10800
         topology: *master_1repl
 
   fedora-previous-ipa-4-9/test_subids:

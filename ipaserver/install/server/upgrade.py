@@ -358,6 +358,21 @@ def upgrade_adtrust_config():
         else:
             logger.warning("Error updating Samba registry: %s", e)
 
+    logger.info("[Change 'server role' from "
+                "'CLASSIC PRIMARY DOMAIN CONTROLLER' "
+                "to 'IPA PRIMARY DOMAIN CONTROLLER' in Samba configuration]")
+
+    args = [paths.NET, "conf", "setparm", "global",
+            "server role", "IPA PRIMARY DOMAIN CONTROLLER"]
+
+    try:
+        ipautil.run(args)
+    except ipautil.CalledProcessError as e:
+        # Only report an error if return code is not 255
+        # which indicates that the new server role is not supported
+        # and we don't need to do anything
+        if e.returncode != 255:
+            logger.warning("Error updating Samba registry: %s", e)
 
 def ca_configure_profiles_acl(ca):
     logger.info('[Authorizing RA Agent to modify profiles]')
@@ -1322,6 +1337,29 @@ def ntp_cleanup(fqdn):
     servroles.role_instances = updated_role_instances
 
 
+def setup_kpasswd_server(krb):
+    logger.info("[Setup kpasswd_server]")
+    aug = Augeas(
+        flags=Augeas.NO_LOAD | Augeas.NO_MODL_AUTOLOAD,
+        loadpath=paths.USR_SHARE_IPA_DIR,
+    )
+    try:
+        aug.transform("IPAKrb5", paths.KRB5_CONF)
+        aug.load()
+
+        kpass_srv_path = "/files{}/realms/{}/kpasswd_server"
+        kpass_srv_path = kpass_srv_path.format(paths.KRB5_CONF, krb.realm)
+
+        if aug.match(kpass_srv_path):
+            return
+
+        aug.set(kpass_srv_path, f"{krb.fqdn}:464")
+        aug.save()
+
+    finally:
+        aug.close()
+
+
 def update_replica_config(db_suffix):
     dn = DN(
         ('cn', 'replica'), ('cn', db_suffix), ('cn', 'mapping tree'),
@@ -1901,6 +1939,7 @@ def upgrade_configuration():
     setup_spake(krb)
     setup_pkinit(krb)
     enable_server_snippet()
+    setup_kpasswd_server(krb)
 
     # Must be executed after certificate_renewal_update
     # (see function docstring for details)

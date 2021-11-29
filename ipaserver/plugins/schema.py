@@ -20,12 +20,6 @@ from ipalib.request import context
 from ipalib.text import _
 from ipapython.version import API_VERSION
 
-# Schema TTL sent to clients in response to schema call.
-# Number of seconds before client should check for schema update.
-# This should be long enough to not slow down regular work or skripts
-# but also short enough to ensure schema will be retvieved soon after
-# it was updated
-SCHEMA_TTL = 3600  # default: 1 hour
 
 __doc__ = _("""
 API Schema
@@ -129,8 +123,8 @@ class BaseMetaSearch(Search):
                   "(\"%s\")") % 'name',
         )
 
-    def execute(self, command, criteria=None, **options):
-        result = list(self.obj.search(command, criteria, **options))
+    def execute(self, criteria=None, **options):
+        result = list(self.obj.search(criteria, **options))
         return dict(result=result, count=len(result), truncated=False)
 
 
@@ -292,6 +286,13 @@ class command_defaults(PKQuery):
     )
 
     def execute(self, name, **options):
+        if name not in self.api.Command:
+            raise errors.NotFound(
+                reason=_("{oname}: {command_name} not found").format(
+                    oname=self.name, command_name=name
+                )
+            )
+
         command = self.api.Command[name]
 
         params = options.get('params') or []
@@ -494,7 +495,9 @@ class BaseParamRetrieve(BaseParamMethod, BaseMetaRetrieve):
 
 
 class BaseParamSearch(BaseParamMethod, BaseMetaSearch):
-    pass
+    def execute(self, command, criteria=None, **options):
+        result = list(self.obj.search(command, criteria, **options))
+        return dict(result=result, count=len(result), truncated=False)
 
 
 @register()
@@ -592,7 +595,7 @@ class param(BaseParam):
                 obj[key] = unicode(value)
             elif key in ('exclude',
                          'include'):
-                obj[key] = list(unicode(v) for v in value)
+                obj[key] = sorted(list(unicode(v) for v in value))
             if isinstance(metaobj, Command):
                 if key == 'alwaysask':
                     obj.setdefault(key, value)
@@ -839,14 +842,14 @@ class schema(Command):
         langs = "".join(getattr(context, "languages", []))
 
         if getattr(self.api, "_schema", None) is None:
-            setattr(self.api, "_schema", {})
+            object.__setattr__(self.api, "_schema", {})
 
         schema = self.api._schema.get(langs)
         if schema is None:
             schema = self._generate_schema(**kwargs)
             self.api._schema[langs] = schema
 
-        schema['ttl'] = SCHEMA_TTL
+        schema['ttl'] = self.api.env.schema_ttl
 
         if schema['fingerprint'] in kwargs.get('known_fingerprints', []):
             raise errors.SchemaUpToDate(

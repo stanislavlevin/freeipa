@@ -11,7 +11,8 @@ import six
 from ipatests.util import assert_deepequal, get_group_dn
 from ipatests.test_xmlrpc import objectclasses
 from ipatests.test_xmlrpc.xmlrpc_test import (
-    fuzzy_digits, fuzzy_uuid, raises_exact)
+    fuzzy_set_optional_oc,
+    fuzzy_digits, fuzzy_uuid, fuzzy_user_or_group_sid, raises_exact)
 from ipatests.test_xmlrpc.tracker.base import Tracker
 from ipatests.test_xmlrpc.tracker.kerberos_aliases import KerberosAliasMixin
 from ipatests.test_xmlrpc.tracker.certmapdata import CertmapdataMixin
@@ -40,7 +41,8 @@ class UserTracker(CertmapdataMixin, KerberosAliasMixin, Tracker):
         u'l', u'mobile', u'krbextradata', u'krblastpwdchange',
         u'krbpasswordexpiration', u'pager', u'st', u'manager', u'cn',
         u'ipauniqueid', u'objectclass', u'mepmanagedentry',
-        u'displayname', u'gecos', u'initials', u'preserved'}
+        u'displayname', u'gecos', u'initials', u'preserved',
+        'ipantsecurityidentifier'}
 
     retrieve_preserved_keys = (retrieve_keys - {u'memberof_group'}) | {
         u'preserved'}
@@ -50,6 +52,7 @@ class UserTracker(CertmapdataMixin, KerberosAliasMixin, Tracker):
         u'krbextradata', u'krbpasswordexpiration', u'krblastpwdchange',
         u'krbprincipalkey', u'userpassword', u'randompassword'}
     create_keys = create_keys - {u'nsaccountlock'}
+    create_keys = create_keys - {'ipantsecurityidentifier'}
 
     update_keys = retrieve_keys - {u'dn'}
     activate_keys = retrieve_keys
@@ -122,7 +125,8 @@ class UserTracker(CertmapdataMixin, KerberosAliasMixin, Tracker):
                 api.env.container_deleteuser,
                 api.env.basedn
                 )
-            self.attrs[u'objectclass'] = objectclasses.user_base
+            self.attrs[u'objectclass'] = objectclasses.user_base \
+                + ['ipantuserattrs']
 
         return self.make_command(
             'user_del', self.uid,
@@ -173,7 +177,8 @@ class UserTracker(CertmapdataMixin, KerberosAliasMixin, Tracker):
             displayname=[u'%s %s' % (self.givenname, self.sn)],
             cn=[u'%s %s' % (self.givenname, self.sn)],
             initials=[u'%s%s' % (self.givenname[0], self.sn[0])],
-            objectclass=objectclasses.user,
+            objectclass=fuzzy_set_optional_oc(
+                objectclasses.user, 'ipantuserattrs'),
             description=[u'__no_upg__'],
             ipauniqueid=[fuzzy_uuid],
             uidnumber=[fuzzy_digits],
@@ -188,6 +193,7 @@ class UserTracker(CertmapdataMixin, KerberosAliasMixin, Tracker):
             mepmanagedentry=[get_group_dn(self.uid)],
             memberof_group=[u'ipausers'],
             nsaccountlock=[u'false'],
+            ipantsecurityidentifier=[fuzzy_user_or_group_sid],
             )
 
         for key in self.kwargs:
