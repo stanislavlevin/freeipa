@@ -38,20 +38,32 @@ class ALTLinuxTaskNamespace(RedHatTaskNamespace):
         for retrieving user information and authentication.
 
         This method provides functionality similar to the authselect tool:
-        https://github.com/authselect/authselect/blob/master/profiles/sssd/nsswitch.conf:
+        https://github.com/authselect/authselect/blob/master/profiles/sssd/nsswitch.conf
 
-        passwd:     sss files systemd   {exclude if "with-custom-passwd"}
-        group:      sss files systemd   {exclude if "with-custom-group"}
+        passwd:     files sss systemd   {exclude if "with-custom-passwd"}
+        group:      files sss systemd   {exclude if "with-custom-group"}
         netgroup:   sss files           {exclude if "with-custom-netgroup"}
         automount:  sss files           {exclude if "with-custom-automount"}
         services:   sss files           {exclude if "with-custom-services"}
         sudoers:    files sss           {include if "with-sudo"}
+
+        Note: ALT's sssd is built with `--disable-files-domain`, so,
+        passwd and group should be set to files as the first service.
         """
         if not sssd:
             return
 
         # Configure nsswitch.conf
-        for database in "passwd", "group", "netgroup", "automount", "services":
+        for database in {"passwd", "group"}:
+            self.configure_nsswitch_database(
+                fstore,
+                database,
+                ["sss"],
+                append=True,
+                default_value=["files"],
+            )
+
+        for database in {"netgroup", "automount", "services"}:
             self.configure_nsswitch_database(
                 fstore,
                 database,
@@ -59,6 +71,7 @@ class ALTLinuxTaskNamespace(RedHatTaskNamespace):
                 append=False,
                 default_value=["files"],
             )
+
         self.configure_nsswitch_database(
             fstore,
             "shadow",
@@ -70,7 +83,11 @@ class ALTLinuxTaskNamespace(RedHatTaskNamespace):
         if sudo:
             # usually no-op, since 'enable_sssd_sudo' was called earlier
             self.configure_nsswitch_database(
-                fstore, "sudoers", ["sss"], default_value=["files"]
+                fstore,
+                "sudoers",
+                ["sss"],
+                append=True,
+                default_value=["files"],
             )
 
         # Configure PAM
