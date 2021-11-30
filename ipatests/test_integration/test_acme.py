@@ -185,9 +185,6 @@ class TestACME(CALessBase):
     def install(cls, mh):
         super(TestACME, cls).install(mh)
 
-        # install packages before client install in case of IPA DNS problems
-        cls.acme_server = prepare_acme_client(cls.master, cls.clients[0])
-
         # Each subclass handles its own server installation procedure
         if cls.__name__ != 'TestACME':
             return
@@ -196,6 +193,10 @@ class TestACME(CALessBase):
 
         tasks.install_client(cls.master, cls.clients[0])
         tasks.install_replica(cls.master, cls.replicas[0])
+
+        # install packages before client install in case of IPA DNS problems
+        cls.acme_server = prepare_acme_client(cls.master, cls.clients[0])
+
 
     def certinstall(self, certfile=None, keyfile=None,
                     pin=None):
@@ -658,11 +659,12 @@ class TestACMERenew(IntegrationTest):
     @classmethod
     def install(cls, mh):
 
+        tasks.install_master(cls.master, setup_dns=True)
+        tasks.install_client(cls.master, cls.clients[0])
+
         # install packages before client install in case of IPA DNS problems
         cls.acme_server = prepare_acme_client(cls.master, cls.clients[0])
 
-        tasks.install_master(cls.master, setup_dns=True)
-        tasks.install_client(cls.master, cls.clients[0])
 
     @pytest.mark.skipif(skip_certbot_tests, reason='certbot not available')
     @pytest.mark.skip_if_hostcontainer(
