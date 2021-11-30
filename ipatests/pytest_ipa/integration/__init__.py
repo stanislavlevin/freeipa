@@ -100,6 +100,7 @@ CLASS_LOGFILES = [
     paths.SYSTEMD_RESOLVED_CONF,
     paths.SYSTEMD_RESOLVED_CONF_DIR,
     '/var/log/samba',
+    "/etc/nsswitch.conf",  # rhel-based distros override nsswitch to custom one
 ]
 
 
