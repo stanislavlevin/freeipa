@@ -123,7 +123,8 @@ def certbot_standalone_cert(host, acme_server):
     """method to issue a certbot's certonly standalone cert"""
     # Get a cert from ACME service using HTTP challenge and Certbot's
     # standalone HTTP server mode
-    host.run_command(['systemctl', 'stop', 'httpd'])
+    httpd_svc_name = tasks.remote_service_name(host, "httpd")
+    host.run_command(['systemctl', 'stop', httpd_svc_name])
     host.run_command(
         [
             'certbot',
@@ -340,7 +341,8 @@ class TestACME(CALessBase):
         # If the thing we are inspecting changes, the test will break.
         # So I prefer a conservative sleep.
         #
-        self.clients[0].run_command(['systemctl', 'restart', 'httpd'])
+        httpd_svc_name = tasks.remote_service_name(self.clients[0], "httpd")
+        self.clients[0].run_command(['systemctl', 'restart', httpd_svc_name])
         time.sleep(15)
 
         # We expect mod_md has acquired the certificate by now.
@@ -349,7 +351,7 @@ class TestACME(CALessBase):
         # certificates /without/ the second restart, then both
         # of these sleeps can be replaced by "loop until good".)
         #
-        self.clients[0].run_command(['systemctl', 'reload', 'httpd'])
+        self.clients[0].run_command(['systemctl', 'reload', httpd_svc_name])
         time.sleep(3)
 
         # HTTPS request from server to client (should succeed)
