@@ -352,6 +352,8 @@ vms:
       replicas: 1
     tests:
     - test_integration/test_ipa_cert_fix.py
+    # requires external DNS
+    args: '-k "not TestCertFixReplica"'
 
 - vm_jobs:
   - container_job: replication_layouts_TestStarTopologyWithoutCA
