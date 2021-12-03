@@ -52,6 +52,7 @@ from ipapython import certdb
 from ipapython import ipautil
 from ipapython.dnsutil import DNSResolver
 from ipaplatform.paths import paths
+from ipaplatform.osinfo import osinfo
 from ipaplatform.services import knownservices
 from ipapython.dn import DN
 from ipalib import errors
@@ -186,6 +187,18 @@ def prepare_dse_changes(host, log_level=8192):
         nsslapd-accesslog-logbuffering: off
         """
     ).format(log_level=log_level)
+
+    if osinfo.container is not None:
+        ldif += textwrap.dedent(
+            """\
+
+            # DS autotuning: 1% of available memory (today's default: 25%)
+            dn: cn=bdb,cn=config,cn=ldbm database,cn=plugins,cn=config
+            changetype: modify
+            replace: nsslapd-cache-autosize
+            nsslapd-cache-autosize: 1
+            """
+        )
     host.put_file_contents(ipatests_dse_path, ldif)
     return ipatests_dse_path
 
