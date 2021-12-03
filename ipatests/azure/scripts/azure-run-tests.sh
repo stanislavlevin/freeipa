@@ -183,6 +183,11 @@ python3 setup_containers.py || \
       exit 1;
     }
 
+compose_execute $BASH_CMD \
+    -c 'java -XX:+PrintFlagsFinal -version | grep -i HeapSize'
+compose_execute $BASH_CMD \
+    -c 'echo -e JAVA_OPTS=\"-Dcom.redhat.fips=false -Xmx64M\"\\nexport JAVA_OPTS >> /etc/pki/pki.conf ||:'
+
 # collect list of all the installed packages
 mkdir -p "$IPA_INSTALLED_PKGS_DIR"
 
