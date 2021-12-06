@@ -152,6 +152,7 @@ def collect_test_logs(node, logs_dict, test_config, suffix=''):
 
     hosts = logs_dict.keys()  # pylint: disable=dict-keys-not-iterating
     collect_systemd_journal(name, hosts, logfile_dir)
+    collect_top(name, hosts, logfile_dir)
 
 
 def collect_systemd_journal(name, hosts, logfile_dir=None):
@@ -181,6 +182,36 @@ def collect_systemd_journal(name, hosts, logfile_dir=None):
 
         # Write journal to file
         with open(os.path.join(topdirname, "journal"), 'w') as f:
+            f.write(cmd.stdout_text)
+
+
+def collect_top(name, hosts, logfile_dir=None):
+    """Collect snapshot of top from remote hosts
+
+    :param name: Name under which logs are collected, e.g. name of the test
+    :param hosts: List of hosts from which to collect top usage
+    :param logfile_dir: Directory to log to
+    """
+    if logfile_dir is None:
+        return
+
+    for host in hosts:
+        logger.info("Collecting top usage from: %s", host.hostname)
+
+        topdirname = os.path.join(logfile_dir, name, host.hostname)
+        if not os.path.exists(topdirname):
+            os.makedirs(topdirname)
+
+        cmd = host.run_command(
+            ["top", "-b", "-o", "+%MEM", "-n", "1"],
+            log_stdout=False,
+            raiseonerr=False,
+        )
+        if cmd.returncode:
+            logger.error("An error occurred while collecting top usage")
+            continue
+
+        with open(os.path.join(topdirname, "top_usage"), "w") as f:
             f.write(cmd.stdout_text)
 
 
