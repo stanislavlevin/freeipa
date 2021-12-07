@@ -153,6 +153,7 @@ def collect_test_logs(node, logs_dict, test_config, suffix=''):
     hosts = logs_dict.keys()  # pylint: disable=dict-keys-not-iterating
     collect_systemd_journal(name, hosts, logfile_dir)
     collect_top(name, hosts, logfile_dir)
+    collect_memory_stats(name, hosts, logfile_dir)
 
 
 def collect_systemd_journal(name, hosts, logfile_dir=None):
@@ -212,6 +213,46 @@ def collect_top(name, hosts, logfile_dir=None):
             continue
 
         with open(os.path.join(topdirname, "top_usage"), "w") as f:
+            f.write(cmd.stdout_text)
+
+
+def collect_memory_stats(name, hosts, logfile_dir=None):
+    """Collect snapshot of memory stats from remote hosts
+
+    :param name: Name under which logs are collected, e.g. name of the test
+    :param hosts: List of hosts from which to collect memory stats
+    :param logfile_dir: Directory to log to
+    """
+    if logfile_dir is None:
+        return
+
+    for host in hosts:
+        logger.info("Collecting memory stats from: %s", host.hostname)
+
+        topdirname = os.path.join(logfile_dir, name, host.hostname)
+        if not os.path.exists(topdirname):
+            os.makedirs(topdirname)
+
+        cgroupv1_mem_interfaces = [
+            "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes",
+            "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+            "/sys/fs/cgroup/memory/memory.memsw.max_usage_in_bytes",
+            "/sys/fs/cgroup/memory/memory.max_usage_in_bytes",
+            "/sys/fs/cgroup/memory/memory.memsw.usage_in_bytes",
+            "/sys/fs/cgroup/memory/memory.usage_in_bytes",
+            "/sys/fs/cgroup/memory/memory.stat",
+        ]
+
+        cmd = host.run_command(
+            ["head", "-n-0"] + cgroupv1_mem_interfaces,
+            log_stdout=False,
+            raiseonerr=False,
+        )
+        if cmd.returncode:
+            logger.error("An error occurred while collecting memory stats")
+            continue
+
+        with open(os.path.join(topdirname, "memory_stats"), "w") as f:
             f.write(cmd.stdout_text)
 
 
