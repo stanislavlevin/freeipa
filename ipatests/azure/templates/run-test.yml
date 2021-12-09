@@ -44,6 +44,13 @@ steps:
     }
     export -f runner
 
+    # clear page cache to make application think the system has more memory
+    # /sys/fs/cgroup/memory/memory.usage_in_bytes = rss + page cache
+    while : ; do
+        sleep 1m
+        sudo /bin/bash -c 'sync; echo 1 > /proc/sys/vm/drop_caches'
+    done &
+
     result=1
     rm -f result_*
     { parallel \
