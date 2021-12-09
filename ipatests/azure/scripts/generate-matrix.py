@@ -54,7 +54,7 @@ with open(args.azure_template) as f:
             jobs[f'ipa_tests_clients_{job_id}'] = clients
 
             for cont in ["server", "replica", "client"]:
-                for res in ["mem_limit", "memswap_limit"]:
+                for res in ["mem_limit", "memswap_limit", "mem_reservation"]:
                     key = f"ipa_tests_{cont}_{res}_{job_id}"
                     jobs[key] = cont_resources[cont][res]
 
