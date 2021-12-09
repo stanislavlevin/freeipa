@@ -2,12 +2,15 @@ default_resources:
   server:
     mem_limit: "2200m"
     memswap_limit: "3000m"
+    mem_reservation: "1800m"
   replica:
     mem_limit: "2200m"
     memswap_limit: "3000m"
+    mem_reservation: "1800m"
   client:
     mem_limit: "512m"
     memswap_limit: "1000m"
+    mem_reservation: "410m"
 
 vms:
 - vm_jobs:
