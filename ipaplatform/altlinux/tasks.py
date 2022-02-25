@@ -54,7 +54,7 @@ class ALTLinuxTaskNamespace(RedHatTaskNamespace):
             return
 
         # Configure nsswitch.conf
-        for database in {"passwd", "group"}:
+        for database in ("passwd", "group"):
             self.configure_nsswitch_database(
                 fstore,
                 database,
@@ -63,7 +63,7 @@ class ALTLinuxTaskNamespace(RedHatTaskNamespace):
                 default_value=["files"],
             )
 
-        for database in {"netgroup", "automount", "services"}:
+        for database in ("netgroup", "automount", "services"):
             self.configure_nsswitch_database(
                 fstore,
                 database,
