@@ -43,7 +43,9 @@ if api.env.in_server:
         # pki >= 10.4.0
         from pki.crypto import DES_EDE3_CBC_OID
     except ImportError:
+        # pylint: disable=no-member
         DES_EDE3_CBC_OID = pki.key.KeyClient.DES_EDE3_CBC_OID
+        # pylint: enable=no-member
 
 
 if six.PY3:
