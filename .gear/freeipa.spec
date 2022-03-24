@@ -44,7 +44,7 @@
 
 Name: freeipa
 Version: 4.8.9
-Release: alt0.M90P.3
+Release: alt4.p9.1
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -438,6 +438,8 @@ Requires: python3-module-qrcode
 Requires: python3-module-requests
 Requires: python3-module-sss-murmur
 Requires: python3-module-yubico
+Obsoletes: python-module-freeipa
+Provides: python-module-freeipa
 %py3_provides ipaplatform
 %py3_provides ipaplatform.constants
 %py3_provides ipaplatform.osinfo
@@ -1061,14 +1063,35 @@ fi
 %python3_sitelibdir/ipaplatform-*.egg-info/
 
 %changelog
+* Thu Mar 24 2022 Andrey Cherepanov <cas@altlinux.org> 4.8.9-alt4.p9.1
+- Backport fixes to p9 branch.
+
+* Tue Sep 21 2021 Andrey Cherepanov <cas@altlinux.org> 4.8.9-alt4.c9f2.2
+- WebUI: Fix topology graph navigation crash (patch from upstream).
+
+* Wed Sep 15 2021 Stanislav Levin <slev@altlinux.org> 4.8.9-alt4.c9f2.1
+- Backported to c9f2.
+
+* Fri Jul 02 2021 Stanislav Levin <slev@altlinux.org> 4.8.9-alt5
+- Improved error message for missing supported NTP (closes: #40343).
+
 * Fri Jul 02 2021 Stanislav Levin <slev@altlinux.org> 4.8.9-alt0.M90P.3
 - Improved error message for missing supported NTP (closes: #40343).
 
-* Thu Nov 26 2020 Stanislav Levin <slev@altlinux.org> 4.8.9-alt0.M90P.2
-- Fixed apt transaction on distro-branch upgrade.
+* Mon Jun 21 2021 Stanislav Levin <slev@altlinux.org> 4.8.9-alt4
+- Dropped dependency on python-nss.
 
-* Thu Oct 01 2020 Stanislav Levin <slev@altlinux.org> 4.8.9-alt0.M90P.1
-- Backported to P9.
+* Thu Apr 29 2021 Stanislav Levin <slev@altlinux.org> 4.8.9-alt3
+- Fixed FTBFS(new Pylint 2.8.2).
+
+* Thu Mar 25 2021 Stanislav Levin <slev@altlinux.org> 4.8.9-alt2
+- Fixed FTBFS(new Pylint 2.7.2).
+
+* Wed Nov 25 2020 Anton V. Boyarshinov <boyarsh@altlinux.org> 4.8.6-alt3.c9
+- add obsoletes to python-module-freeipa to help apt update freeipa-client
+
+* Thu Oct 08 2020 Anton V. Boyarshinov <boyarsh@altlinux.org> 4.8.6-alt2.p9
+- Don't require SELinux
 
 * Fri Aug 21 2020 Stanislav Levin <slev@altlinux.org> 4.8.9-alt1
 - 4.8.8 -> 4.8.9.
