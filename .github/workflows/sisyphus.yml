@@ -60,6 +60,8 @@ jobs:
         useradd -m ${{ env.GHA_USER }}
         # for build as unprivileged user
         [ $(id -u) -eq 0 ] && chmod -R o+wrX .
+        ${{ env.RUN_AS_GHA_USER }} \
+            git config --global --add safe.directory "$GITHUB_WORKSPACE"
         ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-build.sh
 
     - name: Run autoconf
@@ -132,6 +134,8 @@ jobs:
         useradd -m ${{ env.GHA_USER }}
         # for build as unprivileged user
         [ $(id -u) -eq 0 ] && chmod -R o+wrX .
+        ${{ env.RUN_AS_GHA_USER }} \
+            git config --global --add safe.directory "$GITHUB_WORKSPACE"
         ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-build.sh
 
     - name: Install Lint dependencies
@@ -296,6 +300,8 @@ jobs:
         useradd -m ${{ env.GHA_USER }}
         # for build as unprivileged user
         [ $(id -u) -eq 0 ] && chmod -R o+wrX .
+        ${{ env.RUN_AS_GHA_USER }} \
+            git config --global --add safe.directory "$GITHUB_WORKSPACE"
         ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-build.sh
 
     - name: Run autoconf
@@ -342,6 +348,8 @@ jobs:
         useradd -m ${{ env.GHA_USER }}
         # for build as unprivileged user
         [ $(id -u) -eq 0 ] && chmod -R o+wrX .
+        ${{ env.RUN_AS_GHA_USER }} \
+            git config --global --add safe.directory "$GITHUB_WORKSPACE"
         ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-build.sh
 
     - name: Install Tox prerequisites
@@ -384,6 +392,8 @@ jobs:
         useradd -m ${{ env.GHA_USER }}
         # for build as unprivileged user
         [ $(id -u) -eq 0 ] && chmod -R o+wrX .
+        ${{ env.RUN_AS_GHA_USER }} \
+            git config --global --add safe.directory "$GITHUB_WORKSPACE"
         ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-build.sh
 
     - name: Install WebUI Unit tests prerequisites
