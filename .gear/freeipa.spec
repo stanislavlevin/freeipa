@@ -123,7 +123,8 @@ BuildRequires: python3(wheel)
 
 %if_with docs
 BuildRequires: python3(sphinx)
-BuildRequires: python3(m2r)
+BuildRequires: plantuml
+BuildRequires: fonts-ttf-google-noto-sans-vf
 %endif
 
 #
