@@ -589,6 +589,7 @@ rm %buildroot/%plugin_dir/libipa_extdom_extop.la
 rm %buildroot/%plugin_dir/libipa_range_check.la
 rm %buildroot/%plugin_dir/libipa_otp_counter.la
 rm %buildroot/%plugin_dir/libipa_otp_lasttoken.la
+rm %buildroot/%plugin_dir/libipa_graceperiod.la
 rm %buildroot/%plugin_dir/libtopology.la
 rm %buildroot/%_libdir/krb5/plugins/kdb/ipadb.la
 rm %buildroot/%_libdir/samba/pdb/ipasam.la
@@ -885,6 +886,7 @@ fi
 %attr(755,root,root) %plugin_dir/libipa_sidgen.so
 %attr(755,root,root) %plugin_dir/libipa_sidgen_task.so
 %attr(755,root,root) %plugin_dir/libipa_extdom_extop.so
+%attr(755,root,root) %plugin_dir/libipa_graceperiod.so
 %attr(755,root,root) %_libdir/krb5/plugins/kdb/ipadb.so
 %_man1dir/ipa-replica-conncheck.1*
 %_man1dir/ipa-replica-install.1*
