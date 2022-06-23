@@ -199,7 +199,7 @@ class UserTracker(CertmapdataMixin, KerberosAliasMixin, Tracker):
         for key, value in self.kwargs.items():
             if key == "krbprincipalname":
                 try:
-                    princ_splitted = value.split("@")
+                    princ_splitted = value.split("@", maxsplit=1)
                     self.attrs[key] = [
                         "{}@{}".format(
                             princ_splitted[0].lower(),

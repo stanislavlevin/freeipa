@@ -43,7 +43,7 @@ class DebianTaskNamespace(RedHatTaskNamespace):
 
     @staticmethod
     def modify_nsswitch_pam_stack(sssd, mkhomedir, fstore, statestore,
-                                  sudo=True):
+                                  sudo=True, subid=False):
         if mkhomedir:
             try:
                 ipautil.run(["pam-auth-update",
@@ -203,11 +203,7 @@ Serial Number (hex): {cert.serial_number:#x}
 
         return True
 
-    # Debian doesn't use authselect, so call enable/disable_ldap_automount
-    # from BaseTaskNamespace.
-    def enable_ldap_automount(self, statestore):
-        return BaseTaskNamespace.enable_ldap_automount(self, statestore)
-
+    # Debian doesn't use authselect, so call disable_ldap_automount
     def disable_ldap_automount(self, statestore):
         return BaseTaskNamespace.disable_ldap_automount(self, statestore)
 

@@ -192,7 +192,7 @@ class UI_driver:
         if not NO_YAML and os.path.isfile(path):
             try:
                 with open(path, 'r') as conf:
-                    cls.config = yaml.load(stream=conf, Loader=yaml.FullLoader)
+                    cls.config = yaml.safe_load(stream=conf)
             except yaml.YAMLError as e:
                 pytest.skip("Invalid Web UI config.\n%s" % e)
             except IOError as e:
@@ -1150,6 +1150,34 @@ class UI_driver:
             if has:
                 return row
         return None
+
+    def get_row_by_column_value(self, key, column_name, parent=None,
+                                table_name=None):
+        """
+        Get the first matched row element of a search table with given key
+        matched against selected column. None if not found
+        """
+        rows = self.get_rows(parent, table_name)
+        s = "td div[name='%s']" % column_name
+        for row in rows:
+            has = self.find(s, By.CSS_SELECTOR, row)
+            if has.text == key:
+                return row
+        return None
+
+    def get_record_pkey(self, key, column, parent=None, table_name=None):
+        """
+        Get record pkey if value of column is known
+        """
+        row = self.get_row_by_column_value(key,
+                                           column_name=column,
+                                           parent=parent,
+                                           table_name=table_name)
+        val = None
+        if row:
+            el = self.find("td input", By.CSS_SELECTOR, row)
+            val = el.get_attribute("value")
+        return val
 
     def navigate_to_row_record(self, row, pkey_column=None):
         """

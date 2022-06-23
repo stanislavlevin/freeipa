@@ -7,6 +7,7 @@ Tests to verify that the ipa-healthcheck scenarios
 
 from __future__ import absolute_import
 
+from configparser import RawConfigParser, NoOptionError
 from datetime import datetime, timedelta
 import json
 import os
@@ -123,6 +124,7 @@ metaservices_checks = [
 
 ipafiles_checks = ["IPAFileNSSDBCheck", "IPAFileCheck", "TomcatFileCheck"]
 dogtag_checks = ["DogtagCertsConfigCheck", "DogtagCertsConnectivityCheck"]
+pki_clone_checks = ["ClonesConnectivyAndDataCheck"]
 iparoles_checks = ["IPACRLManagerCheck", "IPARenewalMasterCheck"]
 replication_checks = ["ReplicationCheck"]
 replication_checks_0_4 = ["ReplicationConflictCheck"]
@@ -156,7 +158,7 @@ TOMCAT_CONFIG_FILES = (
 
 
 def run_healthcheck(host, source=None, check=None, output_type="json",
-                    failures_only=False):
+                    failures_only=False, config=None):
     """
     Run ipa-healthcheck on the remote host and return the result
 
@@ -181,6 +183,19 @@ def run_healthcheck(host, source=None, check=None, output_type="json",
 
     if failures_only:
         cmd.append("--failures-only")
+
+    if config:
+        config_data = host.get_file_contents(config, encoding='utf-8')
+        cfg = RawConfigParser()
+        cfg.read_string(config_data)
+        # The config file value overrides the CLI so if human or
+        # some other option is overridden, don't import as json.
+        try:
+            output_type = cfg.get('default', 'output_type')
+        except NoOptionError:
+            pass
+        cmd.append("--config")
+        cmd.append(config)
 
     result = host.run_command(cmd, raiseonerr=False)
 
@@ -240,9 +255,16 @@ class TestIpaHealthCheck(IntegrationTest):
     def install(cls, mh):
         if not cls.master.transport.file_exists(SOS_CMD):
             tasks.install_packages(cls.master, SOS_PKG)
-        tasks.install_master(cls.master, setup_dns=True)
+        tasks.install_master(
+            cls.master, setup_dns=True, extra_args=['--no-dnssec-validation']
+        )
         tasks.install_client(cls.master, cls.clients[0])
-        tasks.install_replica(cls.master, cls.replicas[0], setup_dns=True)
+        tasks.install_replica(
+            cls.master,
+            cls.replicas[0],
+            setup_dns=True,
+            extra_args=['--no-dnssec-validation']
+        )
 
     def test_ipa_healthcheck_install_on_master(self):
         """
@@ -466,8 +488,8 @@ class TestIpaHealthCheck(IntegrationTest):
         This testcase checks that when the pki-tomcat service is stopped,
         DogtagCertsConnectivityCheck displays the result as ERROR.
         """
-        error_msg = (
-            "Request for certificate failed, "
+        error_msg = "Request for certificate failed"
+        additional_msg = (
             "Certificate operation cannot be completed: "
             "Request failed with status 503: "
             "Non-2xx response from CA REST API: 503.  (503)"
@@ -479,7 +501,11 @@ class TestIpaHealthCheck(IntegrationTest):
         assert returncode == 1
         for check in data:
             assert check["result"] == "ERROR"
-            assert check["kw"]["msg"] == error_msg
+            assert error_msg in check["kw"]["msg"]
+            # pre ipa-healthcheck 0.11, the additional msg was in msg
+            # but moved to "error" with 0.11+
+            assert additional_msg in check["kw"]["msg"] or \
+                   additional_msg == check["kw"]["error"]
 
     def test_source_ipahealthcheck_meta_core_metacheck(self):
         """
@@ -580,6 +606,47 @@ class TestIpaHealthCheck(IntegrationTest):
         )
         assert returncode == 0
 
+    def test_ipa_healthcheck_no_errors_with_overrides(self):
+        """
+        Test overriding command-line options in a configuration file.
+        """
+        version = tasks.get_healthcheck_version(self.master)
+        if parse_version(version) < parse_version("0.10"):
+            pytest.skip("Skipping test for 0.10 healthcheck version")
+        tmpcmd = self.master.run_command(['mktemp'])
+        config_file = tmpcmd.stdout_text.strip()
+        HC_LOG = "/tmp/hc.log"
+
+        self.master.put_file_contents(
+            config_file,
+            '\n'.join([
+                '[default]',
+                'output_type=human'
+            ])
+        )
+        returncode, output = run_healthcheck(
+            self.master, failures_only=True, config=config_file
+        )
+        assert returncode == 0
+        assert output == "No issues found."
+
+        # Setting an output file automatically enables all=True
+        self.master.put_file_contents(
+            config_file,
+            '\n'.join([
+                '[default]',
+                'output_type=human',
+                'output_file=%s' % HC_LOG,
+            ])
+        )
+        returncode, _unused = run_healthcheck(
+            self.master, config=config_file
+        )
+        logsize = len(self.master.get_file_contents(HC_LOG, encoding='utf-8'))
+        self.master.run_command(['rm', '-f', HC_LOG])
+        self.master.run_command(['rm', '-f', config_file])
+        assert logsize > 0  # run afterward to ensure cleanup
+
     def test_ipa_healthcheck_dna_plugin_returns_warning_pagure_issue_60(self):
         """
         This testcase checks that the status for IPADNARangeCheck on replica
@@ -654,45 +721,28 @@ class TestIpaHealthCheck(IntegrationTest):
         displays the correct result when master and replica is setup
         with integrated DNS.
         """
-        SRV_RECORDS = [
-            "_ldap._tcp." + self.replicas[0].domain.name + ".:" +
-            self.replicas[0].hostname + ".",
-            "_ldap._tcp." + self.master.domain.name + ".:" +
-            self.master.hostname + ".",
-            "_kerberos._tcp." + self.replicas[0].domain.name + ".:" +
-            self.replicas[0].hostname + ".",
-            "_kerberos._tcp." + self.master.domain.name + ".:" +
-            self.master.hostname + ".",
-            "_kerberos._udp." + self.replicas[0].domain.name + ".:" +
-            self.replicas[0].hostname + ".",
-            "_kerberos._udp." + self.master.domain.name + ".:" +
-            self.master.hostname + ".",
-            "_kerberos-master._tcp." + self.replicas[0].domain.name +
-            ".:" + self.replicas[0].hostname + ".",
-            "_kerberos-master._tcp." + self.master.domain.name + ".:" +
-            self.master.hostname + ".",
-            "_kerberos-master._udp." + self.replicas[0].domain.name +
-            ".:" + self.replicas[0].hostname + ".",
-            "_kerberos-master._udp." + self.master.domain.name + ".:" +
-            self.master.hostname + ".",
-            "_kpasswd._tcp." + self.replicas[0].domain.name + ".:" +
-            self.replicas[0].hostname + ".",
-            "_kpasswd._tcp." + self.master.domain.name + ".:" +
-            self.master.hostname + ".",
-            "_kpasswd._udp." + self.replicas[0].domain.name + ".:" +
-            self.replicas[0].hostname + ".",
-            "_kpasswd._udp." + self.master.domain.name + ".:" +
-            self.master.hostname + ".",
-            "\"" + self.master.domain.realm.upper() + "\"",
+        SYSTEM_RECORDS = [
+            rr
+            for h in [self.master, self.replicas[0]]
+            for rr in [
+                # SRV rrs
+                f"_ldap._tcp.{h.domain.name}.:{h.hostname}.",
+                f"_kerberos._tcp.{h.domain.name}.:{h.hostname}.",
+                f"_kerberos._udp.{h.domain.name}.:{h.hostname}.",
+                f"_kerberos-master._tcp.{h.domain.name}.:{h.hostname}.",
+                f"_kerberos-master._udp.{h.domain.name}.:{h.hostname}.",
+                f"_kpasswd._tcp.{h.domain.name}.:{h.hostname}.",
+                f"_kpasswd._udp.{h.domain.name}.:{h.hostname}.",
+                # URI rrs
+                f"_kerberos.{h.domain.name}.:krb5srv:m:tcp:{h.hostname}.",
+                f"_kerberos.{h.domain.name}.:krb5srv:m:udp:{h.hostname}.",
+                f"_kpasswd.{h.domain.name}.:krb5srv:m:tcp:{h.hostname}.",
+                f"_kpasswd.{h.domain.name}.:krb5srv:m:udp:{h.hostname}.",
+            ]
+            + [str(ip) for ip in resolve_ip_addresses_nss(h.external_hostname)]
         ]
+        SYSTEM_RECORDS.append(f'"{self.master.domain.realm.upper()}"')
 
-        for hostname in [
-                self.master.external_hostname,
-                self.replicas[0].external_hostname,
-        ]:
-            # resolve hostname on controller
-            ips = resolve_ip_addresses_nss(hostname)
-            SRV_RECORDS.extend([str(ip) for ip in ips])
 
         returncode, data = run_healthcheck(
             self.master,
@@ -702,7 +752,7 @@ class TestIpaHealthCheck(IntegrationTest):
         assert returncode == 0
         for check in data:
             assert check["result"] == "SUCCESS"
-            assert check["kw"]["key"] in SRV_RECORDS
+            assert check["kw"]["key"] in SYSTEM_RECORDS
 
     def test_ipa_healthcheck_ds_ruv_check(self):
         """
@@ -1051,6 +1101,23 @@ class TestIpaHealthCheck(IntegrationTest):
             assert check["result"] == "CRITICAL"
             assert exception_msg in check["kw"]["exception"]
 
+    def test_source_pki_server_clones_connectivity_and_data(self):
+        """
+        This testcase checks that when ClonesConnectivyAndDataCheck
+        is run it doesn't display source not found error
+        """
+        error_msg = (
+            "Source 'pki.server.healthcheck.clones.connectivity_and_data' "
+            "not found"
+        )
+        result = self.master.run_command(
+            ["ipa-healthcheck", "--source",
+             "pki.server.healthcheck.clones.connectivity_and_data"]
+        )
+        assert error_msg not in result.stdout_text
+        for check in pki_clone_checks:
+            assert check in result.stdout_text
+
     @pytest.fixture
     def modify_tls(self, restart_service):
         """
@@ -1227,6 +1294,23 @@ class TestIpaHealthCheck(IntegrationTest):
         )
         assert msg in cmd.stdout_text
 
+    def modify_perms_run_healthcheck(self, filename, modify_permissions,
+                                     expected_permissions):
+        """
+        Modify the ipa logfile permissions and run
+        healthcheck command to check the status.
+        """
+        modify_permissions(self.master, path=filename, mode="0644")
+        returncode, data = run_healthcheck(
+            self.master, "ipahealthcheck.ipa.files", failures_only=True
+        )
+        assert returncode == 1
+        assert len(data) == 1
+        assert data[0]["result"] == "WARNING"
+        assert data[0]["kw"]["path"] == filename
+        assert data[0]["kw"]["type"] == "mode"
+        assert data[0]["kw"]["expected"] == expected_permissions
+
     def test_ipahealthcheck_verify_perms_for_source_files(self,
                                                           modify_permissions):
         """
@@ -1234,21 +1318,26 @@ class TestIpaHealthCheck(IntegrationTest):
         source.
         The test modifies permissions of ipainstall log file and checks the
         response from healthcheck.
-
         https://pagure.io/freeipa/issue/8949
         """
-        modify_permissions(self.master, path=paths.IPASERVER_INSTALL_LOG,
-                           mode="0644")
-        returncode, data = run_healthcheck(
-            self.master, "ipahealthcheck.ipa.files", failures_only=True)
+        self.modify_perms_run_healthcheck(
+            paths.IPASERVER_INSTALL_LOG, modify_permissions,
+            expected_permissions="0600"
+        )
 
-        assert returncode == 1
-        assert len(data) == 1
-        assert data[0]["result"] == "WARNING"
-        assert data[0]["kw"]["path"] == paths.IPASERVER_INSTALL_LOG
-        assert data[0]["kw"]["type"] == "mode"
-        assert data[0]["kw"]["expected"] == "0600"
-
+    def test_ipahealthcheck_verify_perms_upgrade_log_file(self,
+                                                          modify_permissions):
+        """
+        This testcase creates /var/log/ipaupgrade.log file.
+        Once the file is generated the permissions are modified
+        to check that correct status message is displayed
+        by healthcheck tool
+        """
+        self.master.run_command(["touch", paths.IPAUPGRADE_LOG])
+        self.modify_perms_run_healthcheck(
+            paths.IPAUPGRADE_LOG, modify_permissions,
+            expected_permissions="0600"
+        )
 
     @pytest.fixture
     def remove_healthcheck(self):
@@ -1404,6 +1493,19 @@ class TestIpaHealthCheck(IntegrationTest):
             execute_nsscheck_cert_expiring(check)
 
         finally:
+            # Prior to uninstall remove all the cert tracking to prevent
+            # errors from certmonger trying to check the status of certs
+            # that don't matter because we are uninstalling.
+            self.master.run_command(['systemctl', 'stop', 'certmonger'])
+            # Important: run_command with a str argument is able to
+            # perform shell expansion but run_command with a list of
+            # arguments is not
+            self.master.run_command(
+                "rm -fv " + paths.CERTMONGER_REQUESTS_DIR + "*"
+            )
+            # Delete the renewal lock file to make sure the helpers don't block
+            self.master.run_command("rm -fv " + paths.IPA_RENEWAL_LOCK)
+            self.master.run_command(['systemctl', 'start', 'certmonger'])
             # Uninstall the master here so that the certs don't try
             # to renew after the CA is running again.
             tasks.uninstall_master(self.master)
@@ -1437,16 +1539,21 @@ class TestIpaHealthCheckWithoutDNS(IntegrationTest):
     def install(cls, mh):
         tasks.uninstall_replica(cls.master, cls.replicas[0])
         tasks.uninstall_master(cls.master)
-        tasks.install_master(cls.master, setup_dns=False)
+        tasks.install_master(
+            cls.master, setup_dns=False)
 
     def test_ipa_dns_systemrecords_check(self):
         """
         Test checks the result of IPADNSSystemRecordsCheck
         when ipa-server is configured without DNS.
         """
-        msg1 = "Expected SRV record missing"
-        msg2 = "Got {count} ipa-ca A records, expected {expected}"
-        msg3 = "Got {count} ipa-ca AAAA records, expected {expected}"
+        expected_msgs = {
+            "Expected SRV record missing",
+            "Got {count} ipa-ca A records, expected {expected}",
+            "Got {count} ipa-ca AAAA records, expected {expected}",
+            "Expected URI record missing",
+        }
+
         tasks.install_packages(self.master, HEALTHCHECK_PKG)
         returncode, data = run_healthcheck(
             self.master,
@@ -1456,11 +1563,7 @@ class TestIpaHealthCheckWithoutDNS(IntegrationTest):
         assert returncode == 1
         for check in data:
             assert check["result"] == "WARNING"
-            assert (
-                check["kw"]["msg"] == msg1
-                or check["kw"]["msg"] == msg2
-                or check["kw"]["msg"] == msg3
-            )
+            assert check["kw"]["msg"] in expected_msgs
 
     def test_ipa_certs_check_ipacertnsstrust(self):
         """
@@ -1497,7 +1600,9 @@ class TestIpaHealthCheckWithADtrust(IntegrationTest):
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=True)
+        tasks.install_master(
+            cls.master, setup_dns=True, extra_args=['--no-dnssec-validation']
+        )
         cls.ad = cls.ads[0]
         cls.child_ad = cls.ad_subdomains[0]
         cls.tree_ad = cls.ad_treedomains[0]
@@ -1737,7 +1842,7 @@ def modify_permissions():
     # Restore the previous state
     host = state.pop('host')
     for path, path_state in state.items():
-        (owner, group, mode) = path_state.split(':')
+        (owner, group, mode) = path_state.split(":", maxsplit=2)
         host.run_command(["chown", "%s:%s" % (owner, group), path])
         host.run_command(["chmod", mode, path])
 
@@ -1756,8 +1861,15 @@ class TestIpaHealthCheckFileCheck(IntegrationTest):
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=True)
-        tasks.install_replica(cls.master, cls.replicas[0], setup_dns=True)
+        tasks.install_master(
+            cls.master, setup_dns=True, extra_args=['--no-dnssec-validation']
+        )
+        tasks.install_replica(
+            cls.master,
+            cls.replicas[0],
+            setup_dns=True,
+            extra_args=['--no-dnssec-validation']
+        )
         tasks.install_packages(cls.master, HEALTHCHECK_PKG)
 
     def test_ipa_filecheck_bad_owner(self, modify_permissions):
@@ -2104,7 +2216,9 @@ class TestIpaHealthCheckFilesystemSpace(IntegrationTest):
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=True)
+        tasks.install_master(
+            cls.master, setup_dns=True, extra_args=['--no-dnssec-validation']
+        )
         tasks.install_packages(cls.master, HEALTHCHECK_PKG)
 
     @pytest.fixture
@@ -2185,7 +2299,9 @@ class TestIpaHealthCLI(IntegrationTest):
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=True)
+        tasks.install_master(
+            cls.master, setup_dns=True, extra_args=['--no-dnssec-validation']
+        )
         tasks.install_packages(cls.master, HEALTHCHECK_PKG)
 
     def test_indent(self):

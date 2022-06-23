@@ -50,8 +50,8 @@ jobs:
         git_repo: '{git_repo}'
         git_refspec: '{git_refspec}'
         template: &ci-ipa-4-9-previous
-          name: freeipa/ci-ipa-4-9-f34
-          version: 0.0.4
+          name: freeipa/ci-ipa-4-9-f35
+          version: 0.0.6
         timeout: 1800
         topology: *build
 
@@ -557,6 +557,18 @@ jobs:
         test_suite: test_integration/test_installation.py::TestInstallWithoutNamed
         template: *ci-ipa-4-9-previous
         timeout: 4800
+        topology: *master_1repl
+
+  fedora-previous-ipa-4-9/test_installation_TestInstallwithSHA384withRSA:
+    requires: [fedora-previous-ipa-4-9/build]
+    priority: 50
+    job:
+      class: RunPytest
+      args:
+        build_url: '{fedora-previous-ipa-4-9/build_url}'
+        test_suite: test_integration/test_installation.py::TestInstallwithSHA384withRSA
+        template: *ci-ipa-4-9-previous
+        timeout: 3600
         topology: *master_1repl
 
   fedora-previous-ipa-4-9/test_idviews:
@@ -1306,6 +1318,18 @@ jobs:
         timeout: 4800
         topology: *ipaserver
 
+  fedora-previous-ipa-4-9/test_webui_subid:
+    requires: [fedora-previous-ipa-4-9/build]
+    priority: 50
+    job:
+      class: RunWebuiTests
+      args:
+        build_url: '{fedora-previous-ipa-4-9/build_url}'
+        test_suite: test_webui/test_subid.py
+        template: *ci-ipa-4-9-previous
+        timeout: 2400
+        topology: *ipaserver
+
   fedora-previous-ipa-4-9/customized_ds_config_install:
     requires: [fedora-previous-ipa-4-9/build]
     priority: 50
@@ -1498,6 +1522,18 @@ jobs:
         timeout: 3600
         topology: *master_1repl
 
+  fedora-previous-ipa-4-9/hostname_validator:
+    requires: [fedora-previous-ipa-4-9/build]
+    priority: 50
+    job:
+      class: RunPytest
+      args:
+        build_url: '{fedora-previous-ipa-4-9/build_url}'
+        test_suite: test_integration/test_installation.py::TestHostnameValidator
+        template: *ci-ipa-4-9-previous
+        timeout: 3600
+        topology: *master_1repl
+
   fedora-previous-ipa-4-9/automember:
     requires: [fedora-previous-ipa-4-9/build]
     priority: 50
@@ -1603,7 +1639,7 @@ jobs:
         build_url: '{fedora-previous-ipa-4-9/build_url}'
         test_suite: test_integration/test_trust.py
         template: *ci-ipa-4-9-previous
-        timeout: 9000
+        timeout: 10000
         topology: *adroot_adchild_adtree_master_1client
 
   fedora-previous-ipa-4-9/test_backup_and_restore_TestBackupAndRestoreTrust:
@@ -1722,6 +1758,18 @@ jobs:
       args:
         build_url: '{fedora-previous-ipa-4-9/build_url}'
         test_suite: test_integration/test_custom_plugins.py
+        template: *ci-ipa-4-9-previous
+        timeout: 3600
+        topology: *master_1repl
+
+  fedora-previous-ipa-4-9/test_external_idp:
+    requires: [fedora-previous-ipa-4-9/build]
+    priority: 50
+    job:
+      class: RunPytest
+      args:
+        build_url: '{fedora-previous-ipa-4-9/build_url}'
+        test_suite: test_integration/test_idp.py
         template: *ci-ipa-4-9-previous
         timeout: 3600
         topology: *master_1repl

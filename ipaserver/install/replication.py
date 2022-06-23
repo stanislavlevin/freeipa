@@ -64,9 +64,10 @@ WINSYNC = 2
 
 # List of attributes that need to be excluded from replication initialization.
 TOTAL_EXCLUDES = ('entryusn',
-                 'krblastsuccessfulauth',
-                 'krblastfailedauth',
-                 'krbloginfailedcount')
+                  'krblastsuccessfulauth',
+                  'krblastfailedauth',
+                  'krbloginfailedcount',
+                  'passwordgraceusertime',)
 
 # List of attributes that need to be excluded from normal replication.
 EXCLUDES = ('memberof', 'idnssoaserial') + TOTAL_EXCLUDES
@@ -1095,7 +1096,7 @@ class ReplicationManager:
                 elif status.find("Total update succeeded") > -1:
                     print("\nUpdate succeeded")
                     done = True
-                elif inprogress.lower() == 'true':
+                elif inprogress:
                     print("\nUpdate in progress yet not in progress")
                 else:
                     print("\n[%s] reports: Update failed! Status: [%s]"

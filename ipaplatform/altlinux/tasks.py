@@ -31,7 +31,7 @@ class ALTLinuxTaskNamespace(RedHatTaskNamespace):
         return True
 
     def modify_nsswitch_pam_stack(
-        self, sssd, mkhomedir, fstore, statestore, sudo=True
+        self, sssd, mkhomedir, fstore, statestore, sudo=True, subid=False
     ):
         """
         If sssd flag is true, configure pam and nsswitch so that SSSD is used

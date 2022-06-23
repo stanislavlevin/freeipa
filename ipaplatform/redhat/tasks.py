@@ -245,9 +245,9 @@ class RedHatTaskNamespace(BaseTaskNamespace):
             f.writelines(content)
 
     def modify_nsswitch_pam_stack(self, sssd, mkhomedir, fstore, statestore,
-                                  sudo=True):
+                                  sudo=True, subid=False):
         auth_config = get_auth_tool()
-        auth_config.configure(sssd, mkhomedir, statestore, sudo)
+        auth_config.configure(sssd, mkhomedir, statestore, sudo, subid)
 
     def is_nosssd_supported(self):
         # The flag --no-sssd is not supported any more for rhel-based distros
@@ -779,23 +779,18 @@ class RedHatTaskNamespace(BaseTaskNamespace):
     def enable_sssd_sudo(self, _fstore):
         """sudo enablement is handled by authselect"""
 
-    def enable_ldap_automount(self, statestore):
-        """
-        Point automount to ldap in nsswitch.conf.
-        This function is for non-SSSD setups only.
-        """
-        super(RedHatTaskNamespace, self).enable_ldap_automount(statestore)
-
-        authselect_cmd = [paths.AUTHSELECT, "enable-feature",
-                          "with-custom-automount"]
-        ipautil.run(authselect_cmd)
-
     def disable_ldap_automount(self, statestore):
         """Disable ldap-based automount"""
         super(RedHatTaskNamespace, self).disable_ldap_automount(statestore)
 
         authselect_cmd = [paths.AUTHSELECT, "disable-feature",
                           "with-custom-automount"]
-        ipautil.run(authselect_cmd)
+        try:
+            ipautil.run(authselect_cmd)
+        except ipautil.CalledProcessError:
+            logger.info("Unable to disable with-custom-automount feature")
+            logger.info("It may happen if the configuration was done "
+                        "using authconfig instead of authselect")
+
 
 tasks = RedHatTaskNamespace()

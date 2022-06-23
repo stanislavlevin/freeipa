@@ -626,6 +626,14 @@ class user_add(baseuser_add):
             answer = self.api.Object['radiusproxy'].get_dn_if_exists(rcl)
             entry_attrs['ipatokenradiusconfiglink'] = answer
 
+        rcl = entry_attrs.get('ipaidpconfiglink', None)
+        if rcl:
+            if 'ipaidpuser' not in entry_attrs['objectclass']:
+                entry_attrs['objectclass'].append('ipaidpuser')
+
+            answer = self.api.Object['idp'].get_dn_if_exists(rcl)
+            entry_attrs['ipaidpconfiglink'] = answer
+
         self.pre_common_callback(ldap, dn, entry_attrs, attrs_list, *keys,
                                  **options)
 
@@ -672,9 +680,9 @@ class user_add(baseuser_add):
 
         # generate subid
         default_subid = config.single_value.get(
-            'ipaUserDefaultSubordinateId', 'FALSE'
+            'ipaUserDefaultSubordinateId', False
         )
-        if default_subid == 'TRUE':
+        if default_subid:
             result = self.api.Command.subid_generate(
                 ipaowner=entry_attrs.single_value['uid'],
                 version=options['version']
@@ -1181,6 +1189,9 @@ class userstatus(LDAPObject):
             label=_('Time now'),
             flags={'virtual_attribute', 'no_create', 'no_update', 'no_search'},
         ),
+        Str('passwordgraceusertime',
+            label=_('Password grace count'),
+            flags={'no_create', 'no_update', 'no_search'},),
     )
 
 
@@ -1222,7 +1233,9 @@ class user_status(LDAPQuery):
     def execute(self, *keys, **options):
         ldap = self.obj.backend
         dn, _oc = self.api.Object.user.get_either_dn(*keys, **options)
-        attr_list = ['krbloginfailedcount', 'krblastsuccessfulauth', 'krblastfailedauth', 'nsaccountlock']
+        attr_list = ['krbloginfailedcount', 'krblastsuccessfulauth',
+                     'krblastfailedauth', 'nsaccountlock',
+                     'passwordgraceusertime']
 
         disabled = False
         masters = get_masters(ldap)
@@ -1250,6 +1263,8 @@ class user_status(LDAPQuery):
                 for attr in ['krblastsuccessfulauth', 'krblastfailedauth']:
                     newresult[attr] = entry.get(attr, [u'N/A'])
                 newresult['krbloginfailedcount'] = entry.get('krbloginfailedcount', u'0')
+                newresult['passwordgraceusertime'] = \
+                    entry.get('passwordgraceusertime', u'0')
                 if not options.get('raw', False):
                     for attr in ['krblastsuccessfulauth', 'krblastfailedauth']:
                         try:

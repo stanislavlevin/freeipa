@@ -171,12 +171,17 @@ def find_version(filename):
     else:
         return -1
 
-def upgrade_file(sub_dict, filename, template, add=False):
+
+def upgrade_file(sub_dict, filename, template, add=False, force=False):
     """
     Get the version from the current and template files and update the
     installed configuration file if there is a new template.
 
     If add is True then create a new configuration file.
+
+    If force is True then the version comparison is skipped. This should
+    be used judiciously. It does not override add nor will it affect
+    files that don't exist (version == -1).
     """
     old = int(find_version(filename))
     new = int(find_version(template))
@@ -198,7 +203,10 @@ def upgrade_file(sub_dict, filename, template, add=False):
                        "overwritten. A backup of the original will be made.",
                        filename)
 
-    if old < new or (add and old == 0):
+    if force:
+        logger.error("Forcing update of template %s", template)
+
+    if ((old < new) or (add and old == 0)) or force:
         backup_file(filename, new)
         update_conf(sub_dict, filename, template)
         logger.info("Upgraded %s to version %d", filename, new)
@@ -1113,11 +1121,24 @@ def ds_enable_sidgen_extdom_plugins(ds):
 
     if sysupgrade.get_upgrade_state('ds', 'enable_ds_sidgen_extdom_plugins'):
         logger.debug('sidgen and extdom plugins are enabled already')
-        return
+        return False
 
     ds.add_sidgen_plugin(api.env.basedn)
     ds.add_extdom_plugin(api.env.basedn)
     sysupgrade.set_upgrade_state('ds', 'enable_ds_sidgen_extdom_plugins', True)
+    return True
+
+
+def ds_enable_graceperiod_plugin(ds):
+    """Graceperiod is a newer DS plugin so needs to be enabled on upgrade"""
+    if sysupgrade.get_upgrade_state('ds', 'enable_ds_graceperiod_plugin'):
+        logger.debug('graceperiod is enabled already')
+        return False
+
+    ds.config_graceperiod_module()
+    sysupgrade.set_upgrade_state('ds', 'enable_ds_graceperiod_plugin', True)
+    return True
+
 
 def ca_upgrade_schema(ca):
     logger.info('[Upgrading CA schema]')
@@ -1611,6 +1632,21 @@ def ca_update_acme_configuration(ca, fqdn):
                                   template_name))
 
 
+def set_default_grace_time():
+    dn = DN(
+        ('cn', 'global_policy'), ('cn', api.env.realm),
+        ('cn', 'kerberos'), api.env.basedn
+    )
+    entry = api.Backend.ldap2.get_entry(dn)
+    for (a,_v) in entry.items():
+        if a.lower() == 'passwordgracelimit':
+            return
+
+    entry['objectclass'].append('ipapwdpolicy')
+    entry['passwordgracelimit'] = -1
+    api.Backend.ldap2.update_entry(entry)
+
+
 def upgrade_configuration():
     """
     Execute configuration upgrade of the IPA services
@@ -1713,19 +1749,21 @@ def upgrade_configuration():
                                   "ipa-kdc-proxy.conf.template"))
         if ca.is_configured():
             # Handle upgrade of AJP connector configuration
-            ca.secure_ajp_connector()
+            rewrite = ca.secure_ajp_connector()
             if ca.ajp_secret:
                 sub_dict['DOGTAG_AJP_SECRET'] = "secret={}".format(
                     ca.ajp_secret)
             else:
                 sub_dict['DOGTAG_AJP_SECRET'] = ''
 
-            upgrade_file(
-                sub_dict,
-                paths.HTTPD_IPA_PKI_PROXY_CONF,
-                os.path.join(paths.USR_SHARE_IPA_DIR,
-                             "ipa-pki-proxy.conf.template"),
-                add=True)
+            # force=True will ensure the secret is updated if it changes
+            if rewrite:
+                upgrade_file(
+                    sub_dict,
+                    paths.HTTPD_IPA_PKI_PROXY_CONF,
+                    os.path.join(paths.USR_SHARE_IPA_DIR,
+                                 "ipa-pki-proxy.conf.template"),
+                    add=True, force=True)
         else:
             if os.path.isfile(paths.HTTPD_IPA_PKI_PROXY_CONF):
                 os.remove(paths.HTTPD_IPA_PKI_PROXY_CONF)
@@ -1800,7 +1838,13 @@ def upgrade_configuration():
     ds.realm = api.env.realm
     ds.suffix = ipautil.realm_to_suffix(api.env.realm)
 
-    ds_enable_sidgen_extdom_plugins(ds)
+    if any([
+        ds_enable_sidgen_extdom_plugins(ds),
+        ds_enable_graceperiod_plugin(ds)
+    ]):
+        ds.restart(ds.serverid)
+
+    set_default_grace_time()
 
     if not http.is_kdcproxy_configured():
         logger.info('[Enabling KDC Proxy]')

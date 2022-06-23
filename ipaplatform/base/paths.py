@@ -28,16 +28,15 @@ class BasePathNamespace:
     BIN_HOSTNAMECTL = "/bin/hostnamectl"
     CRYPTO_POLICY_OPENSSLCNF_FILE = None
     ECHO = "/bin/echo"
-    FIPS_MODE_SETUP = "/usr/bin/fips-mode-setup"
+    FIPS_MODE_SETUP = "/bin/fips-mode-setup"
     GZIP = "/bin/gzip"
     LS = "/bin/ls"
     SYSTEMCTL = "/bin/systemctl"
     SYSTEMD_RUN = "/bin/systemd-run"
     SYSTEMD_DETECT_VIRT = "/usr/bin/systemd-detect-virt"
-    SYSTEMD_TMPFILES = "/usr/bin/systemd-tmpfiles"
+    SYSTEMD_TMPFILES = "/bin/systemd-tmpfiles"
     TAR = "/bin/tar"
     PACKAGE_MANAGER = "/usr/bin/rpm"
-    AUTOFS_LDAP_AUTH_CONF = "/etc/autofs_ldap_auth.conf"
     ETC_FEDORA_RELEASE = "/etc/fedora-release"
     GROUP = "/etc/group"
     ETC_HOSTNAME = "/etc/hostname"
@@ -265,6 +264,7 @@ class BasePathNamespace:
     IPA_HTTPD_PASSWD_READER = "/usr/libexec/ipa/ipa-httpd-pwdreader"
     IPA_PKI_WAIT_RUNNING = "/usr/libexec/ipa/ipa-pki-wait-running"
     DNSSEC_KEYFROMLABEL = "/usr/sbin/dnssec-keyfromlabel"
+    DNSSEC_KEYFROMLABEL_9_17 = "/usr/bin/dnssec-keyfromlabel"
     GETSEBOOL = "/usr/sbin/getsebool"
     GROUPADD = "/usr/sbin/groupadd"
     USERMOD = "/usr/sbin/usermod"
@@ -466,6 +466,7 @@ class BasePathNamespace:
     IPA_CCACHE_SWEEPER_GSSPROXY_SOCK = (
         "/var/lib/gssproxy/ipa_ccache_sweeper.sock"
     )
+    PAM_CONFIG = None
 
     def check_paths(self):
         """Check paths for missing files

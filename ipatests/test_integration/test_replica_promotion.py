@@ -31,6 +31,7 @@ from ipatests.test_integration.test_dns_locations import (
 )
 from ipapython.dnsutil import DNSName
 from ipalib.constants import IPA_CA_RECORD
+from ipatests.util import xfail_context
 
 config = get_global_config()
 
@@ -138,7 +139,6 @@ class TestReplicaPromotionLevel1(ReplicaPromotionBase):
         assert res.returncode == 1
         assert expected_err in res.stderr_text
 
-
     @replicas_cleanup
     def test_one_command_installation(self):
         """
@@ -150,11 +150,11 @@ class TestReplicaPromotionLevel1(ReplicaPromotionBase):
         Firewall(self.replicas[0]).enable_services(["freeipa-ldap",
                                                     "freeipa-ldaps"])
         self.replicas[0].run_command(['ipa-replica-install', '-w',
-                                     self.master.config.admin_password,
-                                     '-n', self.master.domain.name,
-                                     '-r', self.master.domain.realm,
-                                     '--server', self.master.hostname,
-                                     '-U'])
+                                      self.master.config.admin_password,
+                                      '-n', self.master.domain.name,
+                                      '-r', self.master.domain.realm,
+                                      '--server', self.master.hostname,
+                                      '-U'])
         # Ensure that pkinit is properly configured, test for 7566
         result = self.replicas[0].run_command(['ipa-pkinit-manage', 'status'])
         assert "PKINIT is enabled" in result.stdout_text
@@ -321,7 +321,7 @@ class TestWrongClientDomain(IntegrationTest):
         result1 = client.run_command(['ipa-replica-install', '-U', '-w',
                                       self.master.config.dirman_password],
                                      raiseonerr=False)
-        assert(result1.returncode == 0), (
+        assert (result1.returncode == 0), (
             'Failed to promote the client installed with the upcase domain name')
 
     def test_client_rollback(self):
@@ -354,6 +354,7 @@ class TestWrongClientDomain(IntegrationTest):
 
         assert("An error occurred while removing SSSD" not in
                result.stdout_text)
+
 
 class TestRenewalMaster(IntegrationTest):
 
@@ -436,6 +437,76 @@ class TestRenewalMaster(IntegrationTest):
 
         self.assertCARenewalMaster(master, replica.hostname)
         self.assertCARenewalMaster(replica, replica.hostname)
+
+    def test_replica_concheck(self):
+        """Test cases for ipa-replica-conncheck command
+
+        Following test cases would be checked:
+        - when called with --principal (it should then prompt for a password)
+        - when called with --principal / --password
+        - when called without principal and password but with a kerberos TGT,
+          kinit admin done before calling ipa-replica-conncheck
+        - when called without principal and password, and without any kerberos
+          TGT (it should default to principal=admin and prompt for a password)
+
+          related: https://pagure.io/freeipa/issue/9047
+        """
+        exp_str1 = "Connection from replica to master is OK."
+        exp_str2 = "Connection from master to replica is OK"
+        tasks.kdestroy_all(self.replicas[0])
+        # when called with --principal (it should then prompt for a password)
+        result = self.replicas[0].run_command(
+            ['ipa-replica-conncheck', '--auto-master-check',
+             '--master', self.master.hostname,
+             '-r', self.replicas[0].domain.realm,
+             '-p', self.replicas[0].config.admin_name],
+            stdin_text=self.master.config.admin_password
+        )
+        assert result.returncode == 0
+        assert (
+            exp_str1 in result.stderr_text and exp_str2 in result.stderr_text
+        )
+
+        # when called with --principal / --password
+        result = self.replicas[0].run_command([
+            'ipa-replica-conncheck', '--auto-master-check',
+            '--master', self.master.hostname,
+            '-r', self.replicas[0].domain.realm,
+            '-p', self.replicas[0].config.admin_name,
+            '-w', self.master.config.admin_password
+        ])
+        assert result.returncode == 0
+        assert (
+            exp_str1 in result.stderr_text and exp_str2 in result.stderr_text
+        )
+
+        # when called without principal and password, and without
+        # any kerberos TGT, it should default to principal=admin
+        # and prompt for a password
+        result = self.replicas[0].run_command(
+            ['ipa-replica-conncheck', '--auto-master-check',
+             '--master', self.master.hostname,
+             '-r', self.replicas[0].domain.realm],
+            stdin_text=self.master.config.admin_password
+        )
+        assert result.returncode == 0
+        assert (
+            exp_str1 in result.stderr_text and exp_str2 in result.stderr_text
+        )
+
+        # when called without principal and password but with a kerberos TGT,
+        # kinit admin done before calling ipa-replica-conncheck
+        tasks.kinit_admin(self.replicas[0])
+        result = self.replicas[0].run_command(
+            ['ipa-replica-conncheck', '--auto-master-check',
+             '--master', self.master.hostname,
+             '-r', self.replicas[0].domain.realm]
+        )
+        assert result.returncode == 0
+        assert (
+            exp_str1 in result.stderr_text and exp_str2 in result.stderr_text
+        )
+        tasks.kdestroy_all(self.replicas[0])
 
     def test_automatic_renewal_master_transfer_ondelete(self):
         # Test that after replica uninstallation, master overtakes the cert
@@ -546,7 +617,8 @@ class TestSubCAkeyReplication(IntegrationTest):
     def check_subca(self, host, name, cert_nick):
         result = host.run_command(['ipa', 'ca-show', name])
         # ipa ca-show returns 0 even if the cert cannot be found locally.
-        assert "ipa: ERROR:" not in result.stderr_text
+        if "ipa: ERROR:" in result.stderr_text:
+            return False
         tasks.run_certutil(
             host, ['-L', '-n', cert_nick], paths.PKI_TOMCAT_ALIAS_DIR
         )
@@ -555,6 +627,7 @@ class TestSubCAkeyReplication(IntegrationTest):
             '-f', paths.PKI_TOMCAT_ALIAS_PWDFILE_TXT,
             '-K', '-n', cert_nick
         ])
+        return True
 
     def get_certinfo(self, host):
         result = tasks.run_certutil(
@@ -566,7 +639,11 @@ class TestSubCAkeyReplication(IntegrationTest):
         for line in result.stdout_text.splitlines():
             mo = certdb.CERT_RE.match(line)
             if mo:
-                certs[mo.group('nick')] = mo.group('flags')
+                # Strip out any token
+                nick = mo.group('nick')
+                if ':' in nick:
+                    nick = nick.split(':', maxsplit=1)[1]
+                certs[nick] = mo.group('flags')
 
         result = tasks.run_certutil(
             host,
@@ -577,7 +654,11 @@ class TestSubCAkeyReplication(IntegrationTest):
         for line in result.stdout_text.splitlines():
             mo = certdb.KEY_RE.match(line)
             if mo:
-                keys[mo.group('nick')] = mo.group('keyid')
+                # Strip out any token
+                nick = mo.group('nick')
+                if ':' in nick:
+                    nick = nick.split(':', maxsplit=1)[1]
+                keys[nick] = mo.group('keyid')
         return certs, keys
 
     def check_certdb(self, master, replica):
@@ -593,14 +674,8 @@ class TestSubCAkeyReplication(IntegrationTest):
         if master.is_fips_mode:
             # Mixed FIPS/non-FIPS installations are not supported
             assert replica.is_fips_mode
-            key_nick = self.SERVER_KEY_NICK_FIPS
-        else:
-            key_nick = self.SERVER_KEY_NICK
 
-        # expected keys, server key has different name
         expected_keys = set(expected_certs)
-        expected_keys.remove(self.SERVER_CERT_NICK)
-        expected_keys.add(key_nick)
 
         # get certs and keys from Dogtag's NSSDB
         master_certs, master_keys = self.get_certinfo(master)
@@ -612,9 +687,9 @@ class TestSubCAkeyReplication(IntegrationTest):
         assert set(master_keys) == expected_keys
         assert set(replica_keys) == expected_keys
 
-        # server keys are different
-        master_server_key = master_keys.pop(key_nick)
-        replica_server_key = replica_keys.pop(key_nick)
+        # The Server-Cert keys are unique per-machine
+        master_server_key = master_keys.pop('Server-Cert cert-pki-ca')
+        replica_server_key = replica_keys.pop('Server-Cert cert-pki-ca')
         assert master_server_key != replica_server_key
         # but key ids of other keys are equal
         assert master_keys == replica_keys
@@ -637,11 +712,18 @@ class TestSubCAkeyReplication(IntegrationTest):
         master_nick = self.add_subca(
             master, self.SUBCA_MASTER, self.SUBCA_MASTER_CN
         )
-        # give replication some time
-        time.sleep(15)
+        # give replication some time, up to 60 seconds
+        for _i in range(0,6):
+            time.sleep(10)
+            m = self.check_subca(master, self.SUBCA_MASTER, master_nick)
+            r = self.check_subca(replica, self.SUBCA_MASTER, master_nick)
 
-        self.check_subca(master, self.SUBCA_MASTER, master_nick)
-        self.check_subca(replica, self.SUBCA_MASTER, master_nick)
+            if m and r:
+                break
+        else:
+            assert m, "master doesn't have the subCA"
+            assert r, "replica doesn't have the subCA"
+
         self.check_pki_error(replica)
         self.check_certdb(master, replica)
 
@@ -652,12 +734,19 @@ class TestSubCAkeyReplication(IntegrationTest):
         replica_nick = self.add_subca(
             replica, self.SUBCA_REPLICA, self.SUBCA_REPLICA_CN
         )
-        # give replication some time
-        time.sleep(15)
+        # give replication some time, up to 60 seconds
+        for _i in range(0,6):
+            time.sleep(10)
+            r = self.check_subca(replica, self.SUBCA_REPLICA, replica_nick)
+            m = self.check_subca(master, self.SUBCA_REPLICA, replica_nick)
+
+            if m and r:
+                break
+        else:
+            assert m, "master doesn't have the subCA"
+            assert r, "replica doesn't have the subCA"
 
         # replica.run_command(['ipa-certupdate'])
-        self.check_subca(replica, self.SUBCA_REPLICA, replica_nick)
-        self.check_subca(master, self.SUBCA_REPLICA, replica_nick)
         self.check_pki_error(master)
         self.check_certdb(master, replica)
 
@@ -943,13 +1032,14 @@ class TestHiddenReplicaPromotion(IntegrationTest):
         self._check_dnsrecords([self.master], [self.replicas[0]])
         self._check_config([self.master], [self.replicas[0]])
 
-    @pytest.mark.xfail(
-        reason='https://pagure.io/freeipa/issue/8582', strict=True
-    )
     def test_ipahealthcheck_hidden_replica(self):
         """Ensure that ipa-healthcheck runs successfully on all members
         of an IPA cluster that includes a hidden replica.
         """
+        os_version = (tasks.get_platform(self.master),
+                      tasks.get_platform_version(self.master))
+        pki_version = tasks.get_pki_version(self.master)
+
         # verify state
         self._check_config([self.master], [self.replicas[0]])
         # A DNA range is needed on the replica for ipa-healthcheck to work.
@@ -961,7 +1051,18 @@ class TestHiddenReplicaPromotion(IntegrationTest):
                 srv,
                 failures_only=True
             )
-            assert returncode == 0
+            pki_too_old = \
+                (os_version[0] == 'fedora'
+                    and pki_version < tasks.parse_version('11.1.0'))\
+                or (os_version[0] == 'rhel'
+                    and os_version[1][0] == 8
+                    and pki_version < tasks.parse_version('10.12.0'))\
+                or (os_version[0] == 'rhel'
+                    and os_version[1][0] == 9
+                    and pki_version < tasks.parse_version('11.0.4'))
+            with xfail_context(pki_too_old,
+                               'https://pagure.io/freeipa/issue/8582'):
+                assert returncode == 0
 
     def test_hide_last_visible_server_fails(self):
         # verify state

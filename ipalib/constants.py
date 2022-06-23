@@ -29,6 +29,8 @@ from ipaplatform.constants import constants as _constants
 from ipapython.dn import DN
 from ipapython.fqdn import gethostfqdn
 from ipapython.version import VERSION, API_VERSION
+from cryptography.hazmat.primitives.ciphers import algorithms, modes
+from cryptography.hazmat.backends.openssl.backend import backend
 
 
 FQDN = gethostfqdn()
@@ -153,6 +155,7 @@ DEFAULT_CONFIG = (
     ('container_ca_renewal',
         DN(('cn', 'ca_renewal'), ('cn', 'ipa'), ('cn', 'etc'))),
     ('container_subids', DN(('cn', 'subids'), ('cn', 'accounts'))),
+    ('container_idp', DN(('cn', 'idp'))),
 
     # Ports, hosts, and URIs:
     # Following values do not have any reasonable default.
@@ -167,6 +170,7 @@ DEFAULT_CONFIG = (
 
     ('ldap_cache', True),
     ('ldap_cache_size', 100),
+    ('ldap_cache_debug', False),
 
     # Define an inclusive range of SSL/TLS version support
     ('tls_version_min', TLS_VERSION_DEFAULT_MIN),
@@ -289,24 +293,6 @@ DOMAIN_LEVEL_1 = 1  # replica promotion, topology plugin
 MIN_DOMAIN_LEVEL = DOMAIN_LEVEL_1
 MAX_DOMAIN_LEVEL = DOMAIN_LEVEL_1
 
-# Constants used in generation of replication agreements and as topology
-# defaults
-
-# List of attributes that need to be excluded from replication initialization.
-REPL_AGMT_TOTAL_EXCLUDES = ('entryusn',
-                            'krblastsuccessfulauth',
-                            'krblastfailedauth',
-                            'krbloginfailedcount')
-
-# List of attributes that need to be excluded from normal replication.
-REPL_AGMT_EXCLUDES = ('memberof', 'idnssoaserial') + REPL_AGMT_TOTAL_EXCLUDES
-
-# List of attributes that are not updated on empty replication
-REPL_AGMT_STRIP_ATTRS = ('modifiersName',
-                         'modifyTimestamp',
-                         'internalModifiersName',
-                         'internalModifyTimestamp')
-
 DOMAIN_SUFFIX_NAME = 'domain'
 CA_SUFFIX_NAME = 'ca'
 PKI_GSSAPI_SERVICE_NAME = 'dogtag'
@@ -374,3 +360,17 @@ KRA_TRACKING_REQS = {
 }
 
 ALLOWED_NETBIOS_CHARS = string.ascii_uppercase + string.digits + '-'
+
+# vault data wrapping algorithms
+VAULT_WRAPPING_3DES = 'des-ede3-cbc'
+VAULT_WRAPPING_AES128_CBC = 'aes-128-cbc'
+VAULT_WRAPPING_SUPPORTED_ALGOS = (
+    # new default and supported since pki-kra >= 10.4
+    VAULT_WRAPPING_AES128_CBC,
+)
+VAULT_WRAPPING_DEFAULT_ALGO = VAULT_WRAPPING_AES128_CBC
+
+# Add 3DES for backwards compatibility if supported
+if backend.cipher_supported(algorithms.TripleDES(b"\x00" * 8),
+                            modes.CBC(b"\x00" * 8)):
+    VAULT_WRAPPING_SUPPORTED_ALGOS += (VAULT_WRAPPING_3DES,)

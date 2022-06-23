@@ -50,6 +50,13 @@ if test "x$ac_cv_have_decl_sss_nss_getpwnam_timeout" = xyes ; then
     AC_DEFINE(USE_SSS_NSS_TIMEOUT,1,[Use extended NSS API provided by SSSD])
 fi
 
+dnl --- if sss_nss_idmap provides sss_nss_getorigbyusername_timeout and
+dnl --- sss_nss_getorigbygroupname_timeout , use it
+bck_cflags="$CFLAGS"
+CFLAGS="$CFLAGS -DIPA_389DS_PLUGIN_HELPER_CALLS"
+AC_CHECK_DECLS([sss_nss_getorigbyusername_timeout, sss_nss_getorigbygroupname_timeout], [], [], [[#include <sss_nss_idmap.h>]])
+CFLAGS="$bck_cflags"
+
 dnl -- sss_certmap and certauth.h are needed by the IPA KDB certauth plugin --
 PKG_CHECK_EXISTS([sss_certmap],
                  [PKG_CHECK_MODULES([SSSCERTMAP], [sss_certmap])],
@@ -73,6 +80,15 @@ KRAD_LIBS="-lkrad"
 krb5rundir="${runstatedir}/krb5kdc"
 AC_SUBST(KRAD_LIBS)
 AC_SUBST(krb5rundir)
+
+dnl ---------------------------------------------------------------------------
+dnl - Check for KRB5 KDB API issue_pac support
+dnl ---------------------------------------------------------------------------
+
+AC_CHECK_HEADER(kdb.h, [], [AC_MSG_ERROR([kdb.h not found])])
+AC_CHECK_MEMBER([kdb_vftabl.issue_pac],
+                [have_kdb_issue_pac=yes],
+                [have_kdb_issue_pac=no])
 
 dnl ---------------------------------------------------------------------------
 dnl - Check for UUID library

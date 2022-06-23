@@ -118,6 +118,14 @@ def expire_cert_critical():
     yield _expire_cert_critical
 
     host = hosts.pop('host')
+    # Prior to uninstall remove all the cert tracking to prevent
+    # errors from certmonger trying to check the status of certs
+    # that don't matter because we are uninstalling.
+    host.run_command(['systemctl', 'stop', 'certmonger'])
+    # Important: run_command with a str argument is able to
+    # perform shell expansion but run_command with a list of
+    # arguments is not
+    host.run_command('rm -fv ' + paths.CERTMONGER_REQUESTS_DIR + '*')
     tasks.uninstall_master(host)
     tasks.move_date(host, 'start', '-3Years-1day')
 
@@ -389,6 +397,12 @@ class TestCertFixReplica(IntegrationTest):
             setup_dns=False, extra_args=['--no-ntp']
         )
 
+    @classmethod
+    def uninstall(cls, mh):
+        # Uninstall method is empty as the uninstallation is done in
+        # the fixture
+        pass
+
     @pytest.fixture
     def expire_certs(self):
         # move system date to expire certs
@@ -398,7 +412,8 @@ class TestCertFixReplica(IntegrationTest):
         yield
 
         # move date back on replica and master
-        for host in self.master, self.replicas[0]:
+        for host in self.replicas[0], self.master:
+            tasks.uninstall_master(host)
             tasks.move_date(host, 'start', '-3years-1days')
 
     def test_renew_expired_cert_replica(self, expire_certs):

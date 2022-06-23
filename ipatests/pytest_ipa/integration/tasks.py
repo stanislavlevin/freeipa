@@ -66,6 +66,7 @@ from .env_config import env_to_script
 from .host import Host
 from .firewall import Firewall
 from .resolver import ResolvedResolver
+from .fips import is_fips_enabled, enable_crypto_subpolicy
 
 logger = logging.getLogger(__name__)
 
@@ -362,6 +363,8 @@ def install_master(host, setup_dns=True, setup_kra=False, setup_adtrust=False,
     if setup_adtrust:
         args.append('--setup-adtrust')
         fw_services.append("freeipa-trust")
+        if is_fips_enabled(host):
+            enable_crypto_subpolicy(host, "AD-SUPPORT")
     if external_ca:
         args.append('--external-ca')
 
@@ -496,6 +499,8 @@ def install_replica(master, replica, setup_ca=True, setup_dns=False,
     if setup_adtrust:
         args.append('--setup-adtrust')
         fw_services.append("freeipa-trust")
+        if is_fips_enabled(replica):
+            enable_crypto_subpolicy(replica, "AD-SUPPORT")
     if master_authoritative_for_client_domain(master, replica):
         args.extend(['--ip-address', replica.ip])
 
@@ -565,6 +570,8 @@ def install_client(master, client, extra_args=[], user=None,
 
     args.extend(extra_args)
 
+    if is_fips_enabled(client) and getattr(master.config, 'ad_domains', False):
+        enable_crypto_subpolicy(client, "AD-SUPPORT")
     result = client.run_command(args, stdin_text=stdin_text)
 
     setup_sssd_conf(client)
@@ -579,12 +586,15 @@ def install_adtrust(host):
     Configures the compat tree for the legacy clients.
     """
     kinit_admin(host)
+    if is_fips_enabled(host):
+        enable_crypto_subpolicy(host, "AD-SUPPORT")
     host.run_command(['ipa-adtrust-install', '-U',
                       '--enable-compat',
                       '--netbios-name', host.netbios,
                       '-a', host.config.admin_password,
                       '--add-sids'])
 
+    host.run_command(['net', 'conf', 'setparm', 'global', 'log level', '10'])
     Firewall(host).enable_service("freeipa-trust")
 
     # Restart named because it lost connection to dirsrv
@@ -2086,8 +2096,7 @@ def ldapsearch_dm(host, base, ldap_args, scope='sub', **kwargs):
     args = [
         'ldapsearch',
         '-x', '-ZZ',
-        '-h', host.hostname,
-        '-p', '389',
+        '-H', "ldap://{}".format(host.hostname),
         '-D', str(host.config.dirman_dn),
         '-w', host.config.dirman_password,
         '-s', scope,
@@ -2259,7 +2268,8 @@ class KerberosKeyCopier:
        copier.copy_keys('/etc/krb5.keytab', tmpname, replacement=replacement)
     """
     host_princ_template = "host/{master}@{realm}"
-    valid_etypes = ['aes256-cts-hmac-sha1-96', 'aes128-cts-hmac-sha1-96']
+    valid_etypes = ['aes256-cts-hmac-sha384-192', 'aes128-cts-hmac-sha256-128',
+                    'aes256-cts-hmac-sha1-96', 'aes128-cts-hmac-sha1-96']
 
     def __init__(self, host):
         self.host = host
@@ -2440,6 +2450,18 @@ def get_platform(host):
     ], raiseonerr=False)
     assert result.returncode == 0
     return result.stdout_text.strip()
+
+
+def get_platform_version(host):
+    result = host.run_command([
+        'python3', '-c',
+        'from ipaplatform.osinfo import OSInfo; print(OSInfo().version_number)'
+    ], raiseonerr=False)
+    assert result.returncode == 0
+    # stdout_text is a str in format "(X, Y)" and needs to be
+    # converted back to a functional tuple. This approach works with
+    # any number of version numbers filled, e.g. (34, ) or (8, 6) etc.
+    return tuple(map(int, re.findall(r'[0-9]+', result.stdout_text.strip())))
 
 
 def install_packages(host, pkgs):
@@ -2647,6 +2669,24 @@ def wait_for_ipa_to_start(host, timeout=60):
         )
         if result.returncode == 0:
             break
+
+
+def stop_ipa_server(host):
+    """Stop the entire IdM server using the ipactl utility.
+    """
+    host.run_command([paths.IPACTL, "stop"])
+
+
+def start_ipa_server(host):
+    """Start the entire IdM server using the ipactl utility
+    """
+    host.run_command([paths.IPACTL, "start"])
+
+
+def restart_ipa_server(host):
+    """Restart the entire IdM server using the ipactl utility
+    """
+    host.run_command([paths.IPACTL, "restart"])
 
 
 def dns_update_system_records(host):

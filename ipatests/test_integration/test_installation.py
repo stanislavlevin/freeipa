@@ -34,6 +34,7 @@ from ipatests.pytest_ipa.integration import tasks
 from ipatests.pytest_ipa.integration.env_config import get_global_config
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.test_integration.test_caless import CALessBase, ipa_certs_cleanup
+from ipatests.test_integration.test_cert import get_certmonger_fs_id
 from ipaplatform import services
 
 
@@ -474,7 +475,7 @@ class TestInstallCA(IntegrationTest):
 
         # Tweak sysrestore.state to drop installation section
         self.master.run_command(
-            ['sed','-i', r's/\[installation\]/\[badinstallation\]/',
+            ['sed', '-i', r's/\[installation\]/\[badinstallation\]/',
              os.path.join(paths.SYSRESTORE, SYSRESTORE_STATEFILE)])
 
         # Re-run installation check and it should fall back to old method
@@ -484,7 +485,7 @@ class TestInstallCA(IntegrationTest):
 
         # Restore installation section.
         self.master.run_command(
-            ['sed','-i', r's/\[badinstallation\]/\[installation\]/',
+            ['sed', '-i', r's/\[badinstallation\]/\[installation\]/',
              os.path.join(paths.SYSRESTORE, SYSRESTORE_STATEFILE)])
 
         # Uninstall and confirm that the old method reports correctly
@@ -688,6 +689,7 @@ def get_pki_tomcatd_pid(host):
             pid = line.split()[2]
             break
     return(pid)
+
 
 def get_ipa_services_pids(host):
     ipa_services_name = [
@@ -1067,6 +1069,19 @@ class TestInstallMaster(IntegrationTest):
         )
         assert "nsslapd-db-locks" not in result.stdout_text
 
+    def test_nsslapd_sizelimit(self):
+        """ Test for default value of nsslapd-sizelimit.
+
+        Related : https://pagure.io/freeipa/issue/8962
+        """
+        result = tasks.ldapsearch_dm(
+            self.master,
+            "cn=config",
+            ["nsslapd-sizelimit"],
+            scope="base"
+        )
+        assert "nsslapd-sizelimit: 100000" in result.stdout_text
+
     def test_admin_root_alias_CVE_2020_10747(self):
         # Test for CVE-2020-10747 fix
         # https://bugzilla.redhat.com/show_bug.cgi?id=1810160
@@ -1295,6 +1310,20 @@ class TestInstallMasterKRA(IntegrationTest):
     def test_install_master(self):
         tasks.install_master(self.master, setup_dns=False, setup_kra=True)
 
+    def test_ipa_ccache_sweep_timer_enabled(self):
+        """Test ipa-ccache-sweep.timer enabled by default during installation
+
+        This test checks that ipa-ccache-sweep.timer is enabled by default
+        during the ipa installation.
+
+        related: https://pagure.io/freeipa/issue/9107
+        """
+        result = self.master.run_command(
+            ['systemctl', 'is-enabled', 'ipa-ccache-sweep.timer'],
+            raiseonerr=False
+        )
+        assert 'enabled' in result.stdout_text
+
     def test_install_dns(self):
         tasks.install_dns(self.master)
 
@@ -1434,7 +1463,7 @@ class TestInstallMasterDNS(IntegrationTest):
             ['ipa', 'dnszone-show', self.master.domain.name]
         ).stdout_text
 
-        assert 'Active zone: TRUE' in result
+        assert 'Active zone: True' in result
 
 
 class TestInstallMasterDNSRepeatedly(IntegrationTest):
@@ -1807,6 +1836,48 @@ class TestInstallReplicaAgainstSpecificServer(IntegrationTest):
                                            stdin_text=dirman_password)
         assert self.replicas[0].hostname not in cmd.stdout_text
 
+    def test_replica_install_existing_agreement(self):
+        """When the replication agreement already exists, the installer
+        should print an error message with the information on where
+        and how to remove it"""
+        # master and replica_1 already installed by class' install() method
+
+        # stop the main server in order to preserve the replication agreement
+        # when removing the replica
+        tasks.stop_ipa_server(self.master)
+
+        # intentionally using ipa-server-install --uninstall
+        # instead of replica-manage
+        self.replicas[0].run_command(['ipa-server-install',
+                                      '--uninstall',
+                                      '--force',
+                                      '-U'])
+        tasks.start_ipa_server(self.master)
+
+        result = tasks.install_replica(self.master,
+                                       self.replicas[0],
+                                       setup_ca=False,
+                                       setup_dns=True,
+                                       promote=False,
+                                       raiseonerr=False,
+                                       extra_args=('--force-join',))
+        assert result.returncode != 0
+        assert self.replicas[0].hostname in result.stderr_text
+        assert "server-del" in result.stderr_text
+
+        # delete the agreement based on the error message
+        # and retry the installation
+        self.master.run_command(['ipa',
+                                 'server-del',
+                                 self.replicas[0].hostname,
+                                 '--force'])
+        result = tasks.install_replica(self.master,
+                                       self.replicas[0],
+                                       setup_ca=False,
+                                       setup_dns=True,
+                                       promote=False)
+        assert result.returncode == 0
+
 
 class TestInstallWithoutSudo(IntegrationTest):
 
@@ -1903,3 +1974,128 @@ class TestInstallWithoutNamed(IntegrationTest):
         tasks.install_replica(
             self.master, self.replicas[0], setup_ca=False, setup_dns=False
         )
+
+
+class TestInstallwithSHA384withRSA(IntegrationTest):
+    num_replicas = 0
+
+    def test_install_master_withalgo_sha384withrsa(self, server_cleanup):
+        tasks.install_master(
+            self.master,
+            extra_args=['--ca-signing-algorithm=SHA384withRSA'],
+        )
+
+        # check Signing Algorithm post installation
+        dashed_domain = self.master.domain.realm.replace(".", '-')
+        cmd_args = ['certutil', '-L', '-d',
+                    '/etc/dirsrv/slapd-{}/'.format(dashed_domain),
+                    '-n', 'Server-Cert']
+        result = self.master.run_command(cmd_args)
+        assert 'SHA-384 With RSA Encryption' in result.stdout_text
+
+    def test_install_master_modify_existing(self, server_cleanup):
+        """
+        Setup a master
+        Stop services
+        Modify default.params.signingAlg in CS.cfg
+        Restart services
+        Resubmit cert (Resubmitted cert should have new Algorithm)
+        """
+        tasks.install_master(self.master)
+        self.master.run_command(['ipactl', 'stop'])
+        cs_cfg_content = self.master.get_file_contents(paths.CA_CS_CFG_PATH,
+                                                       encoding='utf-8')
+        new_lines = []
+        replace_str = "ca.signing.defaultSigningAlgorithm=SHA384withRSA"
+        ocsp_rep_str = "ca.ocsp_signing.defaultSigningAlgorithm=SHA384withRSA"
+        for line in cs_cfg_content.split('\n'):
+            if line.startswith('ca.signing.defaultSigningAlgorithm'):
+                new_lines.append(replace_str)
+            elif line.startswith('ca.ocsp_signing.defaultSigningAlgorithm'):
+                new_lines.append(ocsp_rep_str)
+            else:
+                new_lines.append(line)
+        self.master.put_file_contents(paths.CA_CS_CFG_PATH,
+                                      '\n'.join(new_lines))
+        self.master.run_command(['ipactl', 'start'])
+
+        cmd = ['getcert', 'list', '-f', paths.RA_AGENT_PEM]
+        result = self.master.run_command(cmd)
+        request_id = get_certmonger_fs_id(result.stdout_text)
+
+        # resubmit RA Agent cert
+        cmd = ['getcert', 'resubmit', '-f', paths.RA_AGENT_PEM]
+        self.master.run_command(cmd)
+
+        tasks.wait_for_certmonger_status(self.master,
+                                         ('CA_WORKING', 'MONITORING'),
+                                         request_id)
+
+        cmd_args = ['openssl', 'x509', '-in',
+                    paths.RA_AGENT_PEM, '-noout', '-text']
+        result = self.master.run_command(cmd_args)
+        assert_str = 'Signature Algorithm: sha384WithRSAEncryption'
+        assert assert_str in result.stdout_text
+
+
+class TestHostnameValidator(IntegrationTest):
+    """Test installer hostname validator."""
+
+    num_replicas = 0
+
+    def get_args(self, host):
+        return [
+            'ipa-server-install',
+            '-n', host.domain.name,
+            '-r', host.domain.realm,
+            '-p', host.config.dirman_password,
+            '-a', host.config.admin_password,
+            '--setup-dns',
+            '--forwarder', host.config.dns_forwarder,
+            '--auto-reverse',
+            '--netbios-name', 'EXAMPLE',
+        ]
+
+    def test_user_input_hostname(self):
+        # https://pagure.io/freeipa/issue/9111
+        # Validate the user-provided hostname
+        self.master.run_command(['hostname', 'fedora'])
+        result = self.master.run_command(
+            self.get_args(self.master), raiseonerr=False,
+            stdin_text=self.master.hostname + '\nn\nn\nn\n',
+        )
+
+        # Scrape the output for the summary which is only displayed
+        # if the hostname is validated.
+        hostname = None
+        for line in result.stdout_text.split('\n'):
+            print(line)
+            m = re.match(
+                r"Hostname:\s+({})".format(self.master.hostname), line
+            )
+            if m:
+                hostname = m.group(1)
+                break
+        assert hostname == self.master.hostname
+
+    def test_hostname_with_dot(self):
+        # https://pagure.io/freeipa/issue/9111
+        # Validate the user-provided hostname
+        self.master.run_command(['hostname', 'fedora'])
+        result = self.master.run_command(
+            self.get_args(self.master), raiseonerr=False,
+            stdin_text=self.master.hostname + '.\nn\nn\nn\n',
+        )
+
+        # Scrape the output for the summary which is only displayed
+        # if the hostname is validated.
+        hostname = None
+        for line in result.stdout_text.split('\n'):
+            print(line)
+            m = re.match(
+                r"Hostname:\s+({})".format(self.master.hostname), line
+            )
+            if m:
+                hostname = m.group(1)
+                break
+        assert hostname == self.master.hostname

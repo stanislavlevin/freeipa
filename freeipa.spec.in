@@ -149,8 +149,8 @@
 # RHEL 8.2+, F32+ has 3.58
 %global nss_version 3.44.0-4
 
-# RHEL 8.3+, F32+
-%global sssd_version 2.4.0
+# RHEL 8.7+, F35+, adds IdP integration
+%global sssd_version 2.7.0
 
 %define krb5_base_version %(LC_ALL=C /usr/bin/pkgconf --modversion krb5 | grep -Eo '^[^.]+\.[^.]+' || echo %krb5_version)
 %global kdcproxy_version 0.4-3
@@ -323,7 +323,9 @@ BuildRequires:  python3-wheel
 
 %if %{with doc}
 BuildRequires: python3-sphinx
-BuildRequires: python3-m2r
+BuildRequires: plantuml
+BuildRequires: fontconfig
+BuildRequires: google-noto-sans-vf-fonts
 %endif
 
 #
@@ -651,7 +653,12 @@ Requires: python3-sssdconfig >= %{sssd_version}
 Requires: cyrus-sasl-gssapi%{?_isa}
 Requires: chrony
 Requires: krb5-workstation >= %{krb5_version}
-Requires: authselect >= 0.4-2
+# authselect: sssd profile with-subid
+%if 0%{?fedora} >= 36
+Requires: authselect >= 1.4.0
+%else
+Requires: authselect >= 1.2.5
+%endif
 Requires: curl
 # NIS domain name config: /usr/lib/systemd/system/*-domainname.service
 # All Fedora 28+ and RHEL8+ contain the service in hostname package
@@ -663,6 +670,7 @@ Requires: xmlrpc-c >= 1.27.4
 Requires: jansson
 %endif
 Requires: sssd-ipa >= %{sssd_version}
+Requires: sssd-idp >= %{sssd_version}
 Requires: certmonger >= %{certmonger_version}
 Requires: nss-tools >= %{nss_version}
 Requires: bind-utils
@@ -693,6 +701,12 @@ Provides: %{name}-admintools = %{version}-%{release}
 %if 0%{?rhel} == 8
 # Conflict with crypto-policies < 20200629-1 to get AD-SUPPORT policy module
 Conflicts: crypto-policies < 20200629-1
+%endif
+
+%if 0%{?rhel} == 9
+# Conflict with crypto-policies < 20220223-1 to get upgraded AD-SUPPORT and
+# AD-SUPPORT-LEGACY policy modules
+Conflicts: crypto-policies < 20220223-1
 %endif
 
 %description client
@@ -1053,6 +1067,7 @@ rm %{buildroot}/%{plugin_dir}/libipa_extdom_extop.la
 rm %{buildroot}/%{plugin_dir}/libipa_range_check.la
 rm %{buildroot}/%{plugin_dir}/libipa_otp_counter.la
 rm %{buildroot}/%{plugin_dir}/libipa_otp_lasttoken.la
+rm %{buildroot}/%{plugin_dir}/libipa_graceperiod.la
 rm %{buildroot}/%{plugin_dir}/libtopology.la
 rm %{buildroot}/%{_libdir}/krb5/plugins/kdb/ipadb.la
 rm %{buildroot}/%{_libdir}/samba/pdb/ipasam.la
@@ -1236,6 +1251,7 @@ if [ $1 -gt 1 ] ; then
 
         %{__python3} -c 'from ipaclient.install.client import configure_krb5_snippet; configure_krb5_snippet()' >>/var/log/ipaupgrade.log 2>&1
         %{__python3} -c 'from ipaclient.install.client import update_ipa_nssdb; update_ipa_nssdb()' >>/var/log/ipaupgrade.log 2>&1
+        chmod 0600 /var/log/ipaupgrade.log
         SSH_CLIENT_SYSTEM_CONF="/etc/ssh/ssh_config"
         if [ -f "$SSH_CLIENT_SYSTEM_CONF" ]; then
             sed -E --in-place=.orig 's/^(HostKeyAlgorithms ssh-rsa,ssh-dss)$/# disabled by ipa-client update\n# \1/' "$SSH_CLIENT_SYSTEM_CONF"
@@ -1411,6 +1427,7 @@ fi
 %attr(755,root,root) %{plugin_dir}/libipa_sidgen.so
 %attr(755,root,root) %{plugin_dir}/libipa_sidgen_task.so
 %attr(755,root,root) %{plugin_dir}/libipa_extdom_extop.so
+%attr(755,root,root) %{plugin_dir}/libipa_graceperiod.so
 %attr(755,root,root) %{_libdir}/krb5/plugins/kdb/ipadb.so
 %{_mandir}/man1/ipa-replica-conncheck.1*
 %{_mandir}/man1/ipa-replica-install.1*

@@ -101,9 +101,13 @@ dnl ---------------------------------------------------------------------------
 
 SAVE_CPPFLAGS=$CPPFLAGS
 CPPFLAGS="$NSPR_CFLAGS $NSS_CFLAGS"
-AC_CHECK_LIB([ldap_r], [ldap_search], [ ], AC_MSG_ERROR([libldap_r not found]))
-AC_CHECK_LIB([lber], [ber_peek_tag], [ ], AC_MSG_ERROR([liblber not found]))
-LDAP_LIBS="-lldap_r -llber"
+SAVE_LIBS="$LIBS"
+LIBS=
+AC_SEARCH_LIBS([ldap_search], [ldap_r ldap], [], [AC_MSG_ERROR([libldap or libldap_r not found])])
+AC_SEARCH_LIBS([ber_peek_tag], [lber], [], [AC_MSG_ERROR([liblber not found])])
+LDAP_LIBS="$LIBS"
+LDAP_CFLAGS=""
+LIBS="$SAVE_LIBS"
 LDAP_CFLAGS=""
 AC_SUBST(LDAP_LIBS)
 AC_SUBST(LDAP_CFLAGS)
@@ -313,6 +317,9 @@ AM_COND_IF([BUILD_IPA_CERTAUTH_PLUGIN], [
 AM_CONDITIONAL([BUILD_IPA_KDCPOLICY_PLUGIN],
                [test x$have_kdcpolicy_plugin = xyes])
 
+AM_CONDITIONAL([BUILD_IPA_ISSUE_PAC],
+               [test x$have_kdb_issue_pac = xyes])
+
 dnl ---------------------------------------------------------------------------
 dnl - Check for program paths
 dnl ---------------------------------------------------------------------------
@@ -408,6 +415,7 @@ AC_SUBST([IPAPLATFORM])
 AC_MSG_RESULT([${IPAPLATFORM}])
 
 if test "x${IPAPLATFORM}" == "xdebian"; then
+    HTTPD_GROUP="www-data"
     KRB5KDC_SERVICE="krb5-kdc.service"
     NAMED_GROUP="bind"
     ODS_USER="opendnssec"
@@ -421,12 +429,17 @@ elif test "x${IPAPLATFORM}" == "xaltlinux"; then
     ODS_GROUP="_opendnssec"
     PYTHON_INSTALL_EXTRA_OPTIONS=""
 else
+    HTTPD_GROUP="apache"
     KRB5KDC_SERVICE="krb5kdc.service"
     NAMED_GROUP="named"
     ODS_USER="ods"
     ODS_GROUP="ods"
     PYTHON_INSTALL_EXTRA_OPTIONS=""
 fi
+
+AC_MSG_CHECKING([HTTPD_GROUP])
+AC_SUBST([HTTPD_GROUP])
+AC_MSG_RESULT([${HTTPD_GROUP}])
 
 AC_SUBST([KRB5KDC_SERVICE])
 
@@ -663,6 +676,7 @@ AC_CONFIG_FILES([
     daemons/ipa-slapi-plugins/ipa-cldap/Makefile
     daemons/ipa-slapi-plugins/ipa-dns/Makefile
     daemons/ipa-slapi-plugins/ipa-enrollment/Makefile
+    daemons/ipa-slapi-plugins/ipa-graceperiod/Makefile
     daemons/ipa-slapi-plugins/ipa-lockout/Makefile
     daemons/ipa-slapi-plugins/ipa-otp-counter/Makefile
     daemons/ipa-slapi-plugins/ipa-otp-lasttoken/Makefile

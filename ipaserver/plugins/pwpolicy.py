@@ -63,6 +63,10 @@ policy.
 Group password policies are automatically removed when the groups they
 are associated with are removed.
 
+Grace period defines the number of LDAP logins allowed after expiration.
+-1 means do not enforce expiration to match previous behavior. 0 allows
+no additional logins after expiration.
+
 EXAMPLES:
 
  Modify the global policy:
@@ -245,7 +249,7 @@ class pwpolicy(LDAPObject):
         'krbpwdmaxfailure', 'krbpwdfailurecountinterval',
         'krbpwdlockoutduration', 'ipapwdmaxrepeat',
         'ipapwdmaxsequence', 'ipapwddictcheck',
-        'ipapwdusercheck',
+        'ipapwdusercheck', 'passwordgracelimit',
     ]
     managed_permissions = {
         'System: Read Group Password Policy': {
@@ -258,7 +262,7 @@ class pwpolicy(LDAPObject):
                 'krbpwdlockoutduration', 'krbpwdmaxfailure',
                 'krbpwdmindiffchars', 'krbpwdminlength', 'objectclass',
                 'ipapwdmaxrepeat', 'ipapwdmaxsequence', 'ipapwddictcheck',
-                'ipapwdusercheck',
+                'ipapwdusercheck', 'passwordgracelimit',
             },
             'default_privileges': {
                 'Password Policy Readers',
@@ -286,7 +290,7 @@ class pwpolicy(LDAPObject):
                 'krbpwdhistorylength', 'krbpwdlockoutduration',
                 'krbpwdmaxfailure', 'krbpwdmindiffchars', 'krbpwdminlength',
                 'ipapwdmaxrepeat', 'ipapwdmaxsequence', 'ipapwddictcheck',
-                'ipapwdusercheck',
+                'ipapwdusercheck', 'passwordgracelimit',
             },
             'replaces': [
                 '(targetattr = "krbmaxpwdlife || krbminpwdlife || krbpwdhistorylength || krbpwdmindiffchars || krbpwdminlength || krbpwdmaxfailure || krbpwdfailurecountinterval || krbpwdlockoutduration")(target = "ldap:///cn=*,cn=$REALM,cn=kerberos,$SUFFIX")(version 3.0;acl "permission:Modify Group Password Policy";allow (write) groupdn = "ldap:///cn=Modify Group Password Policy,cn=permissions,cn=pbac,$SUFFIX";)',
@@ -364,6 +368,15 @@ class pwpolicy(LDAPObject):
             label=_('Lockout duration'),
             doc=_('Period for which lockout is enforced (seconds)'),
             minvalue=0,
+        ),
+        Int(
+            'passwordgracelimit?',
+            cli_name='gracelimit',
+            label=_('Grace login limit'),
+            doc=_('Number of LDAP authentications allowed after expiration'),
+            minvalue=-1,
+            maxvalue=Int.MAX_UINT32,
+            default=-1,
         ),
     )
 
@@ -450,7 +463,7 @@ class pwpolicy(LDAPObject):
             for attr in ['ipapwdmaxrepeat', 'ipapwdmaxsequence',
                          'ipapwddictcheck', 'ipapwdusercheck']:
                 val = get_val(entry, attr)
-                if val not in ('FALSE', '0', 0, None):
+                if val not in (False, 'FALSE', '0', 0, None):
                     return True
             return False
 
@@ -581,7 +594,9 @@ class pwpolicy_mod(LDAPUpdate):
     def pre_callback(self, ldap, dn, entry_attrs, attrs_list, *keys, **options):
         assert isinstance(dn, DN)
         old_entry_attrs = ldap.get_entry(dn, ['objectclass'])
-        if 'ipapwdpolicy' not in old_entry_attrs['objectclass']:
+        if not self.obj.has_objectclass(
+            old_entry_attrs['objectclass'], 'ipapwdpolicy'
+        ):
             old_entry_attrs['objectclass'].append('ipapwdpolicy')
             entry_attrs['objectclass'] = old_entry_attrs['objectclass']
         self.obj.convert_time_on_input(entry_attrs)

@@ -40,7 +40,7 @@ jitter(krb5_deltat baseline, krb5_deltat *lifetime_out)
         return;
     }
 
-    *lifetime_out = baseline - offset % JITTER_WINDOW_SECONDS;
+    *lifetime_out = baseline - abs(offset) % JITTER_WINDOW_SECONDS;
 }
 
 static krb5_error_code
@@ -89,8 +89,9 @@ ipa_kdcpolicy_check_as(krb5_context context, krb5_kdcpolicy_moddata moddata,
 
     ua = ied->user_auth;
 
-    /* If no mechanisms are set, allow every auth method */
-    if (ua == IPADB_USER_AUTH_NONE) {
+    /* If no mechanisms are set, or it is anonymous PKINIT, allow every auth method */
+    if ((ua == IPADB_USER_AUTH_NONE) ||
+        (request->kdc_options & KDC_OPT_REQUEST_ANONYMOUS)) {
         jitter(ONE_DAY_SECONDS, lifetime_out);
         kerr = 0;
         goto done;
@@ -133,6 +134,15 @@ ipa_kdcpolicy_check_as(krb5_context context, krb5_kdcpolicy_moddata moddata,
                 goto done;
             }
             pol_limits = &(ied->pol_limits[IPADB_USER_AUTH_IDX_HARDENED]);
+        } else if (strcmp(auth_indicator, "idp") == 0) {
+            valid_auth_indicators++;
+            /* Allow hardened even if only password pre-auth is allowed */
+            if (!(ua & IPADB_USER_AUTH_IDP)) {
+                *status = "IdP pre-authentication not allowed for this user.";
+                kerr = KRB5KDC_ERR_POLICY;
+                goto done;
+            }
+            pol_limits = &(ied->pol_limits[IPADB_USER_AUTH_IDX_IDP]);
         }
     }
 
@@ -152,7 +162,7 @@ ipa_kdcpolicy_check_as(krb5_context context, krb5_kdcpolicy_moddata moddata,
         if (pol_limits->max_life != 0) {
             jitter(pol_limits->max_life, lifetime_out);
         } else {
-            jitter(ONE_DAY_SECONDS, lifetime_out);
+            jitter(client->max_life, lifetime_out);
         }
 
         if (pol_limits->max_renewable_life != 0) {

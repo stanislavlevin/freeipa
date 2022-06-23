@@ -101,7 +101,8 @@ class RedHatAuthSelect(RedHatAuthToolBase):
         features = output_items[1:]
         return profile, features
 
-    def configure(self, sssd, mkhomedir, statestore, sudo=True):
+    def configure(self, sssd, mkhomedir, statestore, sudo=True,
+                  subid=False):
         # In the statestore, the following keys are used for the
         # 'authselect' module:
         # Old method:
@@ -121,6 +122,8 @@ class RedHatAuthSelect(RedHatAuthToolBase):
             statestore.backup_state('authselect', 'mkhomedir', True)
         if sudo:
             cmd.append("with-sudo")
+        if subid:
+            cmd.append("with-subid")
         cmd.append("--force")
         cmd.append("--backup={}".format(backup_name))
 
@@ -129,7 +132,14 @@ class RedHatAuthSelect(RedHatAuthToolBase):
     def unconfigure(
         self, fstore, statestore, was_sssd_installed, was_sssd_configured
     ):
-        if not statestore.has_state('authselect') and was_sssd_installed:
+        # If the installation failed before doing the authselect part
+        # nothing to do here
+        complete = statestore.get_state('installation', 'complete')
+        if complete is not None and not complete and \
+           not statestore.has_state('authselect'):
+            return
+
+        if not statestore.has_state('authselect'):
             logger.warning(
                 "WARNING: Unable to revert to the pre-installation state "
                 "('authconfig' tool has been deprecated in favor of "

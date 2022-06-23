@@ -5,7 +5,6 @@
 """
 import base64
 import logging
-import paramiko
 import pytest
 import re
 import time
@@ -102,6 +101,8 @@ def ssh_2f(hostname, username, answers_dict, port=22):
             logger.info(
                 "Answer to ssh prompt is: '%s'", answers_dict[prmpt_str])
         return resp
+
+    import paramiko
     trans = paramiko.Transport((hostname, port))
     trans.connect()
     trans.auth_interactive(username, answer_handler)
@@ -316,7 +317,6 @@ class TestOTPToken(IntegrationTest):
         check_services = self.master.run_command(
             ['systemctl', 'list-units', '--state=failed']
         )
-        assert "0 loaded units listed" in check_services.stdout_text
         assert "ipa-otpd" not in check_services.stdout_text
         # Be sure no services are running and failed units
         self.master.run_command(['killall', 'ipa-otpd'], raiseonerr=False)
@@ -354,6 +354,9 @@ class TestOTPToken(IntegrationTest):
             otpvalue = totp.generate(int(time.time())).decode("ascii")
             kinit_otp(self.master, USER, password=PASSWORD, otp=otpvalue)
             time.sleep(60)
+            # ldapsearch will wake up slapd and force walking through
+            # the connection list, in order to spot the idle connections
+            tasks.ldapsearch_dm(self.master, "", ldap_args=[], scope="base")
 
             def test_cb(cmd_jornalctl):
                 # check if LDAP connection is timed out

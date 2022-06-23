@@ -78,7 +78,7 @@ Specifies the insecure CA end user port. The default is 8080.
 The time to wait for a certmonger request to complete during installation. The default value is 300 seconds.
 .TP
 .B context <context>
-Specifies the context that IPA is being executed in. IPA may operate differently depending on the context. The current defined contexts are cli and server. Additionally this value is used to load /etc/ipa/\fBcontext\fR.conf to provide context\-specific configuration. For example, if you want to always perform client requests in verbose mode but do not want to have verbose enabled on the server, add the verbose option to \fI/etc/ipa/cli.conf\fR.
+Specifies the context that IPA is being executed in. IPA may operate differently depending on the context. The current defined contexts are cli, server and dns. Additionally this value is used to load /etc/ipa/\fBcontext\fR.conf to provide context\-specific configuration. For example, if you want to always perform client requests in verbose mode but do not want to have verbose enabled on the server, add the verbose option to \fI/etc/ipa/cli.conf\fR.
 .TP
 .B debug <boolean>
 When True provides detailed information. Specifically this set the global log level to "debug". Default is False.
@@ -118,6 +118,9 @@ Enable a per-request LDAP cache. The default is True.
 .TP
 .B ldap_cache_size <integer>
 The maximum number of entries cached if ldap_cache is True. Since this cache is per-request it is not expected to be very large. The default is 100. Setting the value < 1 effectively disables the cache regardless of the ldap_cache setting
+.TP
+.B ldap_cache_debug <boolean>
+Log details on hits, misses, etc. for the LDAP cache if the cache is enabled.
 .TP
 .B ldap_uri <URI>
 Specifies the URI of the IPA LDAP server to connect to. The URI scheme may be one of \fBldap\fR or \fBldapi\fR. The default is to use ldapi, e.g. ldapi://%2fvar%2frun%2fslapd\-EXAMPLE\-COM.socket
@@ -159,6 +162,9 @@ Specifies the mode the server is running in. The currently support values are \f
 .TP
 .B mount_ipa <URI>
 Specifies the mount point that the development server will register. The default is /ipa/
+.TP
+.B oidc_child_debug_level <debuglevel>
+Specifies the debug level of \fBoidc_child\fR, a helper process used by \fBipa-otpd\fR for OIDC/OAuth2 authentication. Level can be between 0 and 10, the higher the more details. If the level is 6 or higher HTTP debug output is added as well.
 .TP
 .B prompt_all <boolean>
 Specifies that all options should be prompted for in the IPA client, even optional values. Default is False.
@@ -247,12 +253,20 @@ system\-wide IPA configuration file
 .I $HOME/.ipa/default.conf
 user IPA configuration file
 .TP
-It is also possible to define context\-specific configuration files. The \fBcontext\fR is set when the IPA api is initialized. The two currently defined contexts in IPA are \fBcli\fR and \fBserver\fR. This is helpful, for example, if you only want \fBdebug\fR enabled on the server and not in the client. If this is set to True in \fIdefault.conf\fR it will affect both the ipa client tool and the IPA server. If it is only set in \fIserver.conf\fR then only the server will have \fBdebug\fR set. These files will be loaded if they exist:
+It is also possible to define context\-specific configuration files. The \fBcontext\fR is set when the IPA api is initialized. The currently defined contexts in IPA are \fBcli\fR, \fBserver\fR and \fBdns\fR. This is helpful, for example, if you only want \fBdebug\fR enabled on the server and not in the client. If this is set to True in \fIdefault.conf\fR it will affect both the ipa client tool and the IPA server. If it is only set in \fIserver.conf\fR then only the server will have \fBdebug\fR set. These files will be loaded if they exist:
 .TP
 .I /etc/ipa/cli.conf
 system\-wide IPA client configuration file
 .TP
 .I /etc/ipa/server.conf
 system\-wide IPA server configuration file
+.SH "EXAMPLES"
+.TP
+An example of a context-specific configuration file is \fB/etc/ipa/dns.conf\fR to be used to increase debug output of the IPA DNSSEC daemons.
+.TP
+.RS L
+[global]
+debug = True
+.RE
 .SH "SEE ALSO"
 .BR ipa (1)

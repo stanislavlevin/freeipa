@@ -77,6 +77,7 @@ static char *std_principal_attrs[] = {
     IPA_KRB_AUTHZ_DATA_ATTR,
     IPA_USER_AUTH_TYPE,
     "ipatokenRadiusConfigLink",
+    "ipaIdpConfigLink",
     "krbAuthIndMaxTicketLife",
     "krbAuthIndMaxRenewableAge",
     "ipaNTSecurityIdentifier",
@@ -316,8 +317,31 @@ static void ipadb_validate_radius(struct ipadb_context *ipactx,
                                "ipatokenRadiusConfigLink");
     if (vals == NULL || vals[0] == NULL)
         *ua &= ~IPADB_USER_AUTH_RADIUS;
-    else
-        *ua = IPADB_USER_AUTH_RADIUS;
+    else {
+        /* OTP use implies presence of password in IPA LDAP,
+         * this is incompatible with RADIUS proxy case where
+         * a password in LDAP is not used anymore. */
+        *ua &= ~IPADB_USER_AUTH_OTP;
+    }
+
+    if (vals != NULL)
+        ldap_value_free_len(vals);
+}
+
+static void ipadb_validate_idp(struct ipadb_context *ipactx,
+                               LDAPMessage *lentry,
+                               enum ipadb_user_auth *ua)
+{
+    struct berval **vals;
+
+    if (!(*ua & IPADB_USER_AUTH_IDP))
+        return;
+
+    /* Ensure that the user has a link to an IdP config. */
+    vals = ldap_get_values_len(ipactx->lcontext, lentry,
+                               "ipaIdpConfigLink");
+    if (vals == NULL || vals[0] == NULL)
+        *ua &= ~IPADB_USER_AUTH_IDP;
 
     if (vals != NULL)
         ldap_value_free_len(vals);
@@ -355,6 +379,7 @@ static enum ipadb_user_auth ipadb_get_user_auth(struct ipadb_context *ipactx,
     /* Perform flag validation. */
     ipadb_validate_otp(ipactx, lentry, &ua);
     ipadb_validate_radius(ipactx, lentry, &ua);
+    ipadb_validate_idp(ipactx, lentry, &ua);
 
     return ua;
 }
@@ -537,6 +562,8 @@ static void ipadb_parse_authind_policies(krb5_context kcontext,
          IPADB_USER_AUTH_PKINIT, IPADB_USER_AUTH_IDX_PKINIT},
         {"krbAuthIndMaxTicketLife;hardened",
          IPADB_USER_AUTH_HARDENED, IPADB_USER_AUTH_IDX_HARDENED},
+        {"krbAuthIndMaxTicketLife;idp",
+         IPADB_USER_AUTH_IDP, IPADB_USER_AUTH_IDX_IDP},
 	    {NULL, IPADB_USER_AUTH_NONE, IPADB_USER_AUTH_IDX_MAX},
     }, age_authind_map[] = {
         {"krbAuthIndMaxRenewableAge;otp",
@@ -547,6 +574,8 @@ static void ipadb_parse_authind_policies(krb5_context kcontext,
          IPADB_USER_AUTH_PKINIT, IPADB_USER_AUTH_IDX_PKINIT},
         {"krbAuthIndMaxRenewableAge;hardened",
          IPADB_USER_AUTH_HARDENED, IPADB_USER_AUTH_IDX_HARDENED},
+        {"krbAuthIndMaxRenewableAge;idp",
+         IPADB_USER_AUTH_IDP, IPADB_USER_AUTH_IDX_IDP},
         {NULL, IPADB_USER_AUTH_NONE, IPADB_USER_AUTH_IDX_MAX},
     };
 
@@ -556,7 +585,13 @@ static void ipadb_parse_authind_policies(krb5_context kcontext,
     }
 
     for (size_t i = 0; life_authind_map[i].attribute != NULL; i++) {
-        if (ua & life_authind_map[i].flag) {
+        /* Only change max_life/max_renewable_life per indicator
+         * if the value wasn't set yet. This function gets called twice:
+         * - for the principal entry
+         * - for the associated policy lookup */
+        if ((ua & life_authind_map[i].flag) &&
+            (ied->pol_limits[life_authind_map[i].idx].max_life == 0)) {
+
             ret = ipadb_ldap_attr_to_int(lcontext, lentry,
                                          life_authind_map[i].attribute,
                                          &result);
@@ -583,6 +618,7 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
 {
     const krb5_octet rad_string[] = "otp\0[{\"indicators\": [\"radius\"]}]";
     const krb5_octet otp_string[] = "otp\0[{\"indicators\": [\"otp\"]}]";
+    const krb5_octet idp_string[] = "idp\0[{\"type\":\"oauth2\",\"indicators\": [\"idp\"]}]";
     struct ipadb_context *ipactx;
     enum ipadb_user_auth ua;
     LDAP *lcontext;
@@ -788,17 +824,18 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
                                       &res_key_data, &result, &mkvno);
     switch (ret) {
     case 0:
-        /* Only set a principal's key if password auth can be used. Otherwise
-         * the KDC would add pre-authentication methods to the NEEDED_PREAUTH
-         * reply for AS-REQs which indicate the password authentication is
-         * available. This might confuse applications like e.g. SSSD which try
-         * to determine suitable authentication methods and corresponding
-         * prompts with the help of MIT Kerberos' responder interface which
-         * acts on the returned pre-authentication methods. A typical example
-         * is enforced OTP authentication where of course keys are available
-         * for the first factor but password authentication should not be
-         * advertised by the KDC. */
-        if (!(ua & IPADB_USER_AUTH_PASSWORD) && (ua != IPADB_USER_AUTH_NONE)) {
+        /* Only set a principal's key if password or hardened auth can be used.
+         * Otherwise the KDC would add pre-authentication methods to the
+         * NEEDED_PREAUTH reply for AS-REQs which indicate the password
+         * authentication is available. This might confuse applications like
+         * e.g. SSSD which try to determine suitable authentication methods and
+         * corresponding prompts with the help of MIT Kerberos' responder
+         * interface which acts on the returned pre-authentication methods. A
+         * typical example is enforced OTP authentication where of course keys
+         * are available for the first factor but password authentication
+         * should not be advertised by the KDC. */
+        if (!(ua & (IPADB_USER_AUTH_PASSWORD | IPADB_USER_AUTH_HARDENED)) &&
+            (ua != IPADB_USER_AUTH_NONE)) {
             /* This is the same behavior as ENOENT below. */
             ipa_krb5_free_key_data(res_key_data, result);
             break;
@@ -958,6 +995,11 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
     } else if (ua & IPADB_USER_AUTH_RADIUS) {
         kerr = ipadb_set_tl_data(entry, KRB5_TL_STRING_ATTRS,
                                  sizeof(rad_string), rad_string);
+        if (kerr)
+            goto done;
+    } else if (ua & IPADB_USER_AUTH_IDP) {
+        kerr = ipadb_set_tl_data(entry, KRB5_TL_STRING_ATTRS,
+                                 sizeof(idp_string), idp_string);
         if (kerr)
             goto done;
     }
@@ -1251,6 +1293,8 @@ static krb5_error_code ipadb_fetch_tktpolicy(krb5_context kcontext,
         if (!first) {
             kerr = KRB5_KDB_NOENTRY;
         } else {
+            struct ipadb_e_data *ied;
+
             if (polmask & MAXTKTLIFE_BIT) {
                 ret = ipadb_ldap_attr_to_int(ipactx->lcontext, first,
                                              "krbmaxticketlife", &result);
@@ -1276,6 +1320,15 @@ static krb5_error_code ipadb_fetch_tktpolicy(krb5_context kcontext,
                     entry->attributes |= result;
                 } else {
                     entry->attributes |= maybe_require_preauth(ipactx, entry);
+                }
+            }
+
+            ied = (struct ipadb_e_data *)entry->e_data;
+            if (ied && ied->ipa_user == true) {
+            /* Apply default policy to indicators, if any */
+                if (ied->user_auth & ~IPADB_USER_AUTH_NONE) {
+                    ipadb_parse_authind_policies(kcontext, ipactx->lcontext,
+                                                first, entry, ied->user_auth);
                 }
             }
         }

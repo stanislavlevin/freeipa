@@ -685,6 +685,8 @@ def configure_krb5_conf(
 
     # SSSD include dir
     if configure_sssd:
+        if not os.path.exists(paths.SSSD_PUBCONF_KRB5_INCLUDE_D_DIR):
+            os.makedirs(paths.SSSD_PUBCONF_KRB5_INCLUDE_D_DIR, mode=0o755)
         opts.extend([
             {
                 'name': 'includedir',
@@ -3120,7 +3122,8 @@ def _install(options):
             mkhomedir=options.mkhomedir,
             fstore=fstore,
             statestore=statestore,
-            sudo=options.conf_sudo
+            sudo=options.conf_sudo,
+            subid=options.subid
         )
         # if mkhomedir, make sure oddjobd is enabled and started
         if options.mkhomedir:
@@ -3780,6 +3783,12 @@ class ClientInstallInterface(hostname_.HostNameInstallInterface,
         description="do not configure SSSD as data source for sudo",
     )
     no_sudo = enroll_only(no_sudo)
+
+    subid = knob(
+        None,
+        description="configure SSSD as data source for subid",
+    )
+    subid = enroll_only(subid)
 
     no_dns_sshfp = knob(
         None,

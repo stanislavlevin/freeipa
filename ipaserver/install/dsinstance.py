@@ -246,6 +246,8 @@ class DsInstance(service.Service):
         self.step("configuring DNS plugin", self.__config_dns_module)
         self.step("enabling entryUSN plugin", self.__enable_entryusn)
         self.step("configuring lockout plugin", self.__config_lockout_module)
+        self.step("configuring graceperiod plugin",
+                  self.config_graceperiod_module)
         self.step("configuring topology plugin", self.__config_topology_module)
         self.step("creating indices", self.__create_indices)
         self.step("enabling referential integrity plugin", self.__add_referint_module)
@@ -751,6 +753,15 @@ class DsInstance(service.Service):
     def __config_lockout_module(self):
         self._ldap_mod("lockout-conf.ldif")
 
+    def config_graceperiod_module(self):
+        if not api.Backend.ldap2.isconnected():
+            api.Backend.ldap2.connect()
+        dn = DN('cn=IPA Graceperiod,cn=plugins,cn=config')
+        try:
+            api.Backend.ldap2.get_entry(dn)
+        except errors.NotFound:
+            self._ldap_mod("graceperiod-conf.ldif")
+
     def __config_topology_module(self):
         self._ldap_mod("ipa-topology-conf.ldif", self.sub_dict)
 
@@ -1040,7 +1051,7 @@ class DsInstance(service.Service):
             admpwdfile.write(password)
             admpwdfile.flush()
 
-            args = [paths.LDAPPASSWD, "-h", self.fqdn,
+            args = [paths.LDAPPASSWD, "-H", "ldap://{}".format(self.fqdn),
                     "-ZZ", "-x", "-D", str(DN(('cn', 'Directory Manager'))),
                     "-y", dmpwdfile.name, "-T", admpwdfile.name,
                     str(DN(('uid', 'admin'), ('cn', 'users'), ('cn', 'accounts'), self.suffix))]

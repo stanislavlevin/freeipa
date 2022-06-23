@@ -269,7 +269,7 @@ class config(LDAPObject):
             label=_('Default user authentication types'),
             doc=_('Default types of supported user authentication'),
             values=(u'password', u'radius', u'otp',
-                    u'pkinit', u'hardened', u'disabled'),
+                    u'pkinit', u'hardened', u'idp', u'disabled'),
         ),
         Bool('ipauserdefaultsubordinateid?',
              cli_name='user_default_subid',
@@ -707,7 +707,7 @@ class config_mod(LDAPUpdate):
         if (isinstance(exc, errors.EmptyModlist) and
                 call_func.__name__ == 'update_entry' and
                 ('ca_renewal_master_server' in options or
-                 'enable_sid' in options)):
+                 options['enable_sid'])):
             return
 
         super(config_mod, self).exc_callback(
