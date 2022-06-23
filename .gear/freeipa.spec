@@ -44,7 +44,7 @@
 %define samba_version 4.7.6
 # RHBZ#1958909, RHBZ#1967906
 %define slapi_nis_version 0.56.7-alt2
-%define sssd_version 1.16.3
+%define sssd_version 2.7.0
 %define openldap_version 2.4.47-alt2
 %define opendnssec_version 2.1.9-alt1
 %define libp11_version 0.4.10-alt2
@@ -324,6 +324,7 @@ Group: System/Base
 Requires: libsasl2-plugin-gssapi
 Requires: curl
 Requires: sssd-krb5
+Requires: sssd-idp >= %sssd_version
 Requires: sssd-ipa >= %sssd_version
 Requires: sssd-tools >= %sssd_version
 Requires: libsss_sudo
