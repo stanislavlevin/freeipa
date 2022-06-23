@@ -40,12 +40,14 @@ class ALTLinuxTaskNamespace(RedHatTaskNamespace):
         This method provides functionality similar to the authselect tool:
         https://github.com/authselect/authselect/blob/master/profiles/sssd/nsswitch.conf
 
-        passwd:     files sss systemd   {exclude if "with-custom-passwd"}
-        group:      files sss systemd   {exclude if "with-custom-group"}
-        netgroup:   sss files           {exclude if "with-custom-netgroup"}
-        automount:  sss files           {exclude if "with-custom-automount"}
-        services:   sss files           {exclude if "with-custom-services"}
-        sudoers:    files sss           {include if "with-sudo"}
+        shadow:     files
+        passwd:     files sss
+        group:      files sss
+        services:   files sss
+        netgroup:   files sss
+        automount:  files sss
+        sudoers:    files sss {include if "with-sudo"}
+        subid:      sss {include if "with-subid"}
 
         Note: ALT's sssd is built with `--disable-files-domain`, so,
         passwd and group should be set to files as the first service.
@@ -54,7 +56,10 @@ class ALTLinuxTaskNamespace(RedHatTaskNamespace):
             return
 
         # Configure nsswitch.conf
-        for database in {"passwd", "group"}:
+        # unconditionally append 'sss'
+        for database in (
+            "passwd", "group", "netgroup", "automount", "services"
+        ):
             self.configure_nsswitch_database(
                 fstore,
                 database,
@@ -62,23 +67,6 @@ class ALTLinuxTaskNamespace(RedHatTaskNamespace):
                 append=True,
                 default_value=["files"],
             )
-
-        for database in {"netgroup", "automount", "services"}:
-            self.configure_nsswitch_database(
-                fstore,
-                database,
-                ["sss"],
-                append=False,
-                default_value=["files"],
-            )
-
-        self.configure_nsswitch_database(
-            fstore,
-            "shadow",
-            ["sss"],
-            append=False,
-            default_value=["tcb", "files"],
-        )
 
         if sudo:
             # usually no-op, since 'enable_sssd_sudo' was called earlier
@@ -88,6 +76,11 @@ class ALTLinuxTaskNamespace(RedHatTaskNamespace):
                 ["sss"],
                 append=True,
                 default_value=["files"],
+            )
+
+        if subid:
+            self.configure_nsswitch_database(
+                fstore, "subid", ["sss"], preserve=False
             )
 
         # Configure PAM
