@@ -738,6 +738,7 @@ fi
 if [ $1 -gt 1 ] ; then
     # Has the client been configured?
     restore=0
+    IPA_UPGRADE_LOG="/var/log/ipaupgrade.log"
     test -f '/var/lib/ipa-client/sysrestore/sysrestore.index' && restore=$(wc -l '/var/lib/ipa-client/sysrestore/sysrestore.index' | awk '{print $1}') ||:
 
     if [ -f '/etc/sssd/sssd.conf' -a $restore -ge 2 ]; then
@@ -755,14 +756,9 @@ if [ $1 -gt 1 ] ; then
             cp /etc/ipa/ca.crt /var/lib/ipa-client/pki/kdc-ca-bundle.pem
             cp /etc/ipa/ca.crt /var/lib/ipa-client/pki/ca-bundle.pem
         fi
-        %__python3 -c 'from ipaclient.install.client import configure_krb5_snippet; configure_krb5_snippet()' >>/var/log/ipaupgrade.log 2>&1
-    fi
-
-    if [ $restore -ge 2 ]; then
-        %__python3 -c 'from ipaclient.install.client import update_ipa_nssdb; update_ipa_nssdb()' >/var/log/ipaupgrade.log 2>&1
-    fi
-
-    if [ $restore -ge 2 ]; then
+        %__python3 -c 'from ipaclient.install.client import configure_krb5_snippet; configure_krb5_snippet()' >>"$IPA_UPGRADE_LOG" 2>&1
+        %__python3 -c 'from ipaclient.install.client import update_ipa_nssdb; update_ipa_nssdb()' >>"$IPA_UPGRADE_LOG" 2>&1
+        chmod 0600 "$IPA_UPGRADE_LOG"
         sed -E --in-place=.orig 's/^(HostKeyAlgorithms ssh-rsa,ssh-dss)$/# disabled by ipa-client update\n# \1/' /etc/openssh/ssh_config ||:
     fi
 fi
