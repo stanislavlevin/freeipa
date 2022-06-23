@@ -16,9 +16,9 @@
 %endif
 
 %if_with lint
-    %define linter_options --enable-pylint --with-jslint
+    %define linter_options --enable-pylint
 %else
-    %define linter_options --disable-pylint --without-jslint
+    %define linter_options --disable-pylint
 %endif
 
 # paths defines
@@ -132,7 +132,6 @@ BuildRequires: python3(m2r)
 %if_with lint
 BuildRequires: git-core
 BuildRequires: softhsm
-BuildRequires: jsl
 BuildRequires: nss-utils
 
 BuildRequires: python3-modules-sqlite3

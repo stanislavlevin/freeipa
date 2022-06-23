@@ -1916,10 +1916,7 @@ IPA.cert.normalize_sn = function(cert) {
         typeof(cert.serial_number) == 'number' &&
         window.BigInt !== undefined
     ) {
-        /* undeclared identifier: BigInt */
-        /*jsl:ignore*/
         var sn = BigInt(cert.serial_number_hex);
-        /*jsl:end*/
         return sn.toString();
     }
     return cert.serial_number;
