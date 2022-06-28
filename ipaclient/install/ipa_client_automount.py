@@ -236,6 +236,7 @@ def uninstall(fstore, statestore):
 
     print("Restoring configuration")
 
+    tasks.disable_nsswitch_automount(statestore)
     for filepath in RESTORE_FILES:
         if fstore.has_file(filepath):
             fstore.restore_file(filepath)
@@ -505,6 +506,7 @@ def configure_automount():
         sys.exit("Installation aborted")
 
     try:
+        tasks.enable_nsswitch_automount(statestore)
         configure_nfs(fstore, statestore, options)
         configure_autofs_sssd(fstore, statestore, autodiscover, options)
         configure_autofs_common(fstore, statestore, options)
