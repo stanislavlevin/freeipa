@@ -4,6 +4,15 @@ module.exports = function(grunt) {
             options: {}
         },
         qunit: {
+            options: {
+                puppeteer: {
+                    ignoreDefaultArgs: true,
+                    args: [
+                        "--headless",
+                        "--disable-web-security"
+                    ]
+                },
+            },
             all: [
                 'test/all_tests.html'
             ]
