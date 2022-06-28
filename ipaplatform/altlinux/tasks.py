@@ -11,6 +11,7 @@ from ipaplatform.redhat.tasks import RedHatTaskNamespace
 from ipaplatform.paths import paths
 from ipapython import directivesetter
 from ipapython import ipautil
+from ipapython.ipachangeconf import IPAChangeConf
 
 
 class ALTLinuxTaskNamespace(RedHatTaskNamespace):
@@ -29,6 +30,59 @@ class ALTLinuxTaskNamespace(RedHatTaskNamespace):
 
     def set_nisdomain(self, nisdomain):
         return True
+
+    def enable_nsswitch_automount(self, statestore):
+        database = "automount"
+        conf = IPAChangeConf("IPA automount installer")
+        conf.setOptionAssignment(":")
+
+        # Read the existing configuration
+        with open(paths.NSSWITCH_CONF) as f:
+            opts = conf.parse(f)
+
+        raw_database_entry = conf.findOpts(opts, "option", database)[1]
+
+        # Detect the list of already configured services
+        if not raw_database_entry:
+            # If there is no database entry, database is not present in
+            # the nsswitch.conf
+            configured_services = ["files"]
+            statestore.backup_state("ipaclient_automount", "nss", "")
+        else:
+            configured_services = raw_database_entry["value"].strip().split()
+            statestore.backup_state(
+                "ipaclient_automount", "nss", " ".join(configured_services)
+            )
+
+        added_services = ["sss"]
+        # drop already configured service if it matches
+        configured_services = [
+            s
+            for s in configured_services
+            if s not in added_services
+        ]
+
+        new_value = " " + " ".join(added_services + configured_services)
+
+        # Set new services as sources for database
+        opts = [conf.setOption(database, new_value)]
+
+        conf.changeConf(paths.NSSWITCH_CONF, opts)
+
+    def disable_nsswitch_automount(self, statestore):
+        nss_state = statestore.get_state("ipaclient_automount", "nss")
+        if nss_state is None:
+            # nothing to do
+            return
+
+        conf = IPAChangeConf("IPA automount installer")
+        conf.setOptionAssignment(":")
+        if nss_state == "":
+            opts = [conf.rmOption("automount")]
+        else:
+            opts = [conf.setOption("automount", " " + nss_state)]
+        conf.changeConf(paths.NSSWITCH_CONF, opts)
+        statestore.delete_state("ipaclient_automount", "nss")
 
     def modify_nsswitch_pam_stack(
         self, sssd, mkhomedir, fstore, statestore, sudo=True, subid=False
