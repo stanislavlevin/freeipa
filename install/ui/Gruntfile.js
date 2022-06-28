@@ -6,10 +6,8 @@ module.exports = function(grunt) {
         qunit: {
             options: {
                 puppeteer: {
-                    ignoreDefaultArgs: true,
                     args: [
-                        "--headless",
-                        "--disable-web-security"
+                        "--allow-file-access-from-files"
                     ]
                 },
             },
