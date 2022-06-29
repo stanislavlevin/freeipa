@@ -3,7 +3,7 @@ ipa_service="/lib/systemd/system/ipa.service"
 ipa_pluginsdir="/usr/lib64/python3/site-packages/ipaserver/plugins/"
 ipa_new_plugin="/run/ipa/rpmfiletrigger_newplugin"
 
-if egrep -qs "^${ipa_service}$|^${ipa_pluginsdir}"; then
+if grep -E -qs "^${ipa_service}$|^${ipa_pluginsdir}"; then
     {
         /usr/bin/python3 - <<-'EOF'
 	import sys
