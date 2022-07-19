@@ -58,6 +58,9 @@ popd
 
 case $FLAVOR in
 wheel_bundle)
+    # pip 19.3+ is required for support of compat tag 'manylinux2014'
+    # but pip 20+ changed behavior and installs ipa wheels from pypi.org
+    $ENVPYTHON -m pip install --upgrade 'pip<20'
     # copy pylint plugin
     cp "${TOXINIDIR}/pylint_plugins.py" "${ENVSITEPACKAGESDIR}"
 
@@ -82,6 +85,9 @@ wheel_bundle)
     popd
     ;;
 pypi_packages)
+    # pip 19.3+ is required for support of compat tag 'manylinux2014'
+    # but pip 20+ changed behavior and installs ipa wheels from pypi.org
+    $ENVPYTHON -m pip install --upgrade 'pip<20'
     # build packages and bundles
     make -C "${TOXINIDIR}" \
         pypi_packages \
