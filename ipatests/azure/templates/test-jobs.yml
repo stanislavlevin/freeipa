@@ -18,6 +18,12 @@ steps:
 
 - script: |
     set -e
+    sudo systemctl status azsecd ||:
+    sudo systemctl disable --now -s SIGKILL azsecd ||:
+  displayName: Disable azsecd (clamav)
+
+- script: |
+    set -e
     printf "AppArmor status\n"
     sudo aa-status
     printf "Disable AppArmor conflicting profiles\n"
@@ -51,6 +57,16 @@ steps:
   displayName: Allow coredumps
 
 - template: setup-test-environment.yml
+
+- script: |
+    set -eu
+    sudo top -b -o +%MEM n 1
+  displayName: Show Host's top
+
+- script: |
+    set -eu
+    sudo ps -auxf
+  displayName: Show Host's processes
 
 - template: run-test.yml
 
