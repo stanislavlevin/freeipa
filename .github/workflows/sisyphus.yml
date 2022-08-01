@@ -52,9 +52,6 @@ jobs:
         fetch-depth: 0
         ref: ${{ env.GHA_TARGET_REF }}
 
-    - name: Print Host environment
-      run: env | sort
-
     - name: Install base build environment
       run: |
         set -eu
@@ -186,8 +183,20 @@ jobs:
         name: docker-image-${{ github.run_number }}-${{ github.run_attempt }}
         path: ${{ github.workspace }}
 
-    - name: Print Host environment
+    - name: Print Host's environment
       run: env | sort
+
+    - name: Print Host's installed packages
+      run: apt list --installed
+
+    - name: Print Host's systemd status
+      run: sudo systemctl
+
+    - name: Print Host's top
+      run: sudo top -b -o +%MEM n 1
+
+    - name: Print Host's processes' tree
+      run: sudo ps -auxf
 
     - name: Prepare Host
       run: ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/prepare-ci-host.sh
