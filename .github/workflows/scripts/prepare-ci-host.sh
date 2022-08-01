@@ -11,6 +11,15 @@ sudo apt-get install -y \
     systemd-coredump \
     python3-docker \
 
+# Disable azsec services (clamav)
+printf "Disable azsec services (clamav)\n"
+# most of the time systemd killed azsecd with SIGKILL on timeout
+# kill without waiting for graceful termination
+sudo systemctl kill -s SIGKILL azsecd ||:
+sudo systemctl disable --now azsecmond ||:
+sudo systemctl disable --now azsecd ||:
+sudo systemctl disable --now clamav-freshclam ||:
+
 # apparmor
 printf "Disable AppArmor conflicting profiles on Host.\n"
 printf "current AppArmor status:\n"
