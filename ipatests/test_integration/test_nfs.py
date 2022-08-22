@@ -141,9 +141,22 @@ def krb5_nfs_server(request, mh):
         ["sed", "-i.sav",
          "-e", r"s/#[[:space:]]*\(\[nfsd\]\)$/\1/",
          "-e", r"s/^\(#[[:space:]]*\)\?\(vers3=.*\)$/# \2/g",
-         "-e", r"/^\[nfsd\]$/a vers3=n",
+         "-e", r"/^\[nfsd\]$/a vers2=n\nvers3=n",
+         "-e", r"/^\[mountd\]$/a debug=all",
          paths.SYSCONFIG_NFS])
     cls.nfs_server.run_command(["cat", paths.SYSCONFIG_NFS])
+
+    # debug-only
+    nfsd_override_dir = "/etc/systemd/system/nfs-server.service.d/"
+    cls.nfs_server.run_command(["mkdir", "-p", nfsd_override_dir])
+    nfsd_override_conf = os.path.join(nfsd_override_dir, "debug.conf")
+    nfsd_override_content = (
+        "[Service]\n"
+        "ExecStart=\n"
+        "ExecStart=/usr/sbin/rpc.nfsd -d\n"
+    )
+    cls.nfs_server.put_file_contents(nfsd_override_conf, nfsd_override_content)
+    cls.nfs_server.run_command(["systemctl", "daemon-reload"])
 
     # verbosity for nfs-idmapd
     cls.nfs_server.run_command(
@@ -164,6 +177,10 @@ def krb5_nfs_server(request, mh):
            ).format(paths.GSSPROXY_SYSTEM_CONF)
     cls.nfs_server.run_command(["/bin/sh", "-c", cmd])
     cls.nfs_server.run_command(["cat", paths.GSSPROXY_SYSTEM_CONF])
+
+    # ALT: debug
+    cls.nfs_server.run_command(["control", "rpcbind"])
+    cls.nfs_server.run_command(["control", "rpcbind", "server"])
 
     # manual restart is needed due to
     # nfsdopenone: Opening /proc/net/rpc/nfs4.nametoid/channel failed
