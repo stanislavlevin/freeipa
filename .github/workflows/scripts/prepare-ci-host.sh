@@ -54,6 +54,21 @@ sudo sysctl -w fs.suid_dumpable=1
 printf "Configure Host to allow NFS server/client within containers\n"
 sudo modprobe {nfs,nfsd}
 
+printf "NFS mounts\n"
+mount | grep -i nfs ||:
+
+printf "request key confs\n"
+ls -1R /etc/request-key* ||:
+
+for f in /etc/request-key.d/* /etc/request-key.conf;
+do
+    printf "###\nOriginal content of %s\n" "$f"
+    cat "$f"
+    sudo sed -i 's/.*\sid_resolver\s.*/# &/' "$f"
+    printf "###\nPatched content of %s\n" "$f"
+    cat "$f"
+done
+
 # docker
 printf "Configure Docker to allow IPv6 network\n"
 echo '{ "ipv6": true, "fixed-cidr-v6": "2001:db8::/64" }' > docker-daemon.json
