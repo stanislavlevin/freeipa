@@ -1,1 +1,10 @@
-build-docs-fedora.yml
+steps:
+- script: |
+    set -e
+    echo "Generate virtual environment for building documentation"
+    make -C doc/ venv
+    echo "Build documentation"
+    # set JAVA_HOME: https://bugzilla.altlinux.org/43606
+    source /etc/profile.d/javahome.sh
+    make -C doc/ html
+  displayName: Build documentation
