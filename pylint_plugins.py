@@ -78,6 +78,7 @@ ipa_class_members = {
         'server',
         'validate_api',
         'verbose',
+        'host',
     ],
     'ipalib.errors.ACIError': [
         'info',

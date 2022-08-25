@@ -340,8 +340,14 @@ class idp_add(LDAPCreate):
             r = string.Template.pattern
             for (k,v) in points.items():
                 # build list of variables to be replaced
-                subs = list(chain.from_iterable(
-                            (filter(None, s) for s in r.findall(v))))
+                subs = list(
+                    chain.from_iterable(
+                        (
+                            filter(None, s)  # pylint: disable=W1639
+                            for s in r.findall(v)
+                        )
+                    )
+                )
                 if subs:
                     for s in subs:
                         if s not in elements:
