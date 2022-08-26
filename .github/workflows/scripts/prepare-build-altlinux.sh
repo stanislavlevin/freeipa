@@ -14,4 +14,8 @@ function prepare_build() {
         tr -d [[:blank:]] |
         tr '\n' ' ' |
         xargs sudo apt-get install -y
+
+    # https://bugzilla.altlinux.org/43634
+    apt-get install -y \
+        'java>=11'
 }
