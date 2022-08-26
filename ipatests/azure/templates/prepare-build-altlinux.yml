@@ -14,4 +14,8 @@ steps:
         tr -d [[:blank:]] | \
         tr '\n' ' ' | \
         xargs sudo apt-get install -y
+
+    # https://bugzilla.altlinux.org/43634
+    sudo apt-get install -y \
+        'java>=11'
   displayName: Prepare build environment
