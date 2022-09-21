@@ -265,7 +265,7 @@ jobs:
     - name: Check for coredumps
       if: always()
       run:
-        ${{ env.SHELL_CMD }} ${{ env.IPA_TESTS_SCRIPTS }}/check-coredumps.sh
+        ${{ env.SHELL_CMD_NODEBUG }} ${{ env.IPA_TESTS_SCRIPTS }}/check-coredumps.sh
 
     - name: Collect logs
       if: always()
