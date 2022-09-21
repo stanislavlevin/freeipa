@@ -5,6 +5,7 @@ function install_debuginfo() {
     apt-get install -y \
         gdb \
         systemd-coredump \
+        autofs-debuginfo \
         ${IPA_TESTS_REPO_PATH}/dist/rpms_debuginfo/*.rpm \
         389-ds-base-debuginfo \
         apache2-base-debuginfo \
