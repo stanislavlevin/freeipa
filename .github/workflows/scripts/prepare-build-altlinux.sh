@@ -1,6 +1,7 @@
 #!/bin/bash -eu
 
 function prepare_build() {
+    apt-repo add task 307944
     apt-get update
     apt-get install -y gear rpm-build rpm-build-python3
     runuser -u "$GHA_USER" -- gear-rpm -bs --nodeps \
