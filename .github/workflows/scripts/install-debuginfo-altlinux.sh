@@ -8,6 +8,8 @@ function install_debuginfo() {
         autofs-debuginfo \
         ${IPA_TESTS_REPO_PATH}/dist/rpms_debuginfo/*.rpm \
         389-ds-base-debuginfo \
+        libjemalloc2-debuginfo \
+        libsasl2-plugin-gssapi-debuginfo \
         apache2-base-debuginfo \
         apache2-mod_auth_gssapi-debuginfo \
         apache2-mod_ssl-debuginfo \
