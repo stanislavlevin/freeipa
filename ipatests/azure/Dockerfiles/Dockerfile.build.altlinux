@@ -4,7 +4,12 @@ ENV container=docker LANG=en_US.utf8 LANGUAGE=en_US.utf8 LC_ALL=en_US.utf8
 COPY dist /root
 RUN \
     apt-get update \
-    && apt-get install -y /root/rpms/*.rpm openssh \
+    && apt-get install \
+        -o 'Debug::pkgProblemResolver=yes' \
+        -o 'Debug::pkgRemoveDepends=yes' \
+        -o 'Debug::pkgMarkInstall=yes' \
+        -y \
+        /root/rpms/*.rpm openssh \
         gssproxy-nfs-server nfs-server \
     && apt-get clean \
     && find /var/lib/apt/lists/ -type f -exec rm "{}" \; \
