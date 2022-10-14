@@ -1898,7 +1898,10 @@ class trust_enable_agent(Command):
                              follow_name_owner_changes=True)
         server = dbus.Interface(obj, 'org.freeipa.server')
 
-        ret, stdout, stderr = server.trust_enable_agent(method_arguments)
+        # 25sec is the default, not enough on recent 389-ds 2.2.3 to restart it
+        ret, stdout, stderr = server.trust_enable_agent(
+            method_arguments, timeout=25 * 2
+        )
 
         result = dict(
             result=(ret == 0),
