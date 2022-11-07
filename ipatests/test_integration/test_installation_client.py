@@ -134,6 +134,13 @@ class TestClientInstallBind(IntegrationTest):
                         "#listen-on port 53 { 127.0.0.1; };")
         update_contents(paths.NAMED_CONF, "listen-on-v6 port 53 { ::1; };",
                         "#listen-on-v6 port 53 { ::1; };")
+        # ALT's options for named are included from /etc/bind/options.conf
+        if platform == "altlinux":
+            options_conf = "/etc/bind/options.conf"
+            update_contents(options_conf, "listen-on { 127.0.0.1; };",
+                            "# listen-on { 127.0.0.1; };")
+            update_contents(options_conf, "listen-on-v6 { ::1; };",
+                            "# listen-on-v6 { ::1; };")
 
         add_records = textwrap.dedent("""
         @   IN  SOA     {fqdn}. root.{domain}. (
