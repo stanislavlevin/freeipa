@@ -398,6 +398,7 @@ def install_master(host, setup_dns=True, setup_kra=False, setup_adtrust=False,
             # fixup DNS zone default TTL for IPA DNS zone
             # For tests we should not wait too long
             set_default_ttl_for_ipa_dns_zone(host, raiseonerr=raiseonerr)
+            setup_named_dnssec_except(host)
     return result
 
 
@@ -537,6 +538,7 @@ def install_replica(master, replica, setup_ca=True, setup_dns=False,
         kinit_admin(replica)
         if setup_dns:
             setup_named_debugging(replica)
+            setup_named_dnssec_except(replica)
     else:
         fw.disable_services(fw_services)
     return result
@@ -862,6 +864,48 @@ def setup_named_debugging(host):
         ],
     )
     host.run_command(["cat", paths.NAMED_LOGGING_OPTIONS_CONF])
+    result = host.run_command(
+        [
+            "python3",
+            "-c",
+            (
+                "from ipaplatform.services import knownservices; "
+                "print(knownservices.named.systemd_name)"
+            ),
+        ]
+    )
+    service_name = result.stdout_text.strip()
+    host.run_command(["systemctl", "restart", service_name])
+    # ALT-specific problem: due to caps dropping of named it is expected that
+    # LDAP connection can be failed, there are 3 attempts every 5sec
+    time.sleep(10)
+
+
+def setup_named_dnssec_except(host):
+    """
+    Sets validate-except for non-dnssec aware zones. Requires bind 9.13.3+.
+    """
+    platform = get_platform(host)
+    zones = ["pool.ntp.org."]
+    if platform in ["altlinux"]:
+        zones.extend(
+            [
+                "git.altlinux.org.",
+                "download.basealt.ru.",
+                "download.basealt.space.",
+            ]
+        )
+    if not zones:
+        return
+
+    conf_tmpl = "validate-except\n{{\n{}\n}};".format(
+        '\n'.join((f'\t"{x}" ;' for x in zones))
+    )
+    host.run_command(
+        f"echo -e '{conf_tmpl}' >> '{paths.NAMED_CUSTOM_OPTIONS_CONF}'"
+    )
+
+    host.run_command(["cat", paths.NAMED_CUSTOM_OPTIONS_CONF])
     result = host.run_command(
         [
             "python3",
