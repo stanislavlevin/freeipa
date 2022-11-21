@@ -26,7 +26,7 @@ import glob
 import errno
 import shlex
 import sys
-import pipes
+import pipes  # pylint: disable=deprecated-module
 import shutil
 import tempfile
 
