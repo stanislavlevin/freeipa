@@ -51,8 +51,8 @@
 
 Name: freeipa
 # don't forget to update .gear/rules
-Version: 4.9.10
-Release: alt4
+Version: 4.9.11
+Release: alt1
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1092,6 +1092,9 @@ fi
 %python3_sitelibdir/ipaplatform-*.egg-info/
 
 %changelog
+* Mon Jan 23 2023 Stanislav Levin <slev@altlinux.org> 4.9.11-alt1
+- 4.9.10 -> 4.9.11.
+
 * Tue Oct 11 2022 Stanislav Levin <slev@altlinux.org> 4.9.10-alt4
 - Fixed FTBFS (openldap 2.6).
 
