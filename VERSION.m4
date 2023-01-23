@@ -21,7 +21,7 @@
 ########################################################
 define(IPA_VERSION_MAJOR, 4)
 define(IPA_VERSION_MINOR, 9)
-define(IPA_VERSION_RELEASE, 10)
+define(IPA_VERSION_RELEASE, 11)
 
 ########################################################
 # For 'pre' releases the version will be               #
@@ -86,8 +86,8 @@ define(IPA_DATA_VERSION, 20100614120000)
 #                                                      #
 ########################################################
 define(IPA_API_VERSION_MAJOR, 2)
-# Last change: add graceperiodlimit
-define(IPA_API_VERSION_MINOR, 248)
+# Last change: fix vault interoperability issues.
+define(IPA_API_VERSION_MINOR, 251)
 
 ########################################################
 # Following values are auto-generated from values above

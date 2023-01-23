@@ -340,6 +340,31 @@ class TestIpaHealthCheck(IntegrationTest):
         assert returncode == 0
         assert output == "No issues found."
 
+    def test_ipa_healthcheck_fips_enabled(self):
+        """
+        Test if FIPS is enabled and the check exists.
+
+        https://pagure.io/freeipa/issue/8951
+        """
+        returncode, check = run_healthcheck(self.master,
+                                            source="ipahealthcheck.meta.core",
+                                            check="MetaCheck",
+                                            output_type="json",
+                                            failures_only=False)
+        assert returncode == 0
+
+        cmd = self.master.run_command(['fips-mode-setup', '--is-enabled'],
+                                      raiseonerr=False)
+        returncode = cmd.returncode
+
+        # If this produces IndexError, the check does not exist
+        if check[0]["kw"]["fips"] == "disabled":
+            assert returncode == 2
+        elif check[0]["kw"]["fips"] == "enabled":
+            assert returncode == 0
+        else:
+            assert returncode == 1
+
     def test_ipa_healthcheck_after_certupdate(self):
         """
         Verify that ipa-certupdate hasn't messed up tracking
@@ -506,6 +531,45 @@ class TestIpaHealthCheck(IntegrationTest):
             # but moved to "error" with 0.11+
             assert additional_msg in check["kw"]["msg"] or \
                    additional_msg == check["kw"]["error"]
+
+    def test_ipahealthcheck_ca_not_configured(self):
+        """
+        Test if the healthcheck ignores pki-tomcat errors
+        when CA is not configured on the machine
+        Related: https://github.com/freeipa/freeipa-healthcheck/issues/201
+        """
+        # uninstall replica installed by class' install method
+        tasks.uninstall_replica(self.master, self.replicas[0])
+
+        # install it again without CA
+        tasks.install_replica(self.master,
+                              self.replicas[0],
+                              setup_ca=False,
+                              setup_dns=True,
+                              extra_args=['--no-dnssec-validation']
+                              )
+
+        # Init a user on replica to assign a DNA range
+        tasks.kinit_admin(self.replicas[0])
+        tasks.user_add(
+            self.replicas[0], 'ipauser1', first='Test', last='User',
+        )
+
+        returncode, data = run_healthcheck(self.replicas[0],
+                                           failures_only=True)
+        assert returncode == 0
+        assert len(data) == 0
+
+        # restore the replica original configuration
+        tasks.user_del(self.replicas[0], 'ipauser1')
+        tasks.uninstall_replica(self.master, self.replicas[0])
+        tasks.install_replica(
+            self.master,
+            self.replicas[0],
+            setup_dns=True,
+            extra_args=['--no-dnssec-validation']
+        )
+
 
     def test_source_ipahealthcheck_meta_core_metacheck(self):
         """
@@ -2843,3 +2907,65 @@ class TestIpaHealthCheckWithExternalCA(IntegrationTest):
                 assert check["kw"]["msg"] == error_msg
             else:
                 assert error_reason in check["kw"]["msg"]
+
+
+class TestIpaHealthCheckSingleMaster(IntegrationTest):
+
+    @classmethod
+    def install(cls, mh):
+        # Nota Bene: The ipa server is not installed
+        tasks.install_packages(cls.master, HEALTHCHECK_PKG)
+
+    def test_ipahealthcheck_mismatching_certificates_subject(self):
+        """
+        Test if healthcheck uses cert subject base from IPA and not from
+        REALM. This prevents false-positive errors when the subject base is
+        customized.
+
+        Related: https://github.com/freeipa/freeipa-healthcheck/issues/253
+        """
+        # install master with custom cert subject base
+        tasks.install_master(
+            self.master,
+            setup_dns=True,
+            extra_args=[
+                '--no-dnssec-validation',
+                '--subject-base=O=LINUX.IS.GREAT,C=EU'
+            ]
+        )
+        try:
+            returncode, data = run_healthcheck(
+                self.master,
+                source="ipahealthcheck.ipa.certs",
+                check="IPADogtagCertsMatchCheck",
+                failures_only=True)
+
+            assert returncode == 0
+            assert len(data) == 0
+        finally:
+            # uninstall server for the next step
+            tasks.uninstall_master(self.master)
+
+        # install master with custom CA certificate subject DN
+        tasks.install_master(
+            self.master,
+            setup_dns=True,
+            extra_args=[
+                '--no-dnssec-validation',
+                '--ca-subject=CN=Healthcheck test,O=LINUX.IS.GREAT'
+            ]
+        )
+
+        try:
+            returncode, data = run_healthcheck(
+                self.master,
+                source="ipahealthcheck.ipa.certs",
+                check="IPADogtagCertsMatchCheck",
+                failures_only=True)
+
+            assert returncode == 0
+            assert len(data) == 0
+
+        finally:
+            # cleanup
+            tasks.uninstall_master(self.master)

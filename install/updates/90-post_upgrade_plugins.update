@@ -26,6 +26,7 @@ plugin: update_ra_cert_store
 plugin: update_mapping_Guests_to_nobody
 plugin: fix_kra_people_entry
 plugin: update_pwpolicy
+plugin: update_pwpolicy_grace
 
 # last
 # DNS version 1
@@ -41,3 +42,4 @@ plugin: update_dnsserver_configuration_into_ldap
 plugin: update_ldap_server_list
 plugin: update_dna_shared_config
 plugin: update_unhashed_password
+plugin: update_krb_uri_txt_records_for_locations

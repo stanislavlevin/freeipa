@@ -23,6 +23,8 @@ PYTHON_SCRIPT_SUBDIRS = \
         $(top_builddir)/install/tools \
         $(NULL)
 
+PRCI_DEFINITIONS_DIR = $(top_srcdir)/ipatests/prci_definitions
+
 AZURE_PYTHON_SCRIPT_SUBDIR = $(top_builddir)/ipatests/azure
 
 IPA_PLACEHOLDERS = freeipa ipa ipaserver ipatests
@@ -336,6 +338,8 @@ endif  # WITH_RPMLINT
 # There are Jinja yaml templates, which differ from reqular ones. These
 # files should be placed on skip list (YAML_TEMPLATE_FILES), otherwise
 # safe_load fails.
+# Also check PRCI definitions yaml files jobs format and content with
+# prci_checker script
 .PHONY: yamllint
 yamllint:
 	YAML_TEMPLATE_FILES="\
@@ -357,7 +361,10 @@ yamllint:
 		echo $${YAML}; \
 		$(PYTHON) -c "import yaml; f = open('$${YAML}'); yaml.safe_load(f); f.close()" || { echo Your YAML file: $${YAML} has a wrong syntax or this is a Jinja template. In the latter clause, consider to add your YAML file to the YAML_TEMPLATE_FILES list in Makefile.am.; exit 1; } \
 	done; \
-	echo "-----------"
+	echo -e "\nCheck PRCI definitions";
+	@echo "-----------"
+	$(PYTHON) $(PRCI_DEFINITIONS_DIR)/prci_checker.py -d $(PRCI_DEFINITIONS_DIR) -s $(PRCI_DEFINITIONS_DIR)/prci_jobs_spec.yaml;
+	@echo "-----------"
 
 # Build & lint documentation.
 #
@@ -389,7 +396,7 @@ pylint: $(GENERATED_PYTHON_FILES) ipasetup.py python_scripts
 		-name '*~' -o \
 		-name '*.py' -print -o \
 		-type f -exec grep -qsm1 '^#!.*\bpython' '{}' \; -print`; \
-	FILES=`echo -e "$${FILES}\n$(AZURE_PYTHON_SCRIPT_SUBDIR)"`; \
+	FILES=`echo -e "$${FILES}\n$(AZURE_PYTHON_SCRIPT_SUBDIR)\n$(PRCI_DEFINITIONS_DIR)"`; \
 	echo -e "Pylint on $(PYTHON) is running over files:\n$${FILES}\nPlease wait ...\n"; \
 	$(PYTHON) -m pylint --version; \
 	PYTHONPATH=$(top_srcdir) $(PYTHON) -m pylint \

@@ -210,6 +210,7 @@ return {
                         },
                         {
                             $type: 'certs',
+                            name: 'usercertificate',
                             acl_param: 'usercertificate',
                             acl_result_index: 0,
                             adapter: {
@@ -318,6 +319,11 @@ return {
                             label: '@mo-param:pwpolicy:krbpwdlockoutduration:label',
                             read_only: true,
                             measurement_unit: 'seconds'
+                        },
+                        {
+                            name: 'passwordgracelimit',
+                            label: '@mo-param:pwpolicy:passwordgracelimit:label',
+                            read_only: true
                         }
                     ]
                 },
