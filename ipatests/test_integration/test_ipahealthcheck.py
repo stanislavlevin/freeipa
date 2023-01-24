@@ -807,6 +807,10 @@ class TestIpaHealthCheck(IntegrationTest):
         )
         assert msg not in cmd.stdout_text
 
+    @pytest.mark.xfail(
+        reason="ipahealthcheck 0.12: https://pagure.io/freeipa/issue/9291",
+        strict=True,
+    )
     def test_ipa_dns_systemrecords_check(self):
         """
         This test ensures that the ipahealthcheck.ipa.idns check
@@ -1685,6 +1689,10 @@ class TestIpaHealthCheckWithoutDNS(IntegrationTest):
         tasks.install_master(
             cls.master, setup_dns=False)
 
+    @pytest.mark.xfail(
+        reason="ipahealthcheck 0.12: https://pagure.io/freeipa/issue/9291",
+        strict=True,
+    )
     def test_ipa_dns_systemrecords_check(self):
         """
         Test checks the result of IPADNSSystemRecordsCheck
