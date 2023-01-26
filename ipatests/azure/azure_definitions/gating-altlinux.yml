@@ -184,6 +184,8 @@ vms:
   - container_job: subids
     tests:
     - test_integration/test_subids.py
+    containers:
+      clients: 1
 
   - container_job: membermanager
     tests:
