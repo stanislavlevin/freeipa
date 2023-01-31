@@ -5,8 +5,7 @@ steps:
     gear-rpm -ba -v \
         --define '_topdir $(builddir)/rpmbuild' \
         --without 'lint' \
-        --without 'fasttest' \
-        --without 'fastlint'
+        --without 'fasttest'
     mkdir -p $(builddir)/dist/{,s}rpms
     mkdir -p $(builddir)/dist/rpms_debuginfo
     cp -v $(builddir)/rpmbuild/SRPMS/freeipa-*.src.rpm $(builddir)/dist/srpms/
