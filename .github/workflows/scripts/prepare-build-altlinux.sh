@@ -6,6 +6,7 @@ function prepare_build() {
     runuser -u "$GHA_USER" -- gear-rpm -bs --nodeps \
         --define '_allow_undefined_macros 1' \
         --define "_srcrpmdir $(pwd)" \
+        --with "lint" \
         --with "wheels" \
         --with "docs" \
         &&
