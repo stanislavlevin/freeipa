@@ -86,12 +86,12 @@ ACME_CONFIG_FILES = (
 
 
 def check_ports():
-    """Check that dogtag ports (8080, 8443) are available.
+    """Check that dogtag ports (8090, 8443) are available.
 
     Returns True when ports are free, False if they are taken.
     """
     return all([ipautil.check_port_bindable(8443),
-                ipautil.check_port_bindable(8080)])
+                ipautil.check_port_bindable(8090)])
 
 
 def get_preop_pin(instance_root, instance_name):
@@ -935,7 +935,7 @@ class CAInstance(DogtagInstance):
 
         agent_args = [paths.CERTMONGER_DOGTAG_SUBMIT,
                       "--cafile", chain_file.name,
-                      "--ee-url", 'http://%s:8080/ca/ee/ca/' % self.fqdn,
+                      "--ee-url", 'http://%s:8090/ca/ee/ca/' % self.fqdn,
                       "--agent-url",
                       'https://%s:8443/ca/agent/ca/' % self.fqdn,
                       "--certfile", agent_cert.name,
