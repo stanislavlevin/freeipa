@@ -514,7 +514,6 @@ This package contains tests that verify IPA functionality under Python 3.
 %setup -n %name-%version
 %if_with lint
 # we need it to generate cumulative patch without context
-# this patch includes changes made by sed too
 git init
 git config user.email "you@example.com"
 git config user.name "Your Name"
@@ -524,14 +523,19 @@ git checkout -b "patch"
 %endif # lint
 
 %patch -p1
-# change port from 8080 to 8090
-# Port 8080 is used by alterator-ahttpd-server
-grep -rl 8080 | xargs sed -i 's/\(\W\|^\)8080\(\W\|$\)/\18090\2/g'
 
 %if_with lint
 git add .
 git commit -am 'with our changes'
 %endif
+
+# Port 8080 is used by alterator-ahttpd-server
+if grep -rE --exclude-dir=.gear '(\W|^)8080(\W|$)' ; then
+    printf '%%s\n' 'Please change port 8080 to 8090 and commit'
+    exit 1
+else
+    [ "$?" -ne 1 ] && exit 1
+fi
 
 %build
 
