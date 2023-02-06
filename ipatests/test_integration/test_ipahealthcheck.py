@@ -1687,6 +1687,7 @@ class TestIpaHealthCheckWithoutDNS(IntegrationTest):
         Test checks the result of IPADNSSystemRecordsCheck
         when ipa-server is configured without DNS.
         """
+        tasks.install_packages(self.master, HEALTHCHECK_PKG)
         version = tasks.get_healthcheck_version(self.master)
         if (parse_version(version) < parse_version('0.12')):
             expected_msgs = {
@@ -1703,7 +1704,6 @@ class TestIpaHealthCheckWithoutDNS(IntegrationTest):
                 "Expected URI record missing",
             }
 
-        tasks.install_packages(self.master, HEALTHCHECK_PKG)
         returncode, data = run_healthcheck(
             self.master,
             "ipahealthcheck.ipa.idns",
