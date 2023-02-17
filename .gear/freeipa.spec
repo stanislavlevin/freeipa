@@ -1,7 +1,7 @@
 # build defines
 %define _unpackaged_files_terminate_build 1
 
-%ifarch %ix86 armh
+%ifarch %ix86
 %def_with only_client
 %else
 %def_without only_client
