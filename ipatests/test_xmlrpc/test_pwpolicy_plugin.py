@@ -25,6 +25,7 @@ import pytest
 
 from ipalib import api
 from ipalib import errors
+from ipalib.parameters import Int
 from ipapython.dn import DN
 from ipatests.test_xmlrpc import objectclasses
 from ipatests.test_xmlrpc.xmlrpc_test import (XMLRPC_test, assert_attr_equal,
@@ -219,6 +220,17 @@ class test_pwpolicy(XMLRPC_test):
                                             krbminpwdlife=50)['result']
         assert_attr_equal(entry, 'krbminpwdlife', '50')
 
+        # Test upper bound
+        entry = api.Command['pwpolicy_mod'](
+            self.group, passwordgracelimit=Int.MAXINT)['result']
+        assert_attr_equal(entry, 'passwordgracelimit', str(Int.MAXINT))
+
+        # Test bad values
+        for value in (Int.MAXINT + 1, -2):
+            with pytest.raises(errors.ValidationError):
+                entry = api.Command['pwpolicy_mod'](
+                    self.group, passwordgracelimit=value)['result']
+
     def test_maxlife_pwpolicy(self):
         """Check maxlife error message where minlife > maxlife specified
 
@@ -387,6 +399,7 @@ class test_pwpolicy_mod_cospriority(Declarative):
                     krbpwdhistorylength=[u'10'],
                     krbpwdmindiffchars=[u'3'],
                     krbpwdminlength=[u'8'],
+                    passwordgracelimit=[u'-1'],
                     objectclass=objectclasses.pwpolicy,
                 ),
                 summary=None,
@@ -417,6 +430,7 @@ class test_pwpolicy_mod_cospriority(Declarative):
                     krbpwdhistorylength=[u'10'],
                     krbpwdmindiffchars=[u'3'],
                     krbpwdminlength=[u'8'],
+                    passwordgracelimit=[u'-1'],
                 ),
                 summary=None,
                 value=u'ipausers',

@@ -101,3 +101,48 @@ class TestSortURI:
         assert dnsutil.sort_prio_weight([h3, h2, h1]) == [h1, h2, h3]
         assert dnsutil.sort_prio_weight([h3, h3, h3]) == [h3]
         assert dnsutil.sort_prio_weight([h2, h2, h1, h1]) == [h1, h2]
+
+
+class TestDNSResolver:
+    @pytest.fixture(name="res")
+    def resolver(self):
+        """Resolver that doesn't read /etc/resolv.conf
+
+        /etc/resolv.conf is not mandatory on systems
+        """
+        return dnsutil.DNSResolver(configure=False)
+
+    def test_nameservers(self, res):
+        res.nameservers = ["4.4.4.4", "8.8.8.8"]
+        assert res.nameservers == ["4.4.4.4", "8.8.8.8"]
+
+    def test_nameservers_with_ports(self, res):
+        res.nameservers = ["4.4.4.4 port 53", "8.8.8.8 port 8053"]
+        assert res.nameservers == ["4.4.4.4", "8.8.8.8"]
+        assert res.nameserver_ports == {"4.4.4.4": 53, "8.8.8.8": 8053}
+
+        res.nameservers = ["4.4.4.4 port 53", "8.8.8.8  port  8053"]
+        assert res.nameservers == ["4.4.4.4", "8.8.8.8"]
+        assert res.nameserver_ports == {"4.4.4.4": 53, "8.8.8.8": 8053}
+
+    def test_nameservers_with_bad_ports(self, res):
+        try:
+            res.nameservers = ["4.4.4.4 port a"]
+        except ValueError:
+            pass
+        else:
+            pytest.fail("No fail on bad port a")
+
+        try:
+            res.nameservers = ["4.4.4.4 port -1"]
+        except ValueError:
+            pass
+        else:
+            pytest.fail("No fail on bad port -1")
+
+        try:
+            res.nameservers = ["4.4.4.4 port 65536"]
+        except ValueError:
+            pass
+        else:
+            pytest.fail("No fail on bad port 65536")

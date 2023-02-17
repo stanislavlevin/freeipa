@@ -7,7 +7,14 @@ from ipatests.test_webui.ui_driver import UI_driver
 import ipatests.test_webui.data_config as config_data
 import ipatests.test_webui.data_user as user_data
 from ipatests.test_webui.ui_driver import screenshot
+
 import re
+import pytest
+
+try:
+    from selenium.common.exceptions import NoSuchElementException
+except ImportError:
+    pass
 
 
 class test_subid(UI_driver):
@@ -125,3 +132,19 @@ class test_subid(UI_driver):
         self.assert_no_error_dialog()
         after_count = self.get_rows()
         assert len(before_count) < len(after_count)
+
+    @screenshot
+    def test_subid_range_deletion_not_allowed(self):
+        """
+        Test to check that subid range delete is not
+        allowed from WebUI i.e Delete button is not available.
+        """
+        self.init_app()
+        self.navigate_to_entity('subid', facet='search')
+        admin_uid = self.get_record_pkey("admin", "ipaowner",
+                                         table_name="ipauniqueid")
+        with pytest.raises(NoSuchElementException) as excinfo:
+            self.delete_record(admin_uid, table_name="ipauniqueid")
+        # Ensure that the exception is really related to missing remove button
+        msg = "Unable to locate element: .facet-controls button[name=remove]"
+        assert msg in str(excinfo)

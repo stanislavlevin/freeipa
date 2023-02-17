@@ -426,6 +426,7 @@ static bool is_master_host(struct ipadb_context *ipactx, const char *fqdn)
 
 static krb5_error_code ipadb_fill_info3(struct ipadb_context *ipactx,
                                         LDAPMessage *lentry,
+                                        LDAPMessage *sentry,
                                         unsigned int flags,
                                         TALLOC_CTX *memctx,
                                         krb5_timestamp authtime,
@@ -565,7 +566,20 @@ static krb5_error_code ipadb_fill_info3(struct ipadb_context *ipactx,
         unix_to_nt_time(&info3->base.last_password_change, timeres);
         break;
     case ENOENT:
-        info3->base.last_password_change = 0;
+        /* If second entry is present, use Kerberos attributes from it */
+        if (sentry != NULL) {
+            ret = ipadb_ldap_attr_to_time_t(ipactx->lcontext, sentry,
+                                            "krbLastPwdChange", &timeres);
+            switch (ret) {
+            case 0:
+                unix_to_nt_time(&info3->base.last_password_change, timeres);
+                break;
+            default:
+            break;
+            }
+        } else {
+            info3->base.last_password_change = 0;
+        }
         break;
     default:
         return ret;
@@ -983,16 +997,18 @@ static krb5_error_code ipadb_get_pac_attrs_blob(TALLOC_CTX *mem_ctx,
 #endif
 
 krb5_error_code ipadb_get_pac(krb5_context kcontext,
-                              krb5_db_entry *client,
                               unsigned int flags,
+                              krb5_db_entry *client,
+                              krb5_db_entry *server,
+                              krb5_keyblock *replaced_reply_key,
                               krb5_timestamp authtime,
                               krb5_pac *pac)
 {
     TALLOC_CTX *tmpctx;
     struct ipadb_e_data *ied;
     struct ipadb_context *ipactx;
-    LDAPMessage *results = NULL;
-    LDAPMessage *lentry;
+    LDAPMessage *results = NULL, *sresults = NULL;
+    LDAPMessage *lentry = NULL, *sentry = NULL;
     DATA_BLOB pac_data;
     krb5_data data;
     union PAC_INFO pac_info;
@@ -1048,9 +1064,40 @@ krb5_error_code ipadb_get_pac(krb5_context kcontext,
         goto done;
     }
 
+    {
+        bool is_trust_krbtgt;
+
+        /* Trusted domain objects are part of cn=ad,cn=trusts,$BASEDN subtree.
+         * Anchor the search string with ',dc=' to prevent matching anything else.
+         * This is to avoid a string allocation with expanded base DN. */
+        is_trust_krbtgt = strstr(ied->entry_dn, ",cn=ad,cn=trusts,dc=") != NULL;
+
+        if (is_trust_krbtgt) {
+            char *sentry_dn = strchr(ied->entry_dn, ',');
+            if (sentry_dn != NULL) {
+                /* skipped "krbprincipalname=krbtgt/SOME-REALM@AT-REALM," */
+                sentry_dn++;
+                kerr = ipadb_deref_search(ipactx, sentry_dn, LDAP_SCOPE_BASE,
+                                        "(objectclass=*)", user_pac_attrs,
+                                        deref_search_attrs, memberof_pac_attrs,
+                                        &sresults);
+                if (kerr) {
+                    goto done;
+                }
+
+                sentry = ldap_first_entry(ipactx->lcontext, sresults);
+                if (!lentry) {
+                    kerr = ENOENT;
+                    goto done;
+                }
+
+            }
+        }
+    }
+
     /* == Fill Info3 == */
-    kerr = ipadb_fill_info3(ipactx, lentry, flags, tmpctx, authtime,
-                            &pac_info.logon_info.info->info3);
+    kerr = ipadb_fill_info3(ipactx, sentry ? sentry : lentry, sentry ? lentry : NULL,
+                            flags, tmpctx, authtime, &pac_info.logon_info.info->info3);
     if (kerr) {
         goto done;
     }
@@ -1064,9 +1111,13 @@ krb5_error_code ipadb_get_pac(krb5_context kcontext,
         goto done;
     }
 
-    kerr = krb5_pac_init(kcontext, pac);
-    if (kerr) {
-        goto done;
+    /* krb5 1.20+ passes in a pre-created PAC structure but for previous
+     * versions we have to create it ourselves */
+    if (pac != NULL && *pac == NULL) {
+        kerr = krb5_pac_init(kcontext, pac);
+        if (kerr) {
+            goto done;
+        }
     }
 
     data.magic = KV5M_DATA;
@@ -1149,7 +1200,7 @@ krb5_error_code ipadb_get_pac(krb5_context kcontext,
 
 #ifdef HAVE_PAC_REQUESTER_SID
     /* MS-KILE 3.3.5.6.4.8: add PAC_REQUESTER_SID only in TGT case */
-    if ((flags & KRB5_KDB_FLAG_CLIENT_REFERRALS_ONLY) != 0) {
+    if (flags & CLIENT_REFERRALS_FLAGS) {
         union PAC_INFO pac_requester_sid;
         /* == Package PAC_REQUESTER_SID == */
         memset(&pac_requester_sid, 0, sizeof(pac_requester_sid));
@@ -1177,6 +1228,9 @@ krb5_error_code ipadb_get_pac(krb5_context kcontext,
 
 done:
     ldap_msgfree(results);
+    if (sresults != NULL) {
+        ldap_msgfree(sresults);
+    }
     talloc_free(tmpctx);
     return kerr;
 }
@@ -1553,7 +1607,7 @@ static krb5_error_code save_logon_info(krb5_context context,
 }
 
 static struct ipadb_adtrusts *get_domain_from_realm(krb5_context context,
-                                                    krb5_data realm)
+                                                    krb5_data *realm)
 {
     struct ipadb_context *ipactx;
     struct ipadb_adtrusts *domain;
@@ -1570,10 +1624,10 @@ static struct ipadb_adtrusts *get_domain_from_realm(krb5_context context,
 
     for (i = 0; i < ipactx->mspac->num_trusts; i++) {
         domain = &ipactx->mspac->trusts[i];
-        if (strlen(domain->domain_name) != realm.length) {
+        if (strlen(domain->domain_name) != realm->length) {
             continue;
         }
-        if (strncasecmp(domain->domain_name, realm.data, realm.length) == 0) {
+        if (strncasecmp(domain->domain_name, realm->data, realm->length) == 0) {
             return domain;
         }
     }
@@ -1582,7 +1636,7 @@ static struct ipadb_adtrusts *get_domain_from_realm(krb5_context context,
 }
 
 static struct ipadb_adtrusts *get_domain_from_realm_update(krb5_context context,
-                                                           krb5_data realm)
+                                                           krb5_data *realm)
 {
     struct ipadb_context *ipactx;
     struct ipadb_adtrusts *domain;
@@ -1637,7 +1691,7 @@ static void filter_logon_info_log_message_rid(struct dom_sid *sid, uint32_t rid)
 
 static krb5_error_code check_logon_info_consistent(krb5_context context,
                                                    TALLOC_CTX *memctx,
-                                                   krb5_const_principal client_princ,
+                                                   krb5_db_entry *client,
                                                    krb5_boolean is_s4u,
                                                    struct PAC_LOGON_INFO_CTR *info)
 {
@@ -1645,7 +1699,6 @@ static krb5_error_code check_logon_info_consistent(krb5_context context,
     struct ipadb_context *ipactx;
     bool result;
     bool is_from_trusted_domain = false;
-    krb5_db_entry *client_actual = NULL;
     struct ipadb_e_data *ied = NULL;
     int flags = 0;
     struct dom_sid client_sid;
@@ -1701,18 +1754,12 @@ static krb5_error_code check_logon_info_consistent(krb5_context context,
         }
     }
 
-    if (is_s4u && is_from_trusted_domain) {
+    if (client == NULL || (is_s4u && is_from_trusted_domain)) {
         /* If the PAC belongs to a user from the trusted domain, we cannot compare SIDs */
         return 0;
     }
 
-    kerr = ipadb_get_principal(context, client_princ, flags, &client_actual);
-    if (kerr != 0) {
-        krb5_klog_syslog(LOG_ERR, "PAC issue: ipadb_get_principal failed.");
-        return KRB5KDC_ERR_TGT_REVOKED;
-    }
-
-    ied = (struct ipadb_e_data *)client_actual->e_data;
+    ied = (struct ipadb_e_data *)client->e_data;
     if (ied == NULL || ied->magic != IPA_E_DATA_MAGIC) {
         krb5_klog_syslog(LOG_ERR, "PAC issue: client e_data fetching failed.");
         kerr = EINVAL;
@@ -1748,14 +1795,12 @@ static krb5_error_code check_logon_info_consistent(krb5_context context,
     }
 
 done:
-    ipadb_free_principal(context, client_actual);
-
     return kerr;
 }
 
 krb5_error_code filter_logon_info(krb5_context context,
                                   TALLOC_CTX *memctx,
-                                  krb5_data realm,
+                                  krb5_data *realm,
                                   struct PAC_LOGON_INFO_CTR *info)
 {
 
@@ -1980,7 +2025,8 @@ krb5_error_code filter_logon_info(krb5_context context,
 
 
 static krb5_error_code ipadb_check_logon_info(krb5_context context,
-                                              krb5_const_principal client_princ,
+                                              krb5_db_entry *client,
+                                              krb5_db_entry *signing_krbtgt,
                                               krb5_boolean is_cross_realm,
                                               krb5_boolean is_s4u,
                                               krb5_data *pac_blob,
@@ -1989,7 +2035,7 @@ static krb5_error_code ipadb_check_logon_info(krb5_context context,
     struct PAC_LOGON_INFO_CTR info;
     krb5_error_code kerr;
     TALLOC_CTX *tmpctx;
-    krb5_data origin_realm = client_princ->realm;
+    krb5_data origin_realm = {0};
     bool result;
 
     tmpctx = talloc_new(NULL);
@@ -2017,12 +2063,12 @@ static krb5_error_code ipadb_check_logon_info(krb5_context context,
                 return KRB5_KDB_DBNOTINITED;
             }
             /* In S4U case we might be dealing with the PAC issued by the trusted domain */
-            if (is_s4u && (ipactx->mspac->trusts != NULL)) {
+            if ((ipactx->mspac->trusts != NULL)) {
                 /* Iterate through list of trusts and check if this SID belongs to
                 * one of the domains we trust */
                 for(int i = 0 ; i < ipactx->mspac->num_trusts ; i++) {
                     result = dom_sid_check(&ipactx->mspac->trusts[i].domsid,
-                                           requester_sid, false);
+                                           &client_sid, false);
                     if (result) {
                         is_from_trusted_domain = true;
                         break;
@@ -2030,7 +2076,7 @@ static krb5_error_code ipadb_check_logon_info(krb5_context context,
                 }
             }
 
-            if (!is_from_trusted_domain) {
+            if (!is_from_trusted_domain && !is_s4u) {
                 /* memctx is freed by the caller */
                 char *pac_sid = dom_sid_string(tmpctx, &client_sid);
                 char *req_sid = dom_sid_string(tmpctx, requester_sid);
@@ -2051,11 +2097,17 @@ static krb5_error_code ipadb_check_logon_info(krb5_context context,
          * is ours but operates on behalf of the cross-realm principal, we will
          * search through the trusted domains but otherwise skip the exact SID check
          * as we are not responsible for the principal from the trusted domain */
-        kerr = check_logon_info_consistent(context, tmpctx, client_princ, is_s4u, &info);
+        kerr = check_logon_info_consistent(context, tmpctx, client, is_s4u, &info);
         goto done;
     }
 
-    kerr = filter_logon_info(context, tmpctx, origin_realm, &info);
+    if (client != NULL) {
+        origin_realm = client->princ->realm;
+    } else {
+        origin_realm = signing_krbtgt->princ->realm;
+    }
+
+    kerr = filter_logon_info(context, tmpctx, &origin_realm, &info);
     if (kerr) {
         goto done;
     }
@@ -2224,24 +2276,19 @@ done:
     return kerr;
 }
 
-krb5_error_code ipadb_verify_pac(krb5_context context,
-                                 unsigned int flags,
-                                 krb5_const_principal client_princ,
-                                 krb5_db_entry *proxy,
-                                 krb5_db_entry *server,
-                                 krb5_db_entry *krbtgt,
-                                 krb5_keyblock *server_key,
-                                 krb5_keyblock *krbtgt_key,
-                                 krb5_timestamp authtime,
-                                 krb5_authdata **authdata,
-                                 krb5_pac *pac)
+krb5_error_code ipadb_common_verify_pac(krb5_context context,
+                                        unsigned int flags,
+                                        krb5_db_entry *client,
+                                        krb5_db_entry *server,
+                                        krb5_db_entry *signing_krbtgt,
+                                        krb5_keyblock *krbtgt_key,
+                                        krb5_timestamp authtime,
+                                        krb5_pac old_pac,
+                                        krb5_pac *pac)
 {
-    krb5_keyblock *srv_key = NULL;
-    krb5_keyblock *priv_key = NULL;
     krb5_error_code kerr;
     krb5_ui_4 *types = NULL;
     size_t num_buffers;
-    krb5_pac old_pac = NULL;
     krb5_pac new_pac = NULL;
     krb5_data data;
     krb5_data pac_blob = { 0 , 0, NULL};
@@ -2250,42 +2297,15 @@ krb5_error_code ipadb_verify_pac(krb5_context context,
     struct dom_sid *requester_sid = NULL;
     struct dom_sid req_sid;
 
-    kerr = krb5_pac_parse(context,
-                          authdata[0]->contents,
-                          authdata[0]->length,
-                          &old_pac);
-    if (kerr) {
-        goto done;
-    }
-
-    /* for cross realm trusts cases we need to check the right checksum.
-     * when the PAC is signed by our realm, we can always just check it
-     * passing our realm krbtgt key as the kdc checksum key (privsvr).
-     * But when a trusted realm passes us a PAC the kdc checksum is
-     * generated with that realm krbtgt key, so we need to use the cross
-     * realm krbtgt to check the 'server' checksum instead. */
-    if (ipadb_is_cross_realm_krbtgt(krbtgt->princ)) {
+    if (signing_krbtgt != NULL &&
+        ipadb_is_cross_realm_krbtgt(signing_krbtgt->princ)) {
         /* krbtgt from a trusted realm */
         is_cross_realm = true;
-
-        srv_key = krbtgt_key;
-
-    } else {
-        /* krbtgt from our own realm */
-        priv_key = krbtgt_key;
     }
 
-    /* only pass with_realm TRUE when it is cross-realm ticket and S4U
-     * extension (S4U2Self or S4U2Proxy (RBCD)) was requested */
-    kerr = krb5_pac_verify_ext(context, old_pac, authtime,
-                               client_princ, srv_key, priv_key,
-                               (is_cross_realm &&
-                                (flags & KRB5_KDB_FLAG_PROTOCOL_TRANSITION)));
-    if (kerr) {
-        goto done;
-    }
-
-    /* Now that the PAC is verified, do additional checks.
+    /* In krb5 1.20+ the PAC signatures are verified prior to call to issue_pac().
+     * In krb5 before 1.20, we do verify PAC signatures before ipadb_common_verify_pac().
+     * Now we can do additional checks.
      * Augment it with additional info if it is coming from a different realm */
     kerr = krb5_pac_get_buffer(context, old_pac,
                                KRB5_PAC_LOGON_INFO, &pac_blob);
@@ -2302,7 +2322,8 @@ krb5_error_code ipadb_verify_pac(krb5_context context,
 #endif
 
     kerr = ipadb_check_logon_info(context,
-                                  client_princ,
+                                  client,
+                                  signing_krbtgt,
                                   is_cross_realm,
                                   (flags & KRB5_KDB_FLAGS_S4U),
                                   &pac_blob,
@@ -2310,12 +2331,19 @@ krb5_error_code ipadb_verify_pac(krb5_context context,
     if (kerr != 0) {
         goto done;
     }
-    /* extract buffers and rebuilt pac from scratch so that when re-signing
-     * with a different cksum type does not cause issues due to mismatching
-     * signature buffer lengths */
-    kerr = krb5_pac_init(context, &new_pac);
-    if (kerr) {
-        goto done;
+
+    /* krb5 1.20+ passes in a pre-created PAC structure but for previous
+     * versions we have to create it ourselves */
+    if (pac != NULL && *pac == NULL) {
+        /* extract buffers and rebuilt pac from scratch so that when re-signing
+        * with a different cksum type does not cause issues due to mismatching
+        * signature buffer lengths */
+        kerr = krb5_pac_init(context, &new_pac);
+        if (kerr) {
+            goto done;
+        }
+    } else {
+        new_pac = *pac;
     }
 
     kerr = krb5_pac_get_types(context, old_pac, &num_buffers, &types);
@@ -2334,7 +2362,6 @@ krb5_error_code ipadb_verify_pac(krb5_context context,
             pac_blob.length != 0) {
             kerr = krb5_pac_add_buffer(context, new_pac, types[i], &pac_blob);
             if (kerr) {
-                krb5_pac_free(context, new_pac);
                 goto done;
             }
 
@@ -2351,21 +2378,18 @@ krb5_error_code ipadb_verify_pac(krb5_context context,
             TALLOC_CTX *tmpctx = talloc_new(NULL);
             if (tmpctx == NULL) {
                 kerr = ENOMEM;
-                krb5_pac_free(context, new_pac);
                 goto done;
             }
 
             kerr = ipadb_client_requested_pac(context, old_pac, tmpctx, &pac_requested);
             if (kerr != 0) {
                 talloc_free(tmpctx);
-                krb5_pac_free(context, new_pac);
                 goto done;
             }
 
             kerr = ipadb_get_pac_attrs_blob(tmpctx, &pac_requested, &pac_attrs_data);
             if (kerr) {
                 talloc_free(tmpctx);
-                krb5_pac_free(context, new_pac);
                 goto done;
             }
             data.magic = KV5M_DATA;
@@ -2375,7 +2399,6 @@ krb5_error_code ipadb_verify_pac(krb5_context context,
             kerr = krb5_pac_add_buffer(context, new_pac, PAC_TYPE_ATTRIBUTES_INFO, &data);
             if (kerr) {
                 talloc_free(tmpctx);
-                krb5_pac_free(context, new_pac);
                 goto done;
             }
 
@@ -2395,31 +2418,35 @@ krb5_error_code ipadb_verify_pac(krb5_context context,
             krb5_free_data_contents(context, &data);
         }
         if (kerr) {
-            krb5_pac_free(context, new_pac);
             goto done;
         }
     }
 
+#if !defined(KRB5_KDB_FLAG_CLIENT)
     if (flags & KRB5_KDB_FLAG_CONSTRAINED_DELEGATION) {
-        if (proxy == NULL) {
+        if (client == NULL) {
+            if (new_pac != *pac) {
+                krb5_pac_free(context, new_pac);
+            }
             *pac = NULL;
             kerr = 0;
             goto done;
         }
 
-        kerr = ipadb_add_transited_service(context, proxy, server,
+        kerr = ipadb_add_transited_service(context, client, server,
                                            old_pac, new_pac);
         if (kerr) {
-            krb5_pac_free(context, new_pac);
             goto done;
         }
     }
+#endif
 
     *pac = new_pac;
 
 done:
-    krb5_free_authdata(context, authdata);
-    krb5_pac_free(context, old_pac);
+    if (kerr != 0 && (new_pac != *pac)) {
+        krb5_pac_free(context, new_pac);
+    }
     krb5_free_data_contents(context, &pac_blob);
     free(types);
     return kerr;
@@ -2527,9 +2554,12 @@ void get_authz_data_types(krb5_context context, krb5_db_entry *entry,
                 none_found = true;
             }
         } else {
-            krb5_klog_syslog(LOG_ERR, "Ignoring unsupported " \
-                                      "authorization data type [%s].",
-                                      authz_data_list[c]);
+            /* for out-of-realm entries we suppress warnings in our defaults */
+            if (entry != NULL) {
+                krb5_klog_syslog(LOG_ERR, "Ignoring unsupported " \
+                                        "authorization data type [%s].",
+                                        authz_data_list[c]);
+            }
         }
     }
 
