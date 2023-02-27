@@ -14,6 +14,7 @@ __all__ = ("str2dn", "dn2str", "DECODING_ERROR", "LDAPError")
 
 # load reentrant ldap client library (libldap_r-*.so.2 or libldap.so.2)
 ldap_lib_filename = next(
+    # pylint: disable=filter-builtin-not-iterating
     filter(None, map(ctypes.util.find_library, ["ldap_r-2", "ldap"])), None
 )
 
