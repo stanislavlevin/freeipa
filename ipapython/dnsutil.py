@@ -187,6 +187,7 @@ class DNSResolver(dns.resolver.Resolver):
 
         # Call dns.resolver.Resolver.nameservers setter
         if hasattr(dns.resolver.Resolver, "nameservers"):
+            # pylint: disable=no-member
             dns.resolver.Resolver.nameservers.__set__(self, nameservers)
         else:
             # old dnspython (<2) doesn't have 'nameservers' property
