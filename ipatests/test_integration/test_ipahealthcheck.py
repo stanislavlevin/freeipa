@@ -1681,6 +1681,10 @@ class TestIpaHealthCheckWithoutDNS(IntegrationTest):
         tasks.install_master(
             cls.master, setup_dns=False)
 
+    @pytest.mark.xfail(
+        reason="https://github.com/freeipa/freeipa-healthcheck/issues/284",
+        strict=True,
+    )
     def test_ipa_dns_systemrecords_check(self):
         """
         Test checks the result of IPADNSSystemRecordsCheck
