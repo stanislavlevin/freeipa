@@ -750,10 +750,8 @@ if [ $1 -gt 1 ] ; then
     test -f '/var/lib/ipa-client/sysrestore/sysrestore.index' && restore=$(wc -l '/var/lib/ipa-client/sysrestore/sysrestore.index' | awk '{print $1}') ||:
 
     if [ -f '/etc/sssd/sssd.conf' -a $restore -ge 2 ]; then
-        if ! grep -E -q '/var/lib/sss/pubconf/krb5.include.d/' /etc/krb5.conf  2>/dev/null ; then
-            echo "includedir /var/lib/sss/pubconf/krb5.include.d/" > /etc/krb5.conf.ipanew
-            cat /etc/krb5.conf >> /etc/krb5.conf.ipanew
-            mv -Z /etc/krb5.conf.ipanew /etc/krb5.conf
+        if grep -E -q '/var/lib/sss/pubconf/krb5.include.d/' /etc/krb5.conf  2>/dev/null ; then
+            sed -i '\;includedir /var/lib/sss/pubconf/krb5.include.d;d' /etc/krb5.conf
         fi
     fi
 
