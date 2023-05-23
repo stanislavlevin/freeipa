@@ -132,10 +132,9 @@ def cleanup(func):
             os.rmdir(ccache_dir)
         except OSError:
             pass
-        try:
-            os.remove(krb_name + ".ipabkp")
-        except OSError:
-            logger.error("Could not remove %s.ipabkp", krb_name)
+        # During master installation, the .ipabkp file is not created
+        # Ignore the delete error if it is "file does not exist"
+        remove_file(krb_name + ".ipabkp")
 
     return inner
 
@@ -707,19 +706,6 @@ def configure_krb5_conf(
                 'delim': ' '
             }
         ])
-
-    # SSSD include dir
-    if configure_sssd:
-        if not os.path.exists(paths.SSSD_PUBCONF_KRB5_INCLUDE_D_DIR):
-            os.makedirs(paths.SSSD_PUBCONF_KRB5_INCLUDE_D_DIR, mode=0o755)
-        opts.extend([
-            {
-                'name': 'includedir',
-                'type': 'option',
-                'value': paths.SSSD_PUBCONF_KRB5_INCLUDE_D_DIR,
-                'delim': ' '
-            },
-            krbconf.emptyLine()])
 
     # [libdefaults]
     libopts = [
