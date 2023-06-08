@@ -857,9 +857,10 @@ class TestIpaAdTrustInstall(IntegrationTest):
              "-U"]
         )
         self.master.run_command(["mkdir", "/freeipa4234"])
-        self.master.run_command(
-            ["chcon", "-t", "samba_share_t",
-             "/freeipa4234"])
+        if tasks.is_selinux_enabled(self.master):
+            self.master.run_command(
+                ["chcon", "-t", "samba_share_t", "/freeipa4234"]
+            )
         self.master.run_command(
             ["setfacl", "-m", "g:admins:rwx",
              "/freeipa4234"])
