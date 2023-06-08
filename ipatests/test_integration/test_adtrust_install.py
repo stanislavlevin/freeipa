@@ -422,7 +422,7 @@ class TestIpaAdTrustInstall(IntegrationTest):
         """
         user = "ipauser2"
         pwd = "Secret123"
-        cmd = ["ipa-adtrust-install"]
+        cmd = ["/usr/sbin/ipa-adtrust-install"]
         msg = (
             "Must be root to setup AD trusts on server"
         )
