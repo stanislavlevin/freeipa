@@ -468,7 +468,7 @@ class TestIpaAdTrustInstall(IntegrationTest):
             "Must have Kerberos credentials to setup AD trusts on server: "
             "Major (458752): No credentials were supplied, or the credentials "
             "were unavailable or inaccessible, Minor (2529639053): "
-            "No Kerberos credentials available (default cache: KCM:)\n"
+            "No Kerberos credentials available (default cache: "
         )
         self.master.run_command(["kdestroy", "-A"])
         result = self.master.run_command(
