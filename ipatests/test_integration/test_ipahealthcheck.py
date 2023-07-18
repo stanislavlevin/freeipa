@@ -353,6 +353,8 @@ class TestIpaHealthCheck(IntegrationTest):
 
         https://pagure.io/freeipa/issue/8892
         """
+        if not_enough_disk_space(self.master, "/"):
+            pytest.skip("requires at least 20% of free space for '/'")
         returncode, output = run_healthcheck(self.master, output_type="human",
                                              failures_only=True)
         assert returncode == 0
@@ -580,6 +582,8 @@ class TestIpaHealthCheck(IntegrationTest):
             self.replicas[0], 'ipauser1', first='Test', last='User',
         )
 
+        if not_enough_disk_space(self.replicas[0], "/"):
+            pytest.skip("requires at least 20% of free space for '/'")
         returncode, data = run_healthcheck(self.replicas[0],
                                            failures_only=True)
         assert returncode == 0
@@ -687,11 +691,11 @@ class TestIpaHealthCheck(IntegrationTest):
         Ensure that on a default installation with KRA and DNS
         installed ipa-healthcheck runs with no errors.
         """
-        if not_enough_disk_space(self.master, "/"):
-            pytest.skip("requires at least 20% of free space for '/'")
-
         cmd = tasks.install_kra(self.master)
         assert cmd.returncode == 0
+
+        if not_enough_disk_space(self.master, "/"):
+            pytest.skip("requires at least 20% of free space for '/'")
         returncode, _unused = run_healthcheck(
             self.master,
             failures_only=True
@@ -716,6 +720,8 @@ class TestIpaHealthCheck(IntegrationTest):
                 'output_type=human'
             ])
         )
+        if not_enough_disk_space(self.master, "/"):
+            pytest.skip("requires at least 20% of free space for '/'")
         returncode, output = run_healthcheck(
             self.master, failures_only=True, config=config_file
         )
