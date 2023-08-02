@@ -87,7 +87,8 @@ BuildRequires: libunistring-devel
 
 BuildRequires: 389-ds-base-devel >= %ds_version
 BuildRequires: samba-devel >= %samba_version
-BuildRequires: nodejs
+# https://bugzilla.altlinux.org/47092
+BuildRequires: node
 BuildRequires: python3(rjsmin)
 %endif # only_client
 
