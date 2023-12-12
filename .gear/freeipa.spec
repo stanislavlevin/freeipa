@@ -146,6 +146,8 @@ BuildRequires: python3(pyasn1_modules)
 BuildRequires: python3(pysss_nss_idmap)
 BuildRequires: python3(yubico)
 BuildRequires: python3(requests)
+# urllib3.util.ssl_match_hostname
+BuildRequires: python3-module-urllib3 >= 1.26.8
 BuildRequires: python3(dateutil)
 BuildRequires: python3(dns)
 BuildRequires: python3(pyhbac)
@@ -247,6 +249,8 @@ Requires: python3-module-pki-base >= %pki_version
 Requires: python3-module-sssdconfig >= %sssd_version
 Requires: python3-module-samba
 Requires: python3-module-psutil
+# urllib3.util.ssl_match_hostname
+Requires: python3-module-urllib3 >= 1.26.8
 Requires: librpm
 Obsoletes: python3-module-ipaserver-ntp < %EVR
 Provides: python3-module-ipaserver-ntp = %EVR
@@ -451,6 +455,8 @@ Requires: python3-module-ldap >= %python_ldap_version
 Requires: python3-module-pyusb
 Requires: python3-module-qrcode
 Requires: python3-module-requests
+# urllib3.util.ssl_match_hostname
+Requires: python3-module-urllib3 >= 1.26.8
 Requires: python3-module-sss-murmur
 Requires: python3-module-yubico
 %py3_provides ipaplatform
