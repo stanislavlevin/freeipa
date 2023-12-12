@@ -155,7 +155,6 @@ BuildRequires: python3(pysss)
 BuildRequires: python3(pytest_sourceorder)
 BuildRequires: python3-module-lib389 >= %ds_version
 BuildRequires: python3(qrcode)
-BuildRequires: python3-module-openssl
 # python3(samba) has multiple providers
 BuildRequires: python3-module-samba
 %endif
@@ -454,7 +453,6 @@ Requires: python3-module-qrcode
 Requires: python3-module-requests
 Requires: python3-module-sss-murmur
 Requires: python3-module-yubico
-Requires: python3-module-openssl
 %py3_provides ipaplatform
 %py3_provides ipaplatform.constants
 %py3_provides ipaplatform.osinfo
