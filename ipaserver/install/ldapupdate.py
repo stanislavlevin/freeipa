@@ -197,6 +197,35 @@ def safe_output(attr, values):
 _sentinel = object()
 
 
+def run_ldapi_reload_task(conn):
+    """Create and wait for reload ldapi mappings task
+
+    :param conn: ldap2 connection
+    :return: exitcode
+    """
+    task_cn = "reload_{}".format(int(time.time()))
+    task_dn = DN(
+        ('cn', task_cn), ('cn', 'reload ldapi mappings'),
+        ('cn', 'tasks'), ('cn', 'config')
+    )
+    entry = conn.make_entry(
+        task_dn,
+        objectClass=['top', 'extensibleObject'],
+        cn=[task_cn],
+        ttl=[10],
+    )
+    logger.debug('Creating reload task %s', task_dn)
+    conn.add_entry(entry)
+    # task usually finishes in a few ms, avoid 1 sec delay in wait_for_task
+    time.sleep(0.1)
+    exitcode = replication.wait_for_task(api.Backend.ldap2, task_dn)
+    logger.debug(
+        'Task %s has finished with exit code %i',
+        task_dn, exitcode
+    )
+    return exitcode
+
+
 class LDAPUpdate:
     action_keywords = {
         "default", "add", "remove", "only", "onlyifexist", "deleteentry",
@@ -206,6 +235,7 @@ class LDAPUpdate:
         ('cn', 'index'), ('cn', 'userRoot'), ('cn', 'ldbm database'),
         ('cn', 'plugins'), ('cn', 'config')
     )
+    ldapi_autobind_suffix = DN(('cn', 'auto_bind'), ('cn', 'config'))
 
     def __init__(self, dm_password=_sentinel, sub_dict=None,
                  online=_sentinel, ldapi=_sentinel, api=api):
@@ -954,6 +984,7 @@ class LDAPUpdate:
 
     def _run_updates(self, all_updates):
         index_attributes = set()
+        update_ldapi_mappings = False
         for update in all_updates:
             if 'deleteentry' in update:
                 self._delete_record(update)
@@ -961,8 +992,16 @@ class LDAPUpdate:
                 self._run_update_plugin(update['plugin'])
             else:
                 entry, modified = self._update_record(update)
-                if modified and entry.dn.endswith(self.index_suffix):
-                    index_attributes.add(entry.single_value['cn'])
+                if modified:
+                    if entry.dn.endswith(self.index_suffix):
+                        index_attributes.add(entry.single_value['cn'])
+                    if (
+                        entry.dn.endswith(self.ldapi_autobind_suffix)
+                        and "nsLDAPIFixedAuthMap" in entry.get(
+                            "objectClass", ()
+                        )
+                    ):
+                        update_ldapi_mappings = True
 
         if index_attributes:
             # The LDAPUpdate framework now keeps record of all changed/added
@@ -971,6 +1010,10 @@ class LDAPUpdate:
             # added or modified.
             task_dn = self.create_index_task(*sorted(index_attributes))
             self.monitor_index_task(task_dn)
+
+        if update_ldapi_mappings:
+            # update mappings when any autobind entry is added or modified
+            run_ldapi_reload_task(self.conn)
 
     def update(self, files, ordered=True):
         """Execute the update. files is a list of the update files to use.

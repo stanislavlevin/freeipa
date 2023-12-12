@@ -46,6 +46,7 @@ app_DATA =				\
 	41-caacl.update			\
 	41-lightweight-cas.update	\
 	45-roles.update			\
+	49-autobind-services.update	\
 	50-7_bit_check.update	        \
 	50-dogtag10-migration.update	\
 	50-groupuuid.update		\
@@ -65,6 +66,8 @@ app_DATA =				\
 	73-subid.update		\
 	73-winsync.update		\
 	73-certmap.update		\
+	73-passkey.update		\
+	73-service-rbcd.update		\
 	75-user-trust-attributes.update	\
 	80-schema_compat.update 	\
 	81-externalmembers.update	\

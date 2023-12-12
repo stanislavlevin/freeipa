@@ -516,7 +516,8 @@ class TestInstallWithCA_KRA1(InstallTestBase1):
     @classmethod
     def install(cls, mh):
         tasks.install_master(cls.master, setup_dns=cls.master_with_dns,
-                             setup_kra=True)
+                             setup_kra=True,
+                             random_serial=cls.random_serial)
 
     def test_replica0_ipa_kra_install(self):
         tasks.install_kra(self.replicas[0], first_instance=False)
@@ -536,7 +537,8 @@ class TestInstallWithCA_DNS1(InstallTestBase1):
 
     @classmethod
     def install(cls, mh):
-        tasks.install_master(cls.master, setup_dns=cls.master_with_dns)
+        tasks.install_master(cls.master, setup_dns=cls.master_with_dns,
+                             random_serial=cls.random_serial)
 
     @pytest.mark.skipif(config.domain_level == DOMAIN_LEVEL_0,
                         reason='does not work on DOMAIN_LEVEL_0 by design')
@@ -2098,3 +2100,17 @@ class TestHostnameValidator(IntegrationTest):
                 hostname = m.group(1)
                 break
         assert hostname == self.master.hostname
+
+    def test_hostname_matching_domain(self):
+        # https://pagure.io/freeipa/issue/9003
+        # Prevent hostname from matching the domain
+        self.master.run_command(['hostname', self.master.hostname])
+        args = self.get_args(self.master)
+        args.extend(['--hostname', self.master.domain.name])
+        result = self.master.run_command(
+            args, raiseonerr=False,
+        )
+
+        assert result.returncode == 1
+        assert 'hostname cannot be the same as the domain name' \
+            in result.stderr_text

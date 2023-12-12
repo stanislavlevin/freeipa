@@ -106,6 +106,7 @@ enum ipadb_user_auth {
   IPADB_USER_AUTH_PKINIT   = 1 << 4,
   IPADB_USER_AUTH_HARDENED = 1 << 5,
   IPADB_USER_AUTH_IDP      = 1 << 6,
+  IPADB_USER_AUTH_PASSKEY  = 1 << 7,
 };
 
 enum ipadb_user_auth_idx {
@@ -114,6 +115,7 @@ enum ipadb_user_auth_idx {
   IPADB_USER_AUTH_IDX_PKINIT,
   IPADB_USER_AUTH_IDX_HARDENED,
   IPADB_USER_AUTH_IDX_IDP,
+  IPADB_USER_AUTH_IDX_PASSKEY,
   IPADB_USER_AUTH_IDX_MAX,
 };
 
@@ -124,6 +126,12 @@ struct ipadb_global_config {
 	char **authz_data;
 	enum ipadb_user_auth user_auth;
     bool disable_preauth_for_spns;
+};
+
+enum ipadb_tristate_option {
+	IPADB_TRISTATE_FALSE = FALSE,
+	IPADB_TRISTATE_TRUE = TRUE,
+	IPADB_TRISTATE_UNDEFINED,
 };
 
 #define IPA_CONTEXT_MAGIC 0x0c027ea7
@@ -143,6 +151,7 @@ struct ipadb_context {
     krb5_key_salt_tuple *def_encs;
     int n_def_encs;
     struct ipadb_mspac *mspac;
+    enum ipadb_tristate_option optional_pac_tkt_chksum;
 #ifdef HAVE_KRB5_CERTAUTH_PLUGIN
     krb5_certauth_moddata certauth_moddata;
 #endif
@@ -221,6 +230,16 @@ int ipadb_ldap_attr_has_value(LDAP *lcontext, LDAPMessage *le,
                               char *attrname, const char *value);
 int ipadb_ldap_deref_results(LDAP *lcontext, LDAPMessage *le,
                              LDAPDerefRes **results);
+
+krb5_error_code ipadb_get_tl_data(krb5_db_entry *entry,
+                                  krb5_int16 type,
+                                  krb5_ui_2 length,
+                                  krb5_octet *data);
+
+krb5_error_code ipadb_set_tl_data(krb5_db_entry *entry,
+                                  krb5_int16 type,
+                                  krb5_ui_2 length,
+                                  const krb5_octet *data);
 
 struct ipadb_multires;
 krb5_error_code ipadb_multires_init(LDAP *lcontext, struct ipadb_multires **r);
@@ -373,6 +392,12 @@ krb5_error_code ipadb_check_allowed_to_delegate(krb5_context kcontext,
                                                 krb5_const_principal client,
                                                 const krb5_db_entry *server,
                                                 krb5_const_principal proxy);
+
+krb5_error_code ipadb_allowed_to_delegate_from(krb5_context context,
+                                               krb5_const_principal client,
+                                               krb5_const_principal server,
+                                               krb5_pac server_pac,
+                                               const krb5_db_entry *proxy);
 
 /* AS AUDIT */
 

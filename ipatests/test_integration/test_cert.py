@@ -531,12 +531,14 @@ class TestCAShowErrorHandling(IntegrationTest):
         Test to verify if the case of a request
         for /ca/rest/authority/{id}/cert (or .../chain)
         where {id} is an unknown authority ID.
+
         Test Steps:
         1. Setup a freeipa server and a replica
         2. Stop ipa-custodia service on replica
         3. Create a LWCA on the replica
         4. Verify LWCA is recognized on the server
         5. Run `ipa ca-show <LWCA>`
+
         PKI Github Link: https://github.com/dogtagpki/pki/pull/3605/
         """
         self.replicas[0].run_command(['systemctl', 'stop', 'ipa-custodia'])

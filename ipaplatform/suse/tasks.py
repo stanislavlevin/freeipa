@@ -44,7 +44,7 @@ class SuseTaskNamespace(RedHatTaskNamespace):
     def set_selinux_booleans(self, required_settings, backup_func=None):
         return False  # FIXME: Implement after libexec move
 
-    def modify_nsswitch_pam_stack(self, sssd, mkhomedir, fstore, statestore,
+    def modify_nsswitch_pam_stack(self, sssd, mkhomedir, statestore,
                                   sudo=True, subid=False):
         # pylint: disable=ipa-forbidden-import
         from ipalib import sysrestore  # FixMe: break import cycle

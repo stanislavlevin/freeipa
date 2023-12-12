@@ -36,7 +36,6 @@ class BasePathNamespace:
     SYSTEMD_DETECT_VIRT = "/usr/bin/systemd-detect-virt"
     SYSTEMD_TMPFILES = "/bin/systemd-tmpfiles"
     TAR = "/bin/tar"
-    PACKAGE_MANAGER = "/usr/bin/rpm"
     ETC_FEDORA_RELEASE = "/etc/fedora-release"
     GROUP = "/etc/group"
     ETC_HOSTNAME = "/etc/hostname"
@@ -57,7 +56,6 @@ class BasePathNamespace:
     HTTPD_CERT_FILE = "/var/lib/ipa/certs/httpd.crt"
     HTTPD_KEY_FILE = "/var/lib/ipa/private/httpd.key"
     HTTPD_PASSWD_FILE_FMT = "/var/lib/ipa/passwds/{host}-443-RSA"
-    HTTPD_DEFAULT_STARTED_SITE_CONF = None
     # only used on Fedora
     HTTPD_IPA_WSGI_MODULES_CONF = None
     OLD_IPA_KEYTAB = "/etc/httpd/conf/ipa.keytab"
@@ -104,13 +102,10 @@ class BasePathNamespace:
     NAMED_ROOT_KEY = "/etc/named.root.key"
     NAMED_MANAGED_KEYS_DIR = "/var/named/dynamic"
     NAMED_CRYPTO_POLICY_FILE = None
-    NAMED_RNDC_CONF = ""
     NSLCD_CONF = "/etc/nslcd.conf"
     NSS_LDAP_CONF = "/etc/nss_ldap.conf"
     NSSWITCH_CONF = "/etc/nsswitch.conf"
     CHRONY_CONF = "/etc/chrony.conf"
-    NTPD_CONF = "/etc/ntp.conf"
-    ONTPD_CONF = "/etc/ntpd.conf"
     NTP_CONF = "/etc/ntp.conf"
     NTP_STEP_TICKERS = "/etc/ntp/step-tickers"
     ETC_OPENDNSSEC_DIR = "/etc/opendnssec"
@@ -287,6 +282,7 @@ class BasePathNamespace:
     SEMODULE = "/usr/sbin/semodule"
     SMBD = "/usr/sbin/smbd"
     USERADD = "/usr/sbin/useradd"
+    FONTS_DIR = "/usr/share/fonts"
     FONTS_OPENSANS_DIR = "/usr/share/fonts/open-sans"
     FONTS_FONTAWESOME_DIR = "/usr/share/fonts/fontawesome"
     USR_SHARE_IPA_DIR = "/usr/share/ipa/"
@@ -467,6 +463,7 @@ class BasePathNamespace:
         "/var/lib/gssproxy/ipa_ccache_sweeper.sock"
     )
     PAM_CONFIG = None
+    PASSKEY_CHILD = '/usr/libexec/sssd/passkey_child'
 
     def check_paths(self):
         """Check paths for missing files

@@ -8,7 +8,8 @@ Tests to verify that the ipa-healthcheck scenarios
 from __future__ import absolute_import
 
 from configparser import RawConfigParser, NoOptionError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+UTC = timezone.utc
 import json
 import os
 import re
@@ -1547,7 +1548,7 @@ class TestIpaHealthCheck(IntegrationTest):
         tasks.uninstall_replica(self.master, self.replicas[0])
 
         # Store the current date to restore at the end of the test
-        now = datetime.utcnow()
+        now = datetime.now(tz=UTC)
         now_str = datetime.strftime(now, "%Y-%m-%d %H:%M:%S Z")
 
         # Pick a cert to find the upcoming expiration
@@ -2910,6 +2911,11 @@ class TestIpaHealthCheckWithExternalCA(IntegrationTest):
         error_reason = (
             "RA agent description does not match"
         )
+        ldap = self.master.ldap_connect()
+        dn = DN(("uid", "ipara"), ("ou", "People"), ("o", "ipaca"))
+        entry = ldap.get_entry(dn)
+        ldap_cert_desc = entry.single_value.get("description")
+
         update_ra_cert_desc(
             '2;16;CN=Certificate Authority,O=%s;CN=IPA RA,O=%s' %
             (self.master.domain.realm, self.master.domain.realm)
@@ -2923,9 +2929,7 @@ class TestIpaHealthCheckWithExternalCA(IntegrationTest):
         for check in data:
             assert check["result"] == "ERROR"
             assert (
-                check["kw"]["expected"] == "2;6;"
-                "CN=Certificate Authority,O=%s;CN=IPA RA,"
-                "O=%s" % (self.master.domain.realm, self.master.domain.realm)
+                check["kw"]["expected"] == ldap_cert_desc
             )
             assert (
                 check["kw"]["got"] == "2;16;"

@@ -182,17 +182,21 @@ IPA API Commands
    hbactest.md
    host_add.md
    host_add_cert.md
+   host_add_delegation.md
    host_add_managedby.md
    host_add_principal.md
+   host_allow_add_delegation.md
    host_allow_create_keytab.md
    host_allow_retrieve_keytab.md
    host_del.md
    host_disable.md
+   host_disallow_add_delegation.md
    host_disallow_create_keytab.md
    host_disallow_retrieve_keytab.md
    host_find.md
    host_mod.md
    host_remove_cert.md
+   host_remove_delegation.md
    host_remove_managedby.md
    host_remove_principal.md
    host_show.md
@@ -267,6 +271,8 @@ IPA API Commands
    output_show.md
    param_find.md
    param_show.md
+   passkeyconfig_mod.md
+   passkeyconfig_show.md
    passwd.md
    permission_add.md
    permission_add_member.md
@@ -336,18 +342,22 @@ IPA API Commands
    server_state.md
    service_add.md
    service_add_cert.md
+   service_add_delegation.md
    service_add_host.md
    service_add_principal.md
    service_add_smb.md
+   service_allow_add_delegation.md
    service_allow_create_keytab.md
    service_allow_retrieve_keytab.md
    service_del.md
    service_disable.md
+   service_disallow_add_delegation.md
    service_disallow_create_keytab.md
    service_disallow_retrieve_keytab.md
    service_find.md
    service_mod.md
    service_remove_cert.md
+   service_remove_delegation.md
    service_remove_host.md
    service_remove_principal.md
    service_show.md
@@ -372,6 +382,7 @@ IPA API Commands
    stageuser_add_cert.md
    stageuser_add_certmapdata.md
    stageuser_add_manager.md
+   stageuser_add_passkey.md
    stageuser_add_principal.md
    stageuser_del.md
    stageuser_find.md
@@ -379,6 +390,7 @@ IPA API Commands
    stageuser_remove_cert.md
    stageuser_remove_certmapdata.md
    stageuser_remove_manager.md
+   stageuser_remove_passkey.md
    stageuser_remove_principal.md
    stageuser_show.md
    subid_add.md
@@ -456,6 +468,7 @@ IPA API Commands
    user_add_cert.md
    user_add_certmapdata.md
    user_add_manager.md
+   user_add_passkey.md
    user_add_principal.md
    user_del.md
    user_disable.md
@@ -465,6 +478,7 @@ IPA API Commands
    user_remove_cert.md
    user_remove_certmapdata.md
    user_remove_manager.md
+   user_remove_passkey.md
    user_remove_principal.md
    user_show.md
    user_stage.md

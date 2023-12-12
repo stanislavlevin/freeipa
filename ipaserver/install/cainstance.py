@@ -30,7 +30,6 @@ import dbus
 import os
 import re
 import shutil
-import ssl
 import sys
 import syslog
 import time
@@ -87,12 +86,12 @@ ACME_CONFIG_FILES = (
 
 
 def check_ports():
-    """Check that dogtag ports (8090, 8443) are available.
+    """Check that dogtag ports (8080, 8443) are available.
 
     Returns True when ports are free, False if they are taken.
     """
     return all([ipautil.check_port_bindable(8443),
-                ipautil.check_port_bindable(8090)])
+                ipautil.check_port_bindable(8080)])
 
 
 def get_preop_pin(instance_root, instance_name):
@@ -345,7 +344,8 @@ class CAInstance(DogtagInstance):
                            ca_type=None, external_ca_profile=None,
                            ra_p12=None, ra_only=False,
                            promote=False, use_ldaps=False,
-                           pki_config_override=None):
+                           pki_config_override=None,
+                           random_serial_numbers=False):
         """Create a CA instance.
 
            To create a clone, pass in pkcs12_info.
@@ -385,6 +385,7 @@ class CAInstance(DogtagInstance):
         else:
             self.ca_type = x509.ExternalCAType.GENERIC.value
         self.external_ca_profile = external_ca_profile
+        self.random_serial_numbers = random_serial_numbers
 
         self.no_db_setup = promote
         self.use_ldaps = use_ldaps
@@ -481,6 +482,9 @@ class CAInstance(DogtagInstance):
                               migrate_profiles_to_ldap)
                     self.step("adding default CA ACL", ensure_default_caacl)
                     self.step("adding 'ipa' CA entry", ensure_ipa_authority_entry)
+                    if not self.clone:
+                        self.step("Recording random serial number state",
+                                  self.__store_random_serial_number_state)
                 else:
                     # Re-import profiles in the promote case to pick up any
                     # that will only be triggered by an upgrade.
@@ -520,6 +524,14 @@ class CAInstance(DogtagInstance):
         if self.ca_signing_algorithm is not None:
             cfg['ipa_ca_signing_algorithm'] = self.ca_signing_algorithm
 
+        cfg['pki_random_serial_numbers_enable'] = self.random_serial_numbers
+        if self.random_serial_numbers:
+            cfg['pki_request_id_generator'] = 'random'
+            cfg['pki_cert_id_generator'] = 'random'
+        else:
+            cfg['pki_request_id_generator'] = 'legacy'
+            cfg['pki_cert_id_generator'] = 'legacy'
+
         if not (os.path.isdir(paths.PKI_TOMCAT_ALIAS_DIR) and
                 os.path.isfile(paths.PKI_TOMCAT_PASSWORD_CONF)):
             # generate pin which we know can be used for FIPS NSS database
@@ -556,6 +568,19 @@ class CAInstance(DogtagInstance):
             ipautil.remove_file(paths.TMP_CA_P12)
             shutil.copy(cafile, paths.TMP_CA_P12)
             self.service_user.chown(paths.TMP_CA_P12)
+
+            if self.random_serial_numbers:
+                cfg.update(
+                    pki_random_serial_numbers_enable=True,
+                    pki_request_id_generator="random",
+                    pki_cert_id_generator="random",
+                )
+            else:
+                cfg.update(
+                    pki_random_serial_numbers_enable=False,
+                    pki_request_id_generator="legacy",
+                    pki_cert_id_generator="legacy",
+                )
 
             self._configure_clone(
                 cfg,
@@ -878,7 +903,7 @@ class CAInstance(DogtagInstance):
 
         agent_args = [paths.CERTMONGER_DOGTAG_SUBMIT,
                       "--cafile", chain_file.name,
-                      "--ee-url", 'http://%s:8090/ca/ee/ca/' % self.fqdn,
+                      "--ee-url", 'http://%s:8080/ca/ee/ca/' % self.fqdn,
                       "--agent-url",
                       'https://%s:8443/ca/agent/ca/' % self.fqdn,
                       "--certfile", agent_cert.name,
@@ -1551,6 +1576,24 @@ class CAInstance(DogtagInstance):
         ipautil.run(['pki-server', 'acme-deploy'])
 
         return True
+
+    def __store_random_serial_number_state(self):
+        """
+        Save the Random Serial Number (RSN) version.
+
+        This is intended to add flexibility in case RSN bumps
+        another version in dogtag. For now we only support v3
+        or no randomization (0).
+        """
+        if self.random_serial_numbers:
+            value = 3
+        else:
+            value = 0
+        dn = DN(('cn', ipalib.constants.IPA_CA_CN), api.env.container_ca,
+                api.env.basedn)
+        entry_attrs = api.Backend.ldap2.get_entry(dn)
+        entry_attrs['ipaCaRandomSerialNumberVersion'] = value
+        api.Backend.ldap2.update_entry(entry_attrs)
 
 
 def __update_entry_from_cert(make_filter, make_entry, cert):
@@ -2334,7 +2377,7 @@ def check_ipa_ca_san(cert):
 
     try:
         cert.match_hostname(expect)
-    except ssl.CertificateError:
+    except x509.ssl_match_hostname.CertificateError:
         raise errors.ValidationError(
             name='certificate',
             error='Does not have a \'{}\' SAN'.format(expect)

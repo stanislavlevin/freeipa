@@ -34,7 +34,7 @@ import warnings
 from configparser import RawConfigParser
 from urllib.parse import urlparse, urlunparse
 
-from ipalib import api, errors, x509, createntp
+from ipalib import api, errors, x509
 from ipalib import sysrestore
 from ipalib.constants import FQDN, IPAAPI_USER, MAXHOSTNAMELEN
 from ipalib.install import certmonger, certstore, service
@@ -53,15 +53,7 @@ from ipaplatform import services
 from ipaplatform.constants import constants
 from ipaplatform.paths import paths
 from ipaplatform.tasks import tasks
-from ipapython import (
-    certdb,
-    kernel_keyring,
-    ntpmethods,
-    ipaldap,
-    ipautil,
-    dnsutil,
-)
-from ipapython.ntpmethods import TIME_SERVER
+from ipapython import certdb, kernel_keyring, ipaldap, ipautil, dnsutil
 from ipapython.admintool import ScriptError
 from ipapython.dn import DN
 from ipapython.install import typing
@@ -75,8 +67,9 @@ from ipapython.ipautil import (
 )
 from ipapython.ssh import SSHPublicKey
 from ipapython import version
+from ipapython.errors import SetseboolError
 
-from . import automount, sssd
+from . import automount, timeconf, sssd
 from ipaclient import discovery
 from ipapython.ipachangeconf import IPAChangeConf
 
@@ -106,6 +99,7 @@ cli_realm = None
 cli_kdc = None
 client_domain = None
 cli_basedn = None
+selinux_works = None
 # end of global variables
 
 
@@ -976,6 +970,9 @@ def configure_sssd_conf(
 
         nss_service.set_option('memcache_timeout', 600)
         sssdconfig.save_service(nss_service)
+
+    sssd_enable_service(sssdconfig, 'nss')
+    sssd_enable_service(sssdconfig, 'pam')
 
     domain.set_option('ipa_domain', cli_domain)
     domain.set_option('ipa_hostname', client_hostname)
@@ -2158,6 +2155,7 @@ def install_check(options):
     global cli_kdc
     global client_domain
     global cli_basedn
+    global selinux_works
 
     print("This program will set up IPA client.")
     print("Version {}".format(version.VERSION))
@@ -2171,7 +2169,7 @@ def install_check(options):
             "You must be root to run ipa-client-install.",
             rval=CLIENT_INSTALL_ERROR)
 
-    tasks.check_selinux_status()
+    selinux_works = tasks.check_selinux_status()
 
     if is_ipa_client_configured(on_master=options.on_master):
         logger.error("IPA client is already configured on this system.")
@@ -2180,31 +2178,20 @@ def install_check(options):
             "using 'ipa-client-install --uninstall'.")
         raise ScriptError(rval=CLIENT_ALREADY_CONFIGURED)
 
-    if TIME_SERVER is None and options.conf_ntp:
-        raise ScriptError(
-            "NTP client/server was not found in your system. "
-            "Please, install one of supported NTP client/server ({}) "
-            "and try again or use --no-ntp flag.".format(
-                ", ".join(
-                    [
-                        ntp["package_name"]
-                        for ntp in constants.TIME_SERVER_STRUCTURE.values()
-                    ]
-                )
-            )
-        )
-
     check_ldap_conf()
 
     if options.conf_ntp:
         try:
-            ntpmethods.check_timedate_services()
-        except ntpmethods.NTPConflictingService as e:
-            print("WARNING: conflicting time&date synchronization service '{}'"
-                  " will be disabled".format(e.conflicting_service))
-            print("in favor of {}".format(TIME_SERVER))
-            print("")
-        except ntpmethods.NTPConfigurationError:
+            timeconf.check_timedate_services()
+        except timeconf.NTPConflictingService as e:
+            print(
+                "WARNING: conflicting time&date synchronization service "
+                "'{}' will be disabled in favor of chronyd\n".format(
+                    e.conflicting_service
+                )
+            )
+
+        except timeconf.NTPConfigurationError:
             pass
 
     if options.unattended and (
@@ -2521,8 +2508,7 @@ def install_check(options):
     if options.conf_ntp:
         if not options.on_master and not options.unattended and not (
                 options.ntp_servers or options.ntp_pool):
-            options.ntp_servers, options.ntp_pool = \
-                ntpmethods.get_time_source(logger)
+            options.ntp_servers, options.ntp_pool = timeconf.get_time_source()
 
     cli_realm = ds.realm
     cli_realm_source = ds.realm_source
@@ -2624,6 +2610,87 @@ def update_ipa_nssdb():
                                    (nickname, sys_db.secdir, e))
 
 
+def sync_time(ntp_servers, ntp_pool, fstore, statestore):
+    """
+    Will disable any other time synchronization service and configure chrony
+    with given ntp(chrony) server and/or pool using Augeas.
+    If there is no option --ntp-server set IPADiscovery will try to find ntp
+    server in DNS records.
+    """
+    # We assume that NTP servers are discoverable through SRV records in DNS.
+
+    # disable other time&date services first
+    timeconf.force_chrony(statestore)
+
+    if not ntp_servers and not ntp_pool:
+        # autodiscovery happens in case that NTP configuration isn't explicitly
+        # disabled and user did not provide any NTP server addresses or
+        # NTP pool address to the installer interactively or as an cli argument
+        ds = discovery.IPADiscovery()
+        ntp_servers = ds.ipadns_search_srv(
+            cli_domain, '_ntp._udp', None, break_on_first=False
+        )
+        if ntp_servers:
+            for server in ntp_servers:
+                # when autodiscovery found server records
+                logger.debug("Found DNS record for NTP server: \t%s", server)
+
+    logger.info('Synchronizing time')
+
+    configured = False
+    if ntp_servers or ntp_pool:
+        configured = timeconf.configure_chrony(ntp_servers, ntp_pool,
+                                               fstore, statestore)
+    else:
+        logger.warning("No SRV records of NTP servers found and no NTP server "
+                       "or pool address was provided.")
+
+    if not configured:
+        print("Using default chrony configuration.")
+
+    return timeconf.sync_chrony()
+
+
+def restore_time_sync(statestore, fstore):
+    if statestore.has_state('chrony'):
+        chrony_enabled = statestore.restore_state('chrony', 'enabled')
+        restored = False
+
+        try:
+            # Restore might fail due to missing file(s) in backup.
+            # One example is if the client was updated from a previous version
+            # not configured with chrony. In such a cast it is OK to fail.
+            restored = fstore.restore_file(paths.CHRONY_CONF)
+        except ValueError:  # this will not handle possivble IOError
+            logger.debug("Configuration file %s was not restored.",
+                         paths.CHRONY_CONF)
+
+        if not chrony_enabled:
+            services.knownservices.chronyd.stop()
+            services.knownservices.chronyd.disable()
+        elif restored:
+            services.knownservices.chronyd.restart()
+
+    try:
+        timeconf.restore_forced_timeservices(statestore)
+    except CalledProcessError as e:
+        logger.error('Failed to restore time synchronization service: %s', e)
+
+
+def configure_selinux_for_client(statestore):
+    def backup_state(key, value):
+        statestore.backup_state('selinux', key, value)
+
+    try:
+        tasks.set_selinux_booleans(constants.SELINUX_BOOLEAN_SSSD,
+                                   backup_state)
+    except SetseboolError as e:
+        for c in constants.SELINUX_BOOLEAN_SSSD:
+            if c in e.failed:
+                logger.warning(
+                    "SELinux does not support SSSD boolean %s, ignoring", c)
+
+
 def install(options):
     try:
         _install(options, dict())
@@ -2676,24 +2743,15 @@ def _install(options, tdict):
         tasks.set_hostname(options.hostname)
 
     if options.conf_ntp:
-        # Attempt to configure and sync time with NTP server.
-        if not createntp.sync_time_client(
-                fstore, statestore, cli_domain,
-                options.ntp_servers, options.ntp_pool):
-            print("Warning: IPA client was unable to sync time "
-                  "with IPA server!")
-            print("         Time synchronization is required for IPA "
-                  "to work correctly!")
-        else:
-            print("Time successfully synchronized with IPA server")
+        # Attempt to configure and sync time with NTP server (chrony).
+        sync_time(options.ntp_servers, options.ntp_pool, fstore, statestore)
     elif options.on_master:
         # If we're on master skipping the time sync here because it was done
         # in ipa-server-install
         logger.debug("Skipping attempt to configure and synchronize time with"
-                     " %s server as it has been already done on master.",
-                     TIME_SERVER)
+                     " chrony server as it has been already done on master.")
     else:
-        logger.info("Skipping time synchronization")
+        logger.info("Skipping chrony configuration")
 
     if not options.unattended:
         if (options.principal is None and options.password is None and
@@ -3135,7 +3193,6 @@ def _install(options, tdict):
         tasks.modify_nsswitch_pam_stack(
             sssd=options.sssd,
             mkhomedir=options.mkhomedir,
-            fstore=fstore,
             statestore=statestore,
             sudo=options.conf_sudo,
             subid=options.subid
@@ -3158,6 +3215,9 @@ def _install(options, tdict):
         logger.info("%s enabled", "SSSD" if options.sssd else "LDAP")
 
         if options.sssd:
+            if selinux_works:
+                configure_selinux_for_client(statestore)
+
             sssd = services.service('sssd', api)
             try:
                 sssd.restart()
@@ -3282,6 +3342,8 @@ def _install(options, tdict):
 
 
 def uninstall_check(options):
+    global selinux_works
+
     if not is_ipa_client_configured():
         if options.on_master:
             rval = SUCCESS
@@ -3297,6 +3359,8 @@ def uninstall_check(options):
         logger.info("Refer to ipa-server-install for uninstallation.")
         raise ScriptError(rval=CLIENT_NOT_CONFIGURED)
 
+    selinux_works = tasks.check_selinux_status()
+
 
 def uninstall(options):
     env = {'PATH': SECURE_PATH}
@@ -3304,13 +3368,12 @@ def uninstall(options):
     fstore = sysrestore.FileStore(paths.IPA_CLIENT_SYSRESTORE)
     statestore = sysrestore.StateFile(paths.IPA_CLIENT_SYSRESTORE)
 
-    if os.path.isfile(paths.IPA_CLIENT_AUTOMOUNT):
-        try:
-            run([paths.IPA_CLIENT_AUTOMOUNT, "--uninstall", "--debug"])
-        except CalledProcessError as e:
-            if e.returncode != CLIENT_NOT_CONFIGURED:
-                logger.error(
-                    "Unconfigured automount client failed: %s", str(e))
+    try:
+        run([paths.IPA_CLIENT_AUTOMOUNT, "--uninstall", "--debug"])
+    except CalledProcessError as e:
+        if e.returncode != CLIENT_NOT_CONFIGURED:
+            logger.error(
+                "Unconfigured automount client failed: %s", str(e))
 
     # Reload the state as automount unconfigure may have modified it
     fstore._load()
@@ -3561,6 +3624,15 @@ def uninstall(options):
                 "Failed to disable automatic startup of the SSSD daemon: %s",
                 e)
 
+    if statestore.has_state('selinux'):
+        # Restore SELinux boolean states
+        boolean_states = {name: statestore.restore_state('selinux', name)
+                          for name in constants.SELINUX_BOOLEAN_SSSD}
+        try:
+            tasks.set_selinux_booleans(boolean_states)
+        except SetseboolError as e:
+            logger.warning("Unable to reset SELinux variable: %s", str(e))
+
     tasks.restore_hostname(fstore, statestore)
 
     if fstore.has_files():
@@ -3582,10 +3654,7 @@ def uninstall(options):
                 service.service_name
             )
 
-    createntp.uninstall_client(fstore, statestore)
-    # restore ntp state
-    if TIME_SERVER is not None:
-        restore_state(ntpmethods.SERVICE_API, statestore)
+    restore_time_sync(statestore, fstore)
 
     if was_sshd_configured and services.knownservices.sshd.is_running():
         remove_file(paths.SSHD_IPA_CONFIG)

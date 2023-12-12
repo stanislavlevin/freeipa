@@ -79,7 +79,7 @@ class DebianPathNamespace(BasePathNamespace):
     UPDATE_CA_TRUST = "/usr/sbin/update-ca-certificates"
     BIND_LDAP_DNS_IPA_WORKDIR = "/var/cache/bind/dyndb-ldap/ipa/"
     BIND_LDAP_DNS_ZONE_WORKDIR = "/var/cache/bind/dyndb-ldap/ipa/master/"
-    BIND_LDAP_SO = "ldap.so"
+    BIND_LDAP_SO = "/usr/lib/{0}/bind/ldap.so".format(MULTIARCH)
     LIBARCH = "/{0}".format(MULTIARCH)
     LIBSOFTHSM2_SO = "/usr/lib/{0}/softhsm/libsofthsm2.so".format(MULTIARCH)
     PAM_KRB5_SO = "/usr/lib/{0}/security/pam_krb5.so".format(MULTIARCH)
@@ -99,6 +99,7 @@ class DebianPathNamespace(BasePathNamespace):
     IPA_HTTPD_PASSWD_READER = "/usr/lib/ipa/ipa-httpd-pwdreader"
     IPA_PKI_WAIT_RUNNING = "/usr/lib/ipa/ipa-pki-wait-running"
     HTTPD = "/usr/sbin/apache2ctl"
+    FONTS_DIR = "/usr/share/fonts/truetype"
     FONTS_OPENSANS_DIR = "/usr/share/fonts/truetype/open-sans"
     FONTS_FONTAWESOME_DIR = "/usr/share/fonts/truetype/font-awesome"
     VAR_KERBEROS_KRB5KDC_DIR = "/var/lib/krb5kdc/"

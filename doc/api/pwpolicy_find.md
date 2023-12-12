@@ -22,6 +22,14 @@ Search for group password policies.
 * krbpwdmaxfailure : :ref:`Int<Int>`
 * krbpwdfailurecountinterval : :ref:`Int<Int>`
 * krbpwdlockoutduration : :ref:`Int<Int>`
+* ipapwdmaxrepeat : :ref:`Int<Int>`
+ * Default: 0
+* ipapwdmaxsequence : :ref:`Int<Int>`
+ * Default: 0
+* ipapwddictcheck : :ref:`Bool<Bool>`
+ * Default: False
+* ipapwdusercheck : :ref:`Bool<Bool>`
+ * Default: False
 * passwordgracelimit : :ref:`Int<Int>`
  * Default: -1
 * timelimit : :ref:`Int<Int>`

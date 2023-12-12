@@ -740,7 +740,7 @@ class _CrossProcessLock:
         self._do(self._release, owner)
 
     def _acquire(self, owner):
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
 
         if self._locked and now >= self._expire:
             self._locked = False
@@ -799,7 +799,8 @@ class _CrossProcessLock:
                 expire = p.get('lock', 'expire')
                 try:
                     self._expire = datetime.datetime.strptime(
-                        expire, self._DATETIME_FORMAT)
+                        expire, self._DATETIME_FORMAT).replace(
+                        tzinfo=datetime.timezone.utc)
                 except ValueError:
                     raise configparser.Error
         except configparser.Error:

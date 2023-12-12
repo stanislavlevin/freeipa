@@ -36,7 +36,6 @@ import binascii
 import datetime
 import enum
 import ipaddress
-import ssl
 import base64
 import re
 
@@ -52,6 +51,11 @@ from pyasn1.type import univ, char, namedtype, tag
 from pyasn1.codec.der import decoder, encoder
 from pyasn1_modules import rfc2315, rfc2459
 import six
+
+try:
+    from urllib3.util import ssl_match_hostname
+except ImportError:
+    from urllib3.packages import ssl_match_hostname
 
 from ipalib import errors
 from ipapython.dnsutil import DNSName
@@ -262,11 +266,13 @@ class IPACertificate(crypto_x509.Certificate):
 
     @property
     def not_valid_before(self):
-        return self._cert.not_valid_before
+        return datetime.datetime.fromtimestamp(
+            self._cert.not_valid_before.timestamp(), tz=datetime.timezone.utc)
 
     @property
     def not_valid_after(self):
-        return self._cert.not_valid_after
+        return datetime.datetime.fromtimestamp(
+            self._cert.not_valid_after.timestamp(), tz=datetime.timezone.utc)
 
     @property
     def tbs_certificate_bytes(self):
@@ -385,6 +391,7 @@ class IPACertificate(crypto_x509.Certificate):
         return result
 
     def match_hostname(self, hostname):
+        # The caller is expected to catch any exceptions
         match_cert = {}
 
         match_cert['subject'] = match_subject = []
@@ -401,8 +408,7 @@ class IPACertificate(crypto_x509.Certificate):
             for value in values:
                 match_san.append(('DNS', value))
 
-        # deprecated in Python3.7 without replacement
-        ssl.match_hostname(  # pylint: disable=deprecated-method
+        ssl_match_hostname.match_hostname(
             match_cert, DNSName(hostname).ToASCII()
         )
 

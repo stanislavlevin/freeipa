@@ -46,7 +46,6 @@ ${NAMED_ZONE_COMMENT}	type hint;
 ${NAMED_ZONE_COMMENT}	file "named.ca";
 ${NAMED_ZONE_COMMENT}};
 
-${NAMED_RNDC_CONF_COMMENT}include "$NAMED_RNDC_CONF";
 include "$RFC1912_ZONES";
 include "$ROOT_KEY";
 
@@ -58,6 +57,6 @@ dyndb "ipa" "$BIND_LDAP_SO" {
 	base "cn=dns,$SUFFIX";
 	server_id "$FQDN";
 	auth_method "sasl";
-	sasl_mech "GSSAPI";
-	sasl_user "DNS/$FQDN";
+	sasl_mech "EXTERNAL";
+	krb5_keytab "FILE:$NAMED_KEYTAB";
 };

@@ -20,8 +20,8 @@
 #  ->  "1.0.0"                                         #
 ########################################################
 define(IPA_VERSION_MAJOR, 4)
-define(IPA_VERSION_MINOR, 9)
-define(IPA_VERSION_RELEASE, 12)
+define(IPA_VERSION_MINOR, 11)
+define(IPA_VERSION_RELEASE, 0)
 
 ########################################################
 # For 'pre' releases the version will be               #
@@ -34,7 +34,7 @@ define(IPA_VERSION_RELEASE, 12)
 # e.g. define(IPA_VERSION_PRE_RELEASE, rc1)            #
 #  ->  "1.0.0rc1"                                      #
 ########################################################
-define(IPA_VERSION_PRE_RELEASE,)
+define(IPA_VERSION_PRE_RELEASE, )
 
 ########################################################
 # To mark GIT snapshots this should be set to 'yes'    #
@@ -58,8 +58,8 @@ define(IPA_VERSION_IS_GIT_SNAPSHOT, no)
 # - ipa-X-X: define(IPA_GIT_BRANCH,                    #
 #       ipa-IPA_VERSION_MAJOR-IPA_VERSION_MINOR)       #
 ########################################################
-dnl define(IPA_GIT_BRANCH, master)
-define(IPA_GIT_BRANCH, ipa-IPA_VERSION_MAJOR-IPA_VERSION_MINOR)
+define(IPA_GIT_BRANCH, master)
+dnl define(IPA_GIT_BRANCH, ipa-IPA_VERSION_MAJOR-IPA_VERSION_MINOR)
 
 ########################################################
 # The version of IPA data. This is used to identify    #
@@ -86,8 +86,8 @@ define(IPA_DATA_VERSION, 20100614120000)
 #                                                      #
 ########################################################
 define(IPA_API_VERSION_MAJOR, 2)
-# Last change: fix vault interoperability issues.
-define(IPA_API_VERSION_MINOR, 251)
+# Last change: add passkey support
+define(IPA_API_VERSION_MINOR, 253)
 
 ########################################################
 # Following values are auto-generated from values above
@@ -137,6 +137,11 @@ ifelse(IPA_VERSION_IS_GIT_SNAPSHOT, yes,
 IPA_GIT_VERSION),
 NEWLINE)) dnl IPA_VERSION end
 
+########################################################
+# Version of MIT krb5 used to build IPA
+########################################################
+define(IPA_KRB5_BUILD_VERSION, translit(esyscmd(krb5-config --version | awk '{ print $NF }'), NEWLINE))
+
 dnl DEBUG: uncomment following lines and run command m4 VERSION.m4
 dnl `IPA_VERSION: ''IPA_VERSION'
 dnl `IPA_GIT_VERSION: ''IPA_GIT_VERSION'
@@ -144,3 +149,4 @@ dnl `IPA_GIT_BRANCH: ''IPA_GIT_BRANCH'
 dnl `IPA_API_VERSION: ''IPA_API_VERSION'
 dnl `IPA_DATA_VERSION: ''IPA_DATA_VERSION'
 dnl `IPA_NUM_VERSION: ''IPA_NUM_VERSION'
+dnl `IPA_KRB5_BUILD_VERSION: ''IPA_KRB5_BUILD_VERSION'

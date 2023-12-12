@@ -34,7 +34,6 @@ from ipalib import _
 from ipalib.plugable import Registry
 from ipalib.request import context
 from ipapython.dn import DN
-from ipaplatform.constants import constants as platformconstants
 
 import six
 
@@ -370,19 +369,6 @@ class pwpolicy(LDAPObject):
             minvalue=0,
         ),
         Int(
-            'passwordgracelimit?',
-            cli_name='gracelimit',
-            label=_('Grace login limit'),
-            doc=_('Number of LDAP authentications allowed after expiration'),
-            minvalue=-1,
-            maxvalue=Int.MAXINT,
-            default=-1,
-            autofill=True,
-        ),
-    )
-
-    pwquality_lib_params = (
-        Int(
             'ipapwdmaxrepeat?',
             cli_name='maxrepeat',
             label=_('Max repeat'),
@@ -414,10 +400,17 @@ class pwpolicy(LDAPObject):
             doc=_('Check if the password contains the username'),
             default=False,
         ),
+        Int(
+            'passwordgracelimit?',
+            cli_name='gracelimit',
+            label=_('Grace login limit'),
+            doc=_('Number of LDAP authentications allowed after expiration'),
+            minvalue=-1,
+            maxvalue=Int.MAXINT,
+            default=-1,
+            autofill=True,
+        ),
     )
-
-    if platformconstants.PASSWORD_QUALITY_LIB is not None:
-        takes_params += pwquality_lib_params
 
     def get_dn(self, *keys, **options):
         if keys[-1] is not None:

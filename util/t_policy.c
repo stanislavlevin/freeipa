@@ -49,7 +49,6 @@ int main(int argc, const char *argv[]) {
     /* Check that with no policy the IPA minimum is in force */
     assert(ipapwd_check_policy(&policy, "abc", NULL, 3, 0, 0, 0, NULL) == IPAPWD_POLICY_OK);
 
-#if defined(USE_PWQUALITY)
     /* Max repeats of 1 */
     set_policy(&policy, 0, 0, 1, 0, 0, 0, 0);
     assert(ipapwd_check_policy(&policy, "password", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_PWD_CONSECUTIVE);
@@ -90,7 +89,6 @@ int main(int argc, const char *argv[]) {
     assert(ipapwd_check_policy(&policy, "userPDQ123", "user", 0, 0, 0, 0, NULL) == IPAPWD_POLICY_OK);
     set_policy(&policy, 0, 0, 0, 0, 0, 0, 1);
     assert(ipapwd_check_policy(&policy, "userPDQ123", "user", 0, 0, 0, 0, NULL) == IPAPWD_POLICY_PWD_USER);
-#endif /* USE_PWQUALITY */
 
     return 0;
 }

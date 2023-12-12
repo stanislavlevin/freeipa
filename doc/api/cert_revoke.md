@@ -5,7 +5,7 @@ Revoke a certificate.
 ### Arguments
 |Name|Type|Required
 |-|-|-
-|serial_number|:ref:`Int<Int>`|True
+|serial_number|:ref:`SerialNumber<SerialNumber>`|True
 
 ### Options
 * revocation_reason : :ref:`Int<Int>` **(Required)**

@@ -13,6 +13,7 @@ import random
 import shlex
 import ssl
 from itertools import chain, repeat
+import sys
 import textwrap
 import time
 import pytest
@@ -722,9 +723,13 @@ class TestIPACommand(IntegrationTest):
 
     def test_certificate_out_write_to_file(self):
         # commands to test; name of temporary file will be appended
+        result = self.master.run_command([
+            'openssl', 'x509', '-serial', '-noout', '-in', paths.IPA_CA_CRT
+        ])
+        serial = result.stdout_text.strip().split('=', maxsplit=1)[1]
         commands = [
-            ['ipa', 'cert-show', '1', '--certificate-out'],
-            ['ipa', 'cert-show', '1', '--chain', '--certificate-out'],
+            ['ipa', 'cert-show', serial, '--certificate-out'],
+            ['ipa', 'cert-show', serial, '--chain', '--certificate-out'],
             ['ipa', 'ca-show', 'ipa', '--certificate-out'],
             ['ipa', 'ca-show', 'ipa', '--chain', '--certificate-out'],
         ]
@@ -1472,6 +1477,29 @@ class TestIPACommand(IntegrationTest):
             assert 'This account is currently not available' in \
                 result.stdout_text
 
+    def test_ipa_cacert_manage_prune(self):
+        """Test for ipa-cacert-manage prune"""
+
+        certfile = os.path.join(self.master.config.test_dir, 'cert.pem')
+        self.master.put_file_contents(certfile, isrgrootx1)
+        result = self.master.run_command(
+            [paths.IPA_CACERT_MANAGE, 'install', certfile])
+
+        certs_before_prune = self.master.run_command(
+            [paths.IPA_CACERT_MANAGE, 'list'], raiseonerr=False
+        ).stdout_text
+
+        assert isrgrootx1_nick in certs_before_prune
+
+        # Jump in time to make sure the cert is expired
+        self.master.run_command(['date', '-s', '+15Years'])
+        result = self.master.run_command(
+            [paths.IPA_CACERT_MANAGE, 'prune'], raiseonerr=False
+        ).stdout_text
+        self.master.run_command(['date', '-s', '-15Years'])
+
+        assert isrgrootx1_nick in result
+
     def test_ipa_getkeytab_server(self):
         """
         Exercise the ipa-getkeytab server options
@@ -1529,6 +1557,34 @@ class TestIPACommand(IntegrationTest):
             ], raiseonerr=False).stderr_text
 
         assert 'Discovered server %s' % self.master.hostname in result
+
+    def test_ipa_context_manager(self):
+        """Exercise ipalib.api context manager and KRB5_CLIENT_KTNAME auth
+
+        The example_cli.py script uses the context manager to connect and
+        disconnect the global ipalib.api object. The test also checks whether
+        KRB5_CLIENT_KTNAME env var automatically acquires a TGT.
+        """
+        host = self.clients[0]
+        tasks.kdestroy_all(host)
+
+        here = os.path.abspath(os.path.dirname(__file__))
+        with open(os.path.join(here, "example_cli.py")) as f:
+            contents = f.read()
+
+        # upload script and run with Python executable
+        script = "/tmp/example_cli.py"
+        host.put_file_contents(script, contents)
+        result = host.run_command([sys.executable, script])
+
+        # script prints admin account
+        admin_princ = f"admin@{host.domain.realm}"
+        assert admin_princ in result.stdout_text
+
+        # verify that auto-login did use correct principal
+        host_princ = f"host/{host.hostname}@{host.domain.realm}"
+        result = host.run_command([paths.KLIST])
+        assert host_princ in result.stdout_text
 
 
 class TestIPACommandWithoutReplica(IntegrationTest):

@@ -50,8 +50,7 @@ INV_FIRSTNAME = ("invalid 'first': Leading and trailing spaces are "
 FIELD_REQ = 'Required field'
 ERR_INCLUDE = 'may only include letters, numbers, _, -, . and $'
 ERR_MISMATCH = 'Passwords must match'
-ERR_ADMIN_DEL = ('admin cannot be deleted or disabled because it is the last '
-                 'member of group admins')
+ERR_ADMIN_DEL = ('user admin cannot be deleted/modified: privileged user')
 USR_EXIST = 'user with name "{}" already exists'
 ENTRY_EXIST = 'This entry already exists'
 ACTIVE_ERR = 'active user with name "{}" already exists'
@@ -92,7 +91,8 @@ class user_tasks(UI_driver):
     def assert_user_auth_type(self, auth_type, enabled=True):
         """
         Check if provided auth type is enabled or disabled for the user
-        :param auth_type: one of password, radius, otp, pkinit, hardened or idp
+        :param auth_type: one of password, radius, otp, pkinit, hardened, idp
+        or passkey
         :param enabled: check if enabled if True, check for disabled if False
         """
         s_checkbox = 'div[name="ipauserauthtype"] input[value="{}"]'.format(
@@ -103,7 +103,8 @@ class user_tasks(UI_driver):
     def add_user_auth_type(self, auth_type, save=False):
         """
         Select user auth type
-        :param auth_type: one of password, radius, otp, pkinit, hardened or idp
+        :param auth_type: one of password, radius, otp, pkinit, hardened, idp
+        or passkey
         """
         s_checkbox = 'div[name="ipauserauthtype"] input[value="{}"]'.format(
             auth_type)

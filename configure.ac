@@ -130,35 +130,11 @@ PKG_CHECK_MODULES([CRYPTO], [libcrypto])
 dnl ---------------------------------------------------------------------------
 dnl - Check for pwquality library
 dnl ---------------------------------------------------------------------------
-AM_COND_IF(
-	[ENABLE_SERVER],
-	[AC_ARG_WITH([password_quality_lib],
-		     [AC_HELP_STRING([--with-password-quality-lib],
-				     [Password quality library to use])],
-		     [PASSWORD_QUALITY_LIB=${withval}],
-		     [PASSWORD_QUALITY_LIB="pwquality"])],
-	[PASSWORD_QUALITY_LIB=no],
-)
-
-AC_MSG_CHECKING([supported password quality library])
-
-case "${PASSWORD_QUALITY_LIB}" in
-	pwquality )
+AM_COND_IF([ENABLE_SERVER], [
 	PKG_CHECK_MODULES([PWQUALITY], [pwquality],
-		[AC_DEFINE(
-			USE_PWQUALITY,1,
-			[Use libpwquality for password quality checks]
-		 )]
+		[AC_DEFINE(USE_PWQUALITY,1,[Use password quality checks])]
 	)
-	;;
-	no ) ;;
-	* )
-	AC_MSG_ERROR(
-		[bad value ${PASSWORD_QUALITY_LIB} for --with-password-quality-lib]
-	)
-	;;
-esac
-AM_CONDITIONAL([WITH_PASSWORD_QUALITY_LIB], [test x$PASSWORD_QUALITY_LIB != xno])
+])
 
 dnl ---------------------------------------------------------------------------
 dnl - Check for Python 3
@@ -422,12 +398,6 @@ if test "x${IPAPLATFORM}" == "xdebian"; then
     ODS_GROUP="opendnssec"
     # see https://www.debian.org/doc/packaging-manuals/python-policy/ap-packaging_tools.html
     PYTHON_INSTALL_EXTRA_OPTIONS="--install-layout=deb"
-elif test "x${IPAPLATFORM}" == "xaltlinux"; then
-    KRB5KDC_SERVICE="krb5kdc.service"
-    NAMED_GROUP="named"
-    ODS_USER="_opendnssec"
-    ODS_GROUP="_opendnssec"
-    PYTHON_INSTALL_EXTRA_OPTIONS=""
 else
     HTTPD_GROUP="apache"
     KRB5KDC_SERVICE="krb5kdc.service"
@@ -490,6 +460,7 @@ AC_SUBST(VENDOR_SUFFIX)
 AC_SUBST([VERSION], [IPA_VERSION])
 AC_SUBST([GIT_VERSION], [IPA_GIT_VERSION])
 AC_SUBST([GIT_BRANCH], [IPA_GIT_BRANCH])
+AC_SUBST([KRB5_BUILD_VERSION], [IPA_KRB5_BUILD_VERSION])
 # used by Makefile.am for files depending on templates
 AC_SUBST([CONFIG_STATUS])
 
@@ -522,7 +493,7 @@ AC_ARG_ENABLE(more-warnings,
 	[AC_HELP_STRING([--enable-more-warnings],
 	[Maximum compiler warnings])],
 	set_more_warnings="$enableval",[
-        	if test -d $srcdir/../.hg; then
+        	if test -d $srcdir/.git; then
         		set_more_warnings=yes
               	else
                   	set_more_warnings=no
@@ -536,23 +507,8 @@ if test "$GCC" = "yes" -a "$set_more_warnings" != "no"; then
         -Wchar-subscripts -Wmissing-declarations -Wmissing-prototypes \
         -Wnested-externs -Wpointer-arith \
         -Wcast-align -Wsign-compare \
+        -Wshadow -Wstrict-prototypes \
         $CFLAGS"
-
-        for option in -Wno-strict-aliasing -Wno-sign-compare; do
-                SAVE_CFLAGS="$CFLAGS"
-                CFLAGS="$CFLAGS $option"
-                AC_MSG_CHECKING([whether gcc understands $option])
-                AC_TRY_COMPILE([], [],
-                        has_option=yes,
-                        has_option=no,)
-                if test $has_option = no; then
-                        CFLAGS="$SAVE_CFLAGS"
-                fi
-                AC_MSG_RESULT($has_option)
-                unset has_option
-                unset SAVE_CFLAGS
-        done
-        unset option
 else
         AC_MSG_RESULT(no)
 fi

@@ -12,12 +12,12 @@ import os
 import glob
 import shutil
 import fileinput
-import ssl
 import stat
 import sys
 import tempfile
 from contextlib import contextmanager
 from augeas import Augeas
+from pkg_resources import parse_version
 
 from ipalib import api, x509
 from ipalib.constants import RENEWAL_CA_NAME, RA_AGENT_PROFILE, IPA_CA_RECORD
@@ -27,6 +27,7 @@ from ipalib.facts import is_ipa_configured
 import SSSDConfig
 import ipalib.util
 import ipalib.errors
+from ipaclient.install import timeconf
 from ipaclient.install.client import sssd_enable_ifp
 from ipalib.install.dnsforwarders import detect_resolve1_resolv_conf
 from ipaplatform import services
@@ -35,6 +36,7 @@ from ipapython import ipautil, version
 from ipapython import ipaldap
 from ipapython import directivesetter
 from ipapython.dn import DN
+from ipapython.version import KRB5_BUILD_VERSION
 from ipaplatform.constants import constants
 from ipaplatform.paths import paths
 from ipaserver import servroles
@@ -714,7 +716,7 @@ def http_certificate_ensure_ipa_ca_dnsname(http):
 
     try:
         cert.match_hostname(expect)
-    except ssl.CertificateError:
+    except x509.ssl_match_hostname.CertificateError:
         if certs.is_ipa_issued_cert(api, cert):
             request_id = certmonger.get_request_id(
                 {'cert-file': paths.HTTPD_CERT_FILE})
@@ -1192,45 +1194,6 @@ def add_default_caacl(ca):
     sysupgrade.set_upgrade_state('caacl', 'add_default_caacl', True)
 
 
-def setup_krb_paths(krb):
-    logger.info("[Setup KRB5 paths]")
-
-    aug = Augeas(flags=Augeas.NO_LOAD | Augeas.NO_MODL_AUTOLOAD,
-                 loadpath=paths.USR_SHARE_IPA_DIR)
-    try:
-        NEW_KRB_HOME = "/var/lib/kerberos"
-        OLD_KRB_HOME = "/var/kerberos"
-        aug.transform("IPAKrb5", paths.KRB5KDC_KDC_CONF)
-        aug.load()
-
-        path = '/files{}/realms/{}'.format(paths.KRB5KDC_KDC_CONF, krb.realm)
-        modified = False
-
-        expr = '{}/*[.=~regexp("{}")]'.format(
-            path, ".*{}.*".format(OLD_KRB_HOME))
-        matches = aug.match(expr)
-        for m in matches:
-            old_value = aug.get(m)
-            new_value = old_value.replace(OLD_KRB_HOME, NEW_KRB_HOME)
-            aug.set(m, new_value)
-            modified = True
-
-        if modified:
-            try:
-                aug.save()
-            except IOError:
-                for error_path in aug.match('/augeas//error'):
-                    logger.error('augeas: %s', aug.get(error_path))
-                    raise
-
-            kadmin = service.SimpleServiceInstance("kadmin")
-            if kadmin.is_configured():
-                kadmin.restart()
-
-    finally:
-        aug.close()
-
-
 def add_agent_to_security_domain_admins():
     user_dn = DN(('uid', "ipara"), ('ou', 'People'), ('o', 'ipaca'))
     group_dn = DN(('cn', 'Security Domain Administrators'), ('ou', 'groups'),
@@ -1336,27 +1299,6 @@ def enable_server_snippet():
     tasks.restore_context(paths.KRB5_FREEIPA_SERVER)
 
 
-def ntp_cleanup(fqdn):
-    try:
-        api.Backend.ldap2.delete_entry(DN(('cn', 'NTP'), ('cn', fqdn),
-                                       api.env.container_masters))
-    except ipalib.errors.NotFound:
-        logger.debug("NTP service entry was not found in LDAP.")
-
-    ntp_role_instance = servroles.ServiceBasedRole(
-        u"ntp_server_server",
-        u"NTP server",
-        component_services=['NTP']
-    )
-
-    updated_role_instances = tuple()
-    for role_instance in servroles.role_instances:
-        if role_instance is not ntp_role_instance:
-            updated_role_instances += tuple([role_instance])
-
-    servroles.role_instances = updated_role_instances
-
-
 def setup_kpasswd_server(krb):
     logger.info("[Setup kpasswd_server]")
     aug = Augeas(
@@ -1378,6 +1320,48 @@ def setup_kpasswd_server(krb):
 
     finally:
         aug.close()
+
+
+def ntpd_cleanup(fqdn, fstore):
+    sstore = sysrestore.StateFile(paths.SYSRESTORE)
+    timeconf.restore_forced_timeservices(sstore, 'ntpd')
+    if sstore.has_state('ntp'):
+        instance = services.service('ntpd', api)
+        sstore.restore_state(instance.service_name, 'enabled')
+        sstore.restore_state(instance.service_name, 'running')
+        sstore.restore_state(instance.service_name, 'step-tickers')
+        try:
+            instance.disable()
+            instance.stop()
+        except Exception:
+            logger.debug("Service ntpd was not disabled or stopped")
+
+    for ntpd_file in [paths.NTP_CONF, paths.NTP_STEP_TICKERS,
+                      paths.SYSCONFIG_NTPD]:
+        try:
+            fstore.restore_file(ntpd_file)
+        except ValueError as e:
+            logger.debug(e)
+
+    try:
+        api.Backend.ldap2.delete_entry(DN(('cn', 'NTP'), ('cn', fqdn),
+                                       api.env.container_masters))
+    except ipalib.errors.NotFound:
+        logger.debug("NTP service entry was not found in LDAP.")
+
+    ntp_role_instance = servroles.ServiceBasedRole(
+         u"ntp_server_server",
+         u"NTP server",
+         component_services=['NTP']
+    )
+
+    updated_role_instances = tuple()
+    for role_instance in servroles.role_instances:
+        if role_instance is not ntp_role_instance:
+            updated_role_instances += tuple([role_instance])
+
+    servroles.role_instances = updated_role_instances
+    sysupgrade.set_upgrade_state('ntpd', 'ntpd_cleaned', True)
 
 
 def update_replica_config(db_suffix):
@@ -1533,14 +1517,28 @@ def upgrade_bind(fstore):
         bind.setup_resolv_conf()
         logger.info("Updated systemd-resolved configuration")
 
-    changed = bind.setup_named_conf(backup=True)
-    if changed:
-        logger.info("named.conf has been modified, restarting named")
+    if bind.is_configured() and not bind.is_running():
+        # some upgrade steps may require bind running
+        bind_started = True
+        bind.start()
+    else:
+        bind_started = False
+
+    # create or update autobind entry
+    bind.setup_autobind()
+
     try:
-        if bind.is_configured():
-            bind.restart()
-    except ipautil.CalledProcessError as e:
-        logger.error("Failed to restart %s: %s", bind.service_name, e)
+        changed = bind.setup_named_conf(backup=True)
+        if changed:
+            logger.info("named.conf has been modified, restarting named")
+        try:
+            if bind.is_running():
+                bind.restart()
+        except ipautil.CalledProcessError as e:
+            logger.error("Failed to restart %s: %s", bind.service_name, e)
+    finally:
+        if bind_started:
+            bind.stop()
 
     return changed
 
@@ -1673,7 +1671,8 @@ def upgrade_configuration():
     if not ds_running:
         ds.start(ds.serverid)
 
-    ntp_cleanup(fqdn)
+    if not sysupgrade.get_upgrade_state('ntpd', 'ntpd_cleaned'):
+        ntpd_cleanup(fqdn, fstore)
 
     if tasks.configure_pkcs11_modules(fstore):
         print("Disabled p11-kit-proxy")
@@ -1692,6 +1691,7 @@ def upgrade_configuration():
         WSGI_PREFIX_DIR=paths.WSGI_PREFIX_DIR,
         WSGI_PROCESSES=constants.WSGI_PROCESSES,
         GSSAPI_SESSION_KEY=paths.GSSAPI_SESSION_KEY,
+        FONTS_DIR=paths.FONTS_DIR,
         FONTS_OPENSANS_DIR=paths.FONTS_OPENSANS_DIR,
         FONTS_FONTAWESOME_DIR=paths.FONTS_FONTAWESOME_DIR,
         IPA_CCACHES=paths.IPA_CCACHES,
@@ -1734,13 +1734,6 @@ def upgrade_configuration():
         upgrade_file(sub_dict, paths.HTTPD_IPA_CONF,
                      os.path.join(paths.USR_SHARE_IPA_DIR,
                                   "ipa.conf.template"))
-        # move old config
-        if not os.path.exists(paths.HTTPD_IPA_REWRITE_CONF):
-            try:
-                shutil.move("/etc/httpd2/conf/ipa-rewrite.conf",
-                            paths.HTTPD_IPA_REWRITE_CONF)
-            except OSError:
-                pass
         upgrade_file(sub_dict, paths.HTTPD_IPA_REWRITE_CONF,
                      os.path.join(paths.USR_SHARE_IPA_DIR,
                                   "ipa-rewrite.conf.template"))
@@ -1748,6 +1741,10 @@ def upgrade_configuration():
                      os.path.join(paths.USR_SHARE_IPA_DIR,
                                   "ipa-kdc-proxy.conf.template"))
         if ca.is_configured():
+            # Ensure that the drop-in file is present
+            if not os.path.isfile(paths.SYSTEMD_PKI_TOMCAT_IPA_CONF):
+                ca.add_ipa_wait()
+
             # Handle upgrade of AJP connector configuration
             rewrite = ca.secure_ajp_connector()
             if ca.ajp_secret:
@@ -1855,10 +1852,8 @@ def upgrade_configuration():
     update_ipa_httpd_service_conf(http)
     update_ipa_http_wsgi_conf(http)
     migrate_to_mod_ssl(http)
-    tasks.configure_ipa_gssproxy_dir()
     update_http_keytab(http)
     http.configure_gssproxy()
-    http.configure_httpd_mods()
     http.start()
 
     uninstall_selfsign(ds, http)
@@ -1965,12 +1960,14 @@ def upgrade_configuration():
                         CACERT_PEM=paths.CACERT_PEM,
                         KDC_CA_BUNDLE_PEM=paths.KDC_CA_BUNDLE_PEM,
                         CA_BUNDLE_PEM=paths.CA_BUNDLE_PEM)
-    setup_krb_paths(krb)
     krb.add_anonymous_principal()
     setup_spake(krb)
     setup_pkinit(krb)
     enable_server_snippet()
     setup_kpasswd_server(krb)
+
+    if KRB5_BUILD_VERSION >= parse_version('1.20'):
+        krb.pac_tkt_sign_support_enable()
 
     # Must be executed after certificate_renewal_update
     # (see function docstring for details)

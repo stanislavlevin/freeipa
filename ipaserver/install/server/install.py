@@ -17,11 +17,12 @@ import textwrap
 
 import six
 
-from ipaclient.install.client import check_ldap_conf
+from ipaclient.install import timeconf
+from ipaclient.install.client import (
+    check_ldap_conf, sync_time, restore_time_sync)
 from ipapython.ipachangeconf import IPAChangeConf
 from ipalib.install import certmonger, sysrestore
-from ipapython import ipautil, version, ntpmethods
-from ipapython.ntpmethods import TIME_SERVER
+from ipapython import ipautil, version
 from ipapython.ipautil import (
     ipa_generate_password, run, user_input)
 from ipapython import ipaldap
@@ -29,8 +30,7 @@ from ipapython.admintool import ScriptError
 from ipaplatform import services
 from ipaplatform.paths import paths
 from ipaplatform.tasks import tasks
-from ipaplatform.constants import constants
-from ipalib import api, errors, x509, createntp
+from ipalib import api, errors, x509
 from ipalib.constants import DOMAIN_LEVEL_0, FQDN
 from ipalib.facts import is_ipa_configured, is_ipa_client_configured
 from ipalib.util import (
@@ -428,20 +428,6 @@ def install_check(installer):
         raise ScriptError(
             "--setup-kra cannot be used with CA-less installation")
 
-    if TIME_SERVER is None and not options.no_ntp:
-        raise ScriptError(
-            "NTP client/server was not found in your system. "
-            "Please, install one of supported NTP client/server ({}) "
-            "and try again or use --no-ntp flag.".format(
-                ", ".join(
-                    [
-                        ntp["package_name"]
-                        for ntp in constants.TIME_SERVER_STRUCTURE.values()
-                    ]
-                )
-            )
-        )
-
     print("======================================="
           "=======================================")
     print("This program will set up the IPA Server.")
@@ -452,7 +438,7 @@ def install_check(installer):
         print("  * Configure a stand-alone CA (dogtag) for certificate "
               "management")
     if not options.no_ntp:
-        print("  * Configure the NTP client ({})".format(TIME_SERVER))
+        print("  * Configure the NTP client (chronyd)")
     print("  * Create and configure an instance of Directory Server")
     print("  * Create and configure a Kerberos Key Distribution Center (KDC)")
     print("  * Configure Apache (httpd)")
@@ -468,10 +454,7 @@ def install_check(installer):
     if options.no_ntp:
         print("")
         print("Excluded by options:")
-        if TIME_SERVER is not None:
-            print("  * Configure the NTP client ({})".format(TIME_SERVER))
-        else:
-            print("  * Configure the NTP client.")
+        print("  * Configure the NTP client (chronyd)")
     if installer.interactive:
         print("")
         print("To accept the default shown in brackets, press the Enter key.")
@@ -483,13 +466,15 @@ def install_check(installer):
 
     if not options.no_ntp:
         try:
-            ntpmethods.check_timedate_services()
-        except ntpmethods.NTPConflictingService as e:
-            print("WARNING: conflicting time&date synchronization service '{}'"
-                  " will be disabled".format(e.conflicting_service))
-            print("in favor of {}".format(TIME_SERVER))
-            print("")
-        except ntpmethods.NTPConfigurationError:
+            timeconf.check_timedate_services()
+        except timeconf.NTPConflictingService as e:
+            print(
+                "WARNING: conflicting time&date synchronization service "
+                "'{}' will be disabled in favor of chronyd\n".format(
+                    e.conflicting_service
+                )
+            )
+        except timeconf.NTPConfigurationError:
             pass
 
     if not options.setup_dns and installer.interactive:
@@ -539,6 +524,9 @@ def install_check(installer):
         domain_name = options.domain_name
 
     domain_name = domain_name.lower()
+
+    if host_name.lower() == domain_name:
+        raise ScriptError("hostname cannot be the same as the domain name")
 
     if not options.realm_name:
         realm_name = read_realm_name(domain_name, not installer.interactive)
@@ -733,8 +721,7 @@ def install_check(installer):
 
     if not options.no_ntp and not options.unattended and not (
             options.ntp_servers or options.ntp_pool):
-        options.ntp_servers, options.ntp_pool = \
-            ntpmethods.get_time_source(logger)
+        options.ntp_servers, options.ntp_pool = timeconf.get_time_source()
 
     print()
     print("The IPA Master Server will be configured with:")
@@ -856,17 +843,11 @@ def install(installer):
         # As chrony configuration is moved from client here, unconfiguration of
         # chrony will be handled here in uninstall() method as well by invoking
         # the ipa-server-install --uninstall
-        if not options.no_ntp:
-            if not createntp.sync_time_server(
-                    fstore, sstore, options.ntp_servers, options.ntp_pool):
-                raise ScriptError(
-                    "IPA was unable to sync time with {}! "
-                    "Time synchronization is required for IPA to work "
-                    "correctly".format(TIME_SERVER)
-                )
-            else:
-                print("Successfully synchronized time with {}"
-                      .format(TIME_SERVER))
+        if not options.no_ntp and not sync_time(
+                options.ntp_servers, options.ntp_pool, fstore, sstore):
+            print("Warning: IPA was unable to sync time with chrony!")
+            print("         Time synchronization is required for IPA "
+                  "to work correctly")
 
         if options.dirsrv_cert_files:
             ds = dsinstance.DsInstance(fstore=fstore,
@@ -991,7 +972,7 @@ def install(installer):
         kra.install(api, None, options, custodia=custodia)
 
     if options.setup_dns:
-        dns.install(False, False, options, ntp_role=True)
+        dns.install(False, False, options)
 
     # Always call adtrust installer to configure SID generation
     # if --setup-adtrust is not specified, only the SID part is executed
@@ -1073,10 +1054,10 @@ def install(installer):
           "user-add)")
     print("\t   and the web user interface.")
 
-    if TIME_SERVER is None or not ntpmethods.SERVICE_API.is_running():
+    if not services.knownservices.chronyd.is_running():
         print("\t3. Kerberos requires time synchronization between clients")
         print("\t   and servers for correct operation. You should consider "
-              "installing and enabling NTP server.")
+              "enabling chronyd.")
 
     print("")
     if setup_ca:
@@ -1129,6 +1110,7 @@ def uninstall_check(installer):
             raise ScriptError("Aborting uninstall operation.")
 
     kra.uninstall_check(options)
+    ca.uninstall_check(options)
 
     try:
         api.Backend.ldap2.connect(autobind=True)
@@ -1151,7 +1133,7 @@ def uninstall_check(installer):
     else:
         dns.uninstall_check(options)
 
-        ca.uninstall_check(options)
+        ca.uninstall_crl_check(options)
 
         cleanup_dogtag_server_specific_data()
 
@@ -1200,6 +1182,9 @@ def uninstall(installer):
     # Uninstall the KRA prior to shutting the services down so it
     # can un-register with the CA.
     kra.uninstall()
+    # Uninstall the CA priori to shutting the services down so it
+    # can unregister from the security domain
+    ca.uninstall()
 
     print("Shutting down all IPA services")
     try:
@@ -1211,9 +1196,7 @@ def uninstall(installer):
         except Exception:
             pass
 
-    createntp.uninstall_server(fstore, sstore)
-
-    ca.uninstall()
+    restore_time_sync(sstore, fstore)
 
     dns.uninstall()
 
@@ -1240,6 +1223,8 @@ def uninstall(installer):
     # ipa-client-install removes /etc/ipa/default.conf
 
     sstore._load()
+
+    timeconf.restore_forced_timeservices(sstore)
 
     # Clean up group_exists (unused since IPA 2.2, not being set since 4.1)
     sstore.restore_state("install", "group_exists")

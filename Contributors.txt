@@ -16,6 +16,7 @@ Developers:
 	Alexander Bokovoy
 	Alexander Koksharov
 	Alexander Scheel
+	Alexandra Nikandrova
 	Alexandre Mulatinho
 	Alexey Slaykovsky
 	Alexey Tikhonov
@@ -58,6 +59,7 @@ Developers:
 	Erik Belko
 	Fabiano Fidêncio
 	Felipe Volpone
+	Filip Dvorak
 	Filip Skola
 	Florence Blanc-Renaud
 	Francesco Marella
@@ -74,6 +76,7 @@ Developers:
 	Hela Basa
 	Ian Kumlien
 	Ian Pilcher
+	Iker Pedrosa
 	Isaac Boukris
 	Jakub Hrozek
 	James Groffen
@@ -82,12 +85,14 @@ Developers:
 	Jan Kuparinen
 	Jan Pazdziora
 	Jan Zelený
+	Jarl Gullberg
 	Jason Gerard DeRose
 	Jason Woods
 	Jayesh
 	Jayesh Garg
 	Jeremy Frasier
 	Jérôme Fenal
+	Jerry James
 	Jesse Sandberg
 	jh23453
 	Jim Meyering
@@ -108,6 +113,7 @@ Developers:
 	Lars Sjostrom
 	Lenka Doudova
 	Lenka Ryznarova
+	Lenz Grimmer
 	Lewis Eason
 	Lubomír Rintel
 	Ludwig Krispenz
@@ -173,6 +179,7 @@ Developers:
 	Robbie Harwood
 	Robert Collins
 	Robert Kuska
+	s1341
 	Sam Bristow
 	Sam Morris
 	Scott Poore
@@ -180,8 +187,8 @@ Developers:
 	Sergio Oliveira Campos
 	Serhii Tsymbaliuk
 	shanyin
-	simmon
 	Simo Sorce
+	Simon Nussbaum
 	Slava Aseev
 	Spencer E. Olson
 	Stanislav Laznicka
@@ -195,17 +202,20 @@ Developers:
 	Sumit Bose
 	Sylvain Baubeau
 	Takeshi MIZUTA
+	Temuri Doghonadze
 	Theodor van Nahl
 	Thierry Bordaz
 	Thomas Woerner
 	Thorsten Scherf
 	Tibor Dudlák
 	Timo Aaltonen
+	Todd Zullinger
 	Tomáš Babej
 	Tomas Halman
 	Tomáš Křížek
 	Troy Dawson
 	Varun Mylaraiah
+	Viacheslav Sychov
 	Viktor Ashirov
 	Vit Mojzis
 	W. Michael Petullo

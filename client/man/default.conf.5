@@ -72,7 +72,7 @@ Specifies the secure CA agent port. The default is 8443.
 Specifies the hostname of the dogtag CA server. The default is the hostname of the IPA server.
 .TP
 .B ca_port <port>
-Specifies the insecure CA end user port. The default is 8090.
+Specifies the insecure CA end user port. The default is 8080.
 .TP
 .B certmonger_wait_timeout <seconds>
 The time to wait for a certmonger request to complete during installation. The default value is 300 seconds.
@@ -165,6 +165,9 @@ Specifies the mount point that the development server will register. The default
 .TP
 .B oidc_child_debug_level <debuglevel>
 Specifies the debug level of \fBoidc_child\fR, a helper process used by \fBipa-otpd\fR for OIDC/OAuth2 authentication. Level can be between 0 and 10, the higher the more details. If the level is 6 or higher HTTP debug output is added as well.
+.TP
+.B passkey_child_debug_level <debuglevel>
+Specifies the debug level of \fBpasskey_child\fR, a helper process used by \fBipa-otpd\fR for passkey authentication. Level can be between 0 and 10, the higher the more details. If the level is 6 or higher libfido2 debug output is added as well.
 .TP
 .B prompt_all <boolean>
 Specifies that all options should be prompted for in the IPA client, even optional values. Default is False.

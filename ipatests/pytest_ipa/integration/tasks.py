@@ -324,7 +324,8 @@ def set_default_ttl_for_ipa_dns_zone(host, raiseonerr=True):
 
 def install_master(host, setup_dns=True, setup_kra=False, setup_adtrust=False,
                    extra_args=(), domain_level=None, unattended=True,
-                   external_ca=False, stdin_text=None, raiseonerr=True):
+                   external_ca=False, stdin_text=None, raiseonerr=True,
+                   random_serial=False):
     if domain_level is None:
         domain_level = host.config.domain_level
     check_domain_level(domain_level)
@@ -345,6 +346,10 @@ def install_master(host, setup_dns=True, setup_kra=False, setup_adtrust=False,
         '-a', host.config.admin_password,
         "--domain-level=%i" % domain_level,
     ]
+
+    if random_serial:
+        args.append('--random-serial-numbers')
+
     if ipatests_dse:
         args.extend(["--dirsrv-config-file", ipatests_dse])
 
@@ -1418,7 +1423,8 @@ def double_circle_topo(master, replicas, site_size=6):
 
 def install_topo(topo, master, replicas, clients, domain_level=None,
                  skip_master=False, setup_replica_cas=True,
-                 setup_replica_kras=False, clients_extra_args=()):
+                 setup_replica_kras=False, clients_extra_args=(),
+                 random_serial=False):
     """Install IPA servers and clients in the given topology"""
     if setup_replica_kras and not setup_replica_cas:
         raise ValueError("Option 'setup_replica_kras' requires "
@@ -1429,7 +1435,8 @@ def install_topo(topo, master, replicas, clients, domain_level=None,
         install_master(
             master,
             domain_level=domain_level,
-            setup_kra=setup_replica_kras
+            setup_kra=setup_replica_kras,
+            random_serial=random_serial,
         )
 
     add_a_records_for_hosts_in_master_domain(master)
@@ -1681,13 +1688,16 @@ def install_kra(host, domain_level=None,
 
 def install_ca(
         host, domain_level=None, first_instance=False, external_ca=False,
-        cert_files=None, raiseonerr=True, extra_args=()
+        cert_files=None, raiseonerr=True, extra_args=(),
+        random_serial=False,
 ):
     if domain_level is None:
         domain_level = domainlevel(host)
     check_domain_level(domain_level)
     command = ["ipa-ca-install", "-U", "-p", host.config.dirman_password,
                "-P", 'admin', "-w", host.config.admin_password]
+    if random_serial:
+        command.append('--random-serial-numbers')
     if not isinstance(extra_args, (tuple, list)):
         raise TypeError("extra_args must be tuple or list")
     command.extend(extra_args)
@@ -2180,6 +2190,17 @@ def create_active_user(host, login, password, first='test', last='user',
     kdestroy_all(host)
 
 
+def set_user_password(host, username, password):
+    temppass = "redhat\nredhat"
+    sendpass = f"redhat\n{password}\n{password}"
+    kdestroy_all(host)
+    kinit_admin(host)
+    host.run_command(["ipa", "passwd", username],stdin_text=temppass)
+    host.run_command(["kinit", username], stdin_text=sendpass)
+    kdestroy_all(host)
+    kinit_admin(host)
+
+
 def kdestroy_all(host):
     return host.run_command(['kdestroy', '-A'])
 
@@ -2507,9 +2528,7 @@ def install_packages(host, pkgs):
 def download_packages(host, pkgs):
     """Download packages on a remote host.
     :param host: the host where the download takes place
-    :param pkgs: packages to install, provided as a list of strings
-
-    A package can't be downloaded that is already installed.
+    :param pkgs: packages to download, provided as a list of strings
 
     Returns the temporary directory where the packages are.
     The caller is responsible for cleanup.
@@ -2518,14 +2537,11 @@ def download_packages(host, pkgs):
     tmpdir = os.path.join('/tmp', str(uuid.uuid4()))
     # Only supports RHEL 8+ and Fedora for now
     if platform in ('rhel', 'fedora'):
-        install_cmd = ['/usr/bin/dnf', '-y',
-                       '--downloaddir', tmpdir,
-                       '--downloadonly',
-                       'install']
+        download_cmd = ['/usr/bin/dnf', 'download']
     else:
-        raise ValueError('install_packages: unknown platform %s' % platform)
+        raise ValueError('download_packages: unknown platform %s' % platform)
     host.run_command(['mkdir', tmpdir])
-    host.run_command(install_cmd + pkgs)
+    host.run_command(download_cmd + pkgs, cwd=tmpdir)
     return tmpdir
 
 

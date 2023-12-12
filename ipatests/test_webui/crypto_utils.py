@@ -2,8 +2,8 @@
 # Copyright (C) 2018  FreeIPA Contributors see COPYING for license
 #
 
-from datetime import datetime, timedelta
-
+from datetime import datetime, timedelta, timezone
+UTC = timezone.utc
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
@@ -63,9 +63,9 @@ def generate_certificate(hostname):
     ).serial_number(
         x509.random_serial_number()
     ).not_valid_before(
-        datetime.utcnow()
+        datetime.now(tz=UTC)
     ).not_valid_after(
-        datetime.utcnow() + timedelta(days=100)
+        datetime.now(tz=UTC) + timedelta(days=100)
     ).add_extension(
         x509.SubjectAlternativeName([x509.DNSName(hostname)]),
         critical=False
