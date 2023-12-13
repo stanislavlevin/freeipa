@@ -1,4 +1,4 @@
 spec: .gear/freeipa.spec
-tar: release-4-9-12:.
-diff: release-4-9-12:. . name=@name@-@version@-alt.patch exclude=.gear/**
+tar: release-4-11-0:.
+diff: release-4-11-0:. . name=@name@-@version@-alt.patch exclude=.gear/**
 copy: .gear/freeipa-server.filetrigger
