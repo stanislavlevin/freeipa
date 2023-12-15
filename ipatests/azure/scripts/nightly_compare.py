@@ -1,6 +1,6 @@
 import yaml
 
-PRCI_NIGHTLY = "ipatests/prci_definitions/nightly_ipa-4-9_latest.yaml"
+PRCI_NIGHTLY = "ipatests/prci_definitions/nightly_latest.yaml"
 PRCI_GATING = "ipatests/prci_definitions/gating.yaml"
 AZURE_NIGHTLY = "ipatests/azure/azure_definitions/nightly.yml"
 AZURE_GATING = "ipatests/azure/azure_definitions/gating.yml"
