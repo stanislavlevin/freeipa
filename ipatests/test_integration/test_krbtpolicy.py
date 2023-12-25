@@ -80,7 +80,9 @@ class TestPWPolicy(IntegrationTest):
 
     @classmethod
     def install(cls, mh):
-        tasks.install_packages(cls.master, LANG_PKG)
+        platform = tasks.get_platform(cls.master)
+        if platform not in ["altlinux"]:
+            tasks.install_packages(cls.master, LANG_PKG)
         tasks.install_master(cls.master)
         tasks.create_active_user(cls.master, USER1, PASSWORD)
         tasks.create_active_user(cls.master, USER2, PASSWORD)
