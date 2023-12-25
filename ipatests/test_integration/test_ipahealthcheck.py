@@ -306,7 +306,6 @@ class TestIpaHealthCheck(IntegrationTest):
             setup_dns=True,
             extra_args=['--no-dnssec-validation']
         )
-        set_excludes(cls.master, "key", "DSCLE0004")
 
     def test_ipa_healthcheck_install_on_master(self):
         """
@@ -314,6 +313,7 @@ class TestIpaHealthCheck(IntegrationTest):
         succesfully on IPA master.
         """
         tasks.install_packages(self.master, HEALTHCHECK_PKG)
+        set_excludes(self.master, "key", "DSCLE0004")
 
     def test_ipa_healthcheck_install_on_replica(self):
         """
