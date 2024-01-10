@@ -35,6 +35,7 @@ from ipatests.pytest_ipa.integration.env_config import get_global_config
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.test_integration.test_caless import CALessBase, ipa_certs_cleanup
 from ipatests.test_integration.test_cert import get_certmonger_fs_id
+from ipatests.pytest_ipa.integration import skip_if_fips
 from ipaplatform import services
 
 
@@ -298,6 +299,7 @@ class TestInstallCA(IntegrationTest):
         tasks.install_replica(self.master, self.replicas[1], setup_ca=False)
         tasks.install_ca(self.replicas[1], extra_args=["--skip-schema-check"])
 
+    @skip_if_fips()
     def test_certmonger_reads_token_HSM(self):
         """Test if certmonger reads the token in HSM
 
@@ -584,9 +586,8 @@ class TestInstallWithCA_DNS3(CALessBase):
     """
 
     @pytest.mark.xfail(
-        osinfo.id == 'fedora' and osinfo.version_number >= (33,)
-        and osinfo.version_number < (35,),
-        reason='freeipa ticket 8700', strict=True)
+        osinfo.id == 'fedora' and osinfo.version_number >= (36,),
+        reason='freeipa ticket 9135', strict=True)
     @server_install_setup
     def test_number_of_zones(self):
         """There should be two zones: one forward, one reverse"""
@@ -694,7 +695,7 @@ def get_pki_tomcatd_pid(host):
 def get_ipa_services_pids(host):
     ipa_services_name = [
         "krb5kdc", "kadmin", "named", "httpd", "ipa-custodia",
-        "pki_tomcatd", "ipa-dnskeysyncd"
+        "pki_tomcatd"
     ]
     pids_of_ipa_services = {}
     for name in ipa_services_name:
@@ -2099,3 +2100,17 @@ class TestHostnameValidator(IntegrationTest):
                 hostname = m.group(1)
                 break
         assert hostname == self.master.hostname
+
+    def test_hostname_matching_domain(self):
+        # https://pagure.io/freeipa/issue/9003
+        # Prevent hostname from matching the domain
+        self.master.run_command(['hostname', self.master.hostname])
+        args = self.get_args(self.master)
+        args.extend(['--hostname', self.master.domain.name])
+        result = self.master.run_command(
+            args, raiseonerr=False,
+        )
+
+        assert result.returncode == 1
+        assert 'hostname cannot be the same as the domain name' \
+            in result.stderr_text

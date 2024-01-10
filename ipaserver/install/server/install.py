@@ -540,6 +540,9 @@ def install_check(installer):
 
     domain_name = domain_name.lower()
 
+    if host_name.lower() == domain_name:
+        raise ScriptError("hostname cannot be the same as the domain name")
+
     if not options.realm_name:
         realm_name = read_realm_name(domain_name, not installer.interactive)
         logger.debug("read realm_name: %s\n", realm_name)
@@ -999,6 +1002,14 @@ def install(installer):
 
     # Set the admin user kerberos password
     ds.change_admin_password(admin_password)
+
+    # Force KDC to refresh the cached value of ipaKrbAuthzData by restarting.
+    # ipaKrbAuthzData has to be set with "MS-PAC" to trigger PAC generation,
+    # which is required to handle S4U2Proxy with the Bronze-Bit fix.
+    # Not doing so would cause API malfunction for around a minute, which is
+    # long enough to cause the hereafter client installation to fail.
+    service.print_msg("Restarting the KDC")
+    krb.restart()
 
     # Call client install script
     service.print_msg("Configuring client side components")

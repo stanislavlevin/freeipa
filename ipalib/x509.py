@@ -239,6 +239,12 @@ class IPACertificate(crypto_x509.Certificate):
         """
         return self._cert.signature_algorithm_oid
 
+    if hasattr(crypto_x509.Certificate, "signature_algorithm_parameters"):
+        # added in python-cryptography 41.0
+        @property
+        def signature_algorithm_parameters(self):
+            return self._cert.signature_algorithm_parameters
+
     @property
     def signature(self):
         """
@@ -404,6 +410,11 @@ class IPACertificate(crypto_x509.Certificate):
     @property
     def tbs_precertificate_bytes(self):
         return self._cert.tbs_precertificate_bytes
+
+    if hasattr(crypto_x509.Certificate, "verify_directly_issued_by"):
+        # added in python-cryptography 40.0
+        def verify_directly_issued_by(self, issuer):
+            return self._cert.verify_directly_issued_by(issuer)
 
 
 def load_pem_x509_certificate(data):

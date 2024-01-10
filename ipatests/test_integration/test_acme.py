@@ -10,6 +10,7 @@ import pytest
 
 from ipalib.constants import IPA_CA_RECORD
 from ipatests.test_integration.base import IntegrationTest
+from ipatests.pytest_ipa.integration.firewall import Firewall
 from ipatests.pytest_ipa.integration import tasks
 from ipatests.test_integration.test_caless import CALessBase, ipa_certs_cleanup
 from ipaplatform.osinfo import osinfo
@@ -82,6 +83,9 @@ def prepare_acme_client(master, client):
     acme_host = f'{IPA_CA_RECORD}.{master.domain.name}'
     acme_server = f'https://{acme_host}/acme/directory'
 
+    # enable firewall rule on client
+    Firewall(client).enable_services(["http", "https"])
+
     # install acme client packages
     if not skip_certbot_tests:
         tasks.install_packages(client, ['certbot'])
@@ -131,6 +135,7 @@ def certbot_standalone_cert(host, acme_server):
             'certonly',
             '--domain', host.hostname,
             '--standalone',
+            '--key-type', 'rsa',
         ]
     )
 
@@ -305,6 +310,7 @@ class TestACME(CALessBase):
             '--manual-public-ip-logging-ok',
             '--manual-auth-hook', CERTBOT_DNS_IPA_SCRIPT,
             '--manual-cleanup-hook', CERTBOT_DNS_IPA_SCRIPT,
+            '--key-type', 'rsa',
         ])
 
     ##############
@@ -581,20 +587,20 @@ class TestACMERenew(IntegrationTest):
             tasks.kdestroy_all(host)
             tasks.move_date(host, 'stop', '+90days')
 
-        tasks.get_kdcinfo(host)
+        tasks.get_kdcinfo(self.master)
         # Note raiseonerr=False:
         # the assert is located after kdcinfo retrieval.
-        result = host.run_command(
-            "KRB5_TRACE=/dev/stdout kinit admin",
+        # run kinit command repeatedly until sssd gets settle
+        # after date change
+        tasks.run_repeatedly(
+            self.master, "KRB5_TRACE=/dev/stdout kinit admin",
             stdin_text='{0}\n{0}\n{0}\n'.format(
-                self.clients[0].config.admin_password
-            ),
-            raiseonerr=False
+                self.master.config.admin_password
+            )
         )
         # Retrieve kdc.$REALM after the password change, just in case SSSD
         # domain status flipped to online during the password change.
-        tasks.get_kdcinfo(host)
-        assert result.returncode == 0
+        tasks.get_kdcinfo(self.master)
 
         yield
 

@@ -1,9 +1,11 @@
+.. _12-external-idp-support:
+
 Unit 12: Authentication against external Identity Providers
 ===========================================================
 
 **Prerequisites:**
 
-- `Unit 11: Kerberos ticket policy <11-kerberos-ticket-policy.rst>`_
+- :ref:`Unit 11: Kerberos ticket policy <11-kerberos-ticket-policy>`
 
 In this module you will explore how to manage use external OAuth 2.0 servers to
 authorize issuance of Kerberos tickets in FreeIPA.
@@ -112,7 +114,7 @@ suitable, individual parameters can also be added::
   ipa help idp-add
   Usage: ipa [global-options] idp-add NAME [options]
 
-  Add a new Identity Provider server.
+  Add a new Identity Provider reference.
   Options:
     -h, --help            show this help message and exit
     --auth-uri=STR        OAuth 2.0 authorization endpoint
@@ -370,9 +372,9 @@ The following command adds IdP reference named ``keycloak`` as IPA administrator
         --client-id ipa_oidc_client \
         --secret
   -----------------------------------------
-  Added Identity Provider server "keycloak"
+  Added Identity Provider reference "keycloak"
   -----------------------------------------
-    Identity Provider server name: keycloak
+    Identity Provider reference name: keycloak
     Authorization URI: https://client.ipademo.local:8443/auth/realms/master/protocol/openid-connect/auth
     Device authorization URI: https://client.ipademo.local:8443/auth/realms/master/protocol/openid-connect/auth/device
     Token URI: https://client.ipademo.local:8443/auth/realms/master/protocol/openid-connect/token

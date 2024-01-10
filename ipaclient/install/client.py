@@ -132,10 +132,9 @@ def cleanup(func):
             os.rmdir(ccache_dir)
         except OSError:
             pass
-        try:
-            os.remove(krb_name + ".ipabkp")
-        except OSError:
-            logger.error("Could not remove %s.ipabkp", krb_name)
+        # During master installation, the .ipabkp file is not created
+        # Ignore the delete error if it is "file does not exist"
+        remove_file(krb_name + ".ipabkp")
 
     return inner
 
@@ -708,19 +707,6 @@ def configure_krb5_conf(
             }
         ])
 
-    # SSSD include dir
-    if configure_sssd:
-        if not os.path.exists(paths.SSSD_PUBCONF_KRB5_INCLUDE_D_DIR):
-            os.makedirs(paths.SSSD_PUBCONF_KRB5_INCLUDE_D_DIR, mode=0o755)
-        opts.extend([
-            {
-                'name': 'includedir',
-                'type': 'option',
-                'value': paths.SSSD_PUBCONF_KRB5_INCLUDE_D_DIR,
-                'delim': ' '
-            },
-            krbconf.emptyLine()])
-
     # [libdefaults]
     libopts = [
         krbconf.setOption('default_realm', cli_realm)
@@ -990,6 +976,9 @@ def configure_sssd_conf(
 
         nss_service.set_option('memcache_timeout', 600)
         sssdconfig.save_service(nss_service)
+
+    sssd_enable_service(sssdconfig, 'nss')
+    sssd_enable_service(sssdconfig, 'pam')
 
     domain.set_option('ipa_domain', cli_domain)
     domain.set_option('ipa_hostname', client_hostname)

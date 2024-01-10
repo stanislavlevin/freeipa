@@ -283,7 +283,7 @@ class KrbInstance(service.Service):
 
         if fips_enabled:
             supported_enctypes = list(
-                filter(lambda e: not e.startswith('camelia'),
+                filter(lambda e: not e.startswith('camellia'),
                        SUPPORTED_ENCTYPES))
         else:
             supported_enctypes = SUPPORTED_ENCTYPES

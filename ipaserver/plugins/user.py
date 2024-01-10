@@ -88,6 +88,12 @@ usernames that start with a digit or usernames that exceed a certain length
 may cause problems for some UNIX systems.
 Use 'ipa config-mod' to change the username format allowed by IPA tools.
 
+The user name must follow these rules:
+- cannot contain only numbers
+- must start with a letter, a number, _ or .
+- may contain letters, numbers, _, ., or -
+- may end with a letter, a number, _, ., - or $
+
 Disabling a user account prevents that user from obtaining new Kerberos
 credentials. It does not invalidate any credentials that have already
 been issued.
@@ -132,13 +138,22 @@ MEMBEROF_ADMINS = "(memberOf={})".format(
 )
 
 NOT_MEMBEROF_ADMINS = '(!{})'.format(MEMBEROF_ADMINS)
+PROTECTED_USERS = ('admin',)
 
 
 def check_protected_member(user, protected_group_name=u'admins'):
     '''
-    Ensure the last enabled member of a protected group cannot be deleted or
-    disabled by raising LastMemberError.
+    Ensure admin and the last enabled member of a protected group cannot
+    be deleted or disabled by raising ProtectedEntryError or
+    LastMemberError as appropriate.
     '''
+
+    if user in PROTECTED_USERS:
+        raise errors.ProtectedEntryError(
+            label=_("user"),
+            key=user,
+            reason=_("privileged user"),
+        )
 
     # Get all users in the protected group
     result = api.Command.user_find(in_group=protected_group_name)
@@ -632,7 +647,11 @@ class user_add(baseuser_add):
             if 'ipaidpuser' not in entry_attrs['objectclass']:
                 entry_attrs['objectclass'].append('ipaidpuser')
 
-            answer = self.api.Object['idp'].get_dn_if_exists(rcl)
+            try:
+                answer = self.api.Object['idp'].get_dn_if_exists(rcl)
+            except errors.NotFound:
+                reason = "External IdP configuration {} not found"
+                raise errors.NotFound(reason=_(reason).format(rcl))
             entry_attrs['ipaidpconfiglink'] = answer
 
         self.pre_common_callback(ldap, dn, entry_attrs, attrs_list, *keys,
@@ -858,6 +877,12 @@ class user_mod(baseuser_mod):
 
     def pre_callback(self, ldap, dn, entry_attrs, attrs_list, *keys, **options):
         dn, oc = self.obj.get_either_dn(*keys, **options)
+        if options.get('rename') and keys[-1] in PROTECTED_USERS:
+            raise errors.ProtectedEntryError(
+                label=_("user"),
+                key=keys[-1],
+                reason=_("privileged user"),
+            )
         if 'objectclass' not in entry_attrs and 'rename' not in options:
             entry_attrs.update({'objectclass': oc})
         self.pre_common_callback(ldap, dn, entry_attrs, attrs_list, *keys,

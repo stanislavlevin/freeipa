@@ -2068,6 +2068,25 @@ def group_add(host, groupname, extra_args=()):
     return host.run_command(cmd)
 
 
+def group_del(host, groupname):
+    cmd = [
+        "ipa", "group-del", groupname,
+    ]
+    return host.run_command(cmd)
+
+
+def group_add_member(host, groupname, users=None,
+                     raiseonerr=True, extra_args=()):
+    cmd = [
+        "ipa", "group-add-member", groupname
+    ]
+    if users:
+        cmd.append("--users")
+        cmd.append(users)
+    cmd.extend(extra_args)
+    return host.run_command(cmd, raiseonerr=raiseonerr)
+
+
 def ldapmodify_dm(host, ldif_text, **kwargs):
     """Run ldapmodify as Directory Manager
 
@@ -2632,26 +2651,35 @@ def get_pki_version(host):
         raise ValueError("get_pki_version: pki is not installed")
 
 
-def get_healthcheck_version(host):
+def get_package_version(host, pkgname):
     """
-    Function to get healthcheck version on fedora and rhel
+    Get package version on remote host
     """
     platform = get_platform(host)
     if platform in ("rhel", "fedora"):
         cmd = host.run_command(
-            ["rpm", "-qa", "--qf", "%{VERSION}", "*ipa-healthcheck"]
+            ["rpm", "-qa", "--qf", "%{VERSION}", pkgname]
         )
-        healthcheck_version = cmd.stdout_text
-        if not healthcheck_version:
+        get_package_version = cmd.stdout_text
+        if not get_package_version:
             raise ValueError(
-                "get_healthcheck_version: "
-                "ipa-healthcheck package is not installed"
+                "get_package_version: "
+                "pkgname package is not installed"
             )
     else:
         raise ValueError(
-            "get_healthcheck_version: unknown platform %s" % platform
+            "get_package_version: unknown platform %s" % platform
         )
-    return healthcheck_version
+    return get_package_version
+
+
+def get_openldap_client_version(host):
+    """Get openldap-clients version on remote host"""
+    return get_package_version(host, 'openldap-clients')
+
+
+def get_healthcheck_version(host):
+    return get_package_version(host, '*ipa-healthcheck')
 
 
 def wait_for_ipa_to_start(host, timeout=60):

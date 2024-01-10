@@ -401,27 +401,29 @@ static krb5_error_code ipadb_add_asserted_identity(struct ipadb_context *ipactx,
     return 0;
 }
 
-static bool is_master_host(struct ipadb_context *ipactx, const char *fqdn)
+static krb5_error_code
+is_master_host(struct ipadb_context *ipactx, const char *fqdn, bool *result)
 {
-    int ret;
+    int err;
     char *master_host_base = NULL;
-    LDAPMessage *result = NULL;
-    krb5_error_code err;
+    LDAPMessage *ldap_res = NULL;
 
-    ret = asprintf(&master_host_base, "cn=%s,cn=masters,cn=ipa,cn=etc,%s",
+    err = asprintf(&master_host_base, "cn=%s,cn=masters,cn=ipa,cn=etc,%s",
                                       fqdn, ipactx->base);
-    if (ret == -1) {
-        return false;
-    }
-    err = ipadb_simple_search(ipactx, master_host_base, LDAP_SCOPE_BASE,
-                              NULL, NULL, &result);
-    free(master_host_base);
-    ldap_msgfree(result);
-    if (err == 0) {
-        return true;
-    }
+    if (err == -1)
+        return ENOMEM;
 
-    return false;
+    err = ipadb_simple_search(ipactx, master_host_base, LDAP_SCOPE_BASE,
+                              NULL, NULL, &ldap_res);
+    free(master_host_base);
+    ldap_msgfree(ldap_res);
+    if (err != KRB5_KDB_NOENTRY && err != 0)
+        return err;
+
+    if (result)
+        *result = err != KRB5_KDB_NOENTRY;
+
+    return 0;
 }
 
 static krb5_error_code ipadb_fill_info3(struct ipadb_context *ipactx,
@@ -692,9 +694,14 @@ static krb5_error_code ipadb_fill_info3(struct ipadb_context *ipactx,
     if ((is_host || is_service)) {
         /* it is either host or service, so get the hostname first */
         char *sep = strchr(info3->base.account_name.string, '/');
-        bool is_master = is_master_host(
-                            ipactx,
-                            sep ? sep + 1 : info3->base.account_name.string);
+        bool is_master;
+
+        ret = is_master_host(ipactx,
+                             sep ? sep + 1 : info3->base.account_name.string,
+                             &is_master);
+        if (ret)
+            return ret;
+
         if (is_master) {
             /* Well known RID of domain controllers group */
             if (info3->base.rid == 0) {
@@ -1086,7 +1093,7 @@ krb5_error_code ipadb_get_pac(krb5_context kcontext,
                 }
 
                 sentry = ldap_first_entry(ipactx->lcontext, sresults);
-                if (!lentry) {
+                if (!sentry) {
                     kerr = ENOENT;
                     goto done;
                 }
@@ -1827,11 +1834,43 @@ krb5_error_code filter_logon_info(krb5_context context,
     bool result;
     char *domstr = NULL;
 
+    ipactx = ipadb_get_context(context);
+    if (!ipactx || !ipactx->mspac) {
+        return KRB5_KDB_DBNOTINITED;
+    }
+
     domain = get_domain_from_realm_update(context, realm);
     if (!domain) {
         return EINVAL;
     }
 
+    /* check exact sid */
+    result = dom_sid_check(&domain->domsid, info->info->info3.base.domain_sid, true);
+    if (!result) {
+        struct ipadb_mspac *mspac_ctx = ipactx->mspac;
+        result = FALSE;
+        /* Didn't match but perhaps the original PAC was issued by a child domain's DC? */
+        for (k = 0; k < mspac_ctx->num_trusts; k++) {
+            result = dom_sid_check(&mspac_ctx->trusts[k].domsid,
+                             info->info->info3.base.domain_sid, true);
+            if (result) {
+                domain = &mspac_ctx->trusts[k];
+                break;
+            }
+        }
+        if (!result) {
+            domstr = dom_sid_string(NULL, info->info->info3.base.domain_sid);
+            krb5_klog_syslog(LOG_ERR, "PAC Info mismatch: domain = %s, "
+                                      "expected domain SID = %s, "
+                                      "found domain SID = %s",
+                                      domain->domain_name, domain->domain_sid,
+                                      domstr ? domstr : "<failed to display>");
+            talloc_free(domstr);
+            return EINVAL;
+        }
+    }
+
+    /* At this point we may have changed the domain we look at, */
     /* check netbios/flat name */
     if (strcasecmp(info->info->info3.base.logon_domain.string,
                    domain->flat_name) != 0) {
@@ -1840,21 +1879,6 @@ krb5_error_code filter_logon_info(krb5_context context,
                                   "found logon name = %s",
                                   domain->domain_name, domain->flat_name,
                                   info->info->info3.base.logon_domain.string);
-        return EINVAL;
-    }
-
-    /* check exact sid */
-    result = dom_sid_check(&domain->domsid, info->info->info3.base.domain_sid, true);
-    if (!result) {
-        domstr = dom_sid_string(NULL, info->info->info3.base.domain_sid);
-        if (!domstr) {
-            return EINVAL;
-        }
-        krb5_klog_syslog(LOG_ERR, "PAC Info mismatch: domain = %s, "
-                                  "expected domain SID = %s, "
-                                  "found domain SID = %s",
-                                  domain->domain_name, domain->domain_sid, domstr);
-        talloc_free(domstr);
         return EINVAL;
     }
 
@@ -1944,10 +1968,6 @@ krb5_error_code filter_logon_info(krb5_context context,
      * should include different possibilities into account
      * */
     if (info->info->info3.sidcount != 0) {
-        ipactx = ipadb_get_context(context);
-        if (!ipactx || !ipactx->mspac) {
-            return KRB5_KDB_DBNOTINITED;
-        }
         count = info->info->info3.sidcount;
         i = 0;
         j = 0;
@@ -3277,4 +3297,177 @@ krb5_error_code ipadb_is_princ_from_trusted_realm(krb5_context kcontext,
 	}
 
 	return KRB5_KDB_NOENTRY;
+}
+
+krb5_error_code
+ipadb_check_for_bronze_bit_attack(krb5_context context, krb5_kdc_req *request,
+                                  bool *detected, const char **status)
+{
+    krb5_error_code kerr;
+    const char *st = NULL;
+    size_t i, j;
+    krb5_ticket *evidence_tkt;
+    krb5_authdata **authdata, **ifrel = NULL;
+    krb5_pac pac = NULL;
+    TALLOC_CTX *tmpctx = NULL;
+    krb5_data fullsign = { 0, 0, NULL }, linfo_blob = { 0, 0, NULL };
+    DATA_BLOB linfo_data;
+    struct PAC_LOGON_INFO_CTR linfo;
+    enum ndr_err_code ndr_err;
+    struct dom_sid asserted_identity_sid;
+    bool evtkt_is_s4u2self = false;
+    krb5_db_entry *proxy_entry = NULL;
+
+    /* If no additional ticket, this is not a constrained delegateion request.
+     * Skip checks. */
+    if (!(request->kdc_options & KDC_OPT_CNAME_IN_ADDL_TKT)) {
+        kerr = 0;
+        goto end;
+    }
+
+    evidence_tkt = request->second_ticket[0];
+
+    /* No need to check the Forwardable flag. If it was not set, this request
+     * would have failed earlier. */
+
+    /* We only support general constrained delegation (not RBCD), which is not
+     * available for cross-realms. */
+    if (!krb5_realm_compare(context, evidence_tkt->server, request->server)) {
+        st = "S4U2PROXY_NOT_SUPPORTED_FOR_CROSS_REALMS";
+        kerr = ENOTSUP;
+        goto end;
+    }
+
+    authdata = evidence_tkt->enc_part2->authorization_data;
+
+    /* Search for the PAC. */
+    for (i = 0; authdata != NULL && authdata[i] != NULL; i++) {
+        if (authdata[i]->ad_type != KRB5_AUTHDATA_IF_RELEVANT)
+            continue;
+
+        kerr = krb5_decode_authdata_container(context,
+                                              KRB5_AUTHDATA_IF_RELEVANT,
+                                              authdata[i], &ifrel);
+        if (kerr) {
+            st = "S4U2PROXY_CANNOT_DECODE_EVIDENCE_TKT_AUTHDATA";
+            goto end;
+        }
+
+        for (j = 0; ifrel[j] != NULL; j++) {
+            if (ifrel[j]->ad_type == KRB5_AUTHDATA_WIN2K_PAC)
+                break;
+        }
+        if (ifrel[j] != NULL)
+            break;
+
+        krb5_free_authdata(context, ifrel);
+        ifrel = NULL;
+    }
+
+    if (ifrel == NULL) {
+        st = "S4U2PROXY_EVIDENCE_TKT_WITHOUT_PAC";
+        kerr = ENOENT;
+        goto end;
+    }
+
+    /* Parse the PAC. */
+    kerr = krb5_pac_parse(context, ifrel[j]->contents, ifrel[j]->length, &pac);
+    if (kerr) {
+        st = "S4U2PROXY_CANNOT_DECODE_EVICENCE_TKT_PAC";
+        goto end;
+    }
+
+    /* Check that the PAC extanded KDC signature is present. If it is, it was
+     * already tested.
+     * If absent, the context of the PAC cannot be trusted. */
+    kerr = krb5_pac_get_buffer(context, pac, KRB5_PAC_FULL_CHECKSUM, &fullsign);
+    if (kerr) {
+        st = "S4U2PROXY_MISSING_EXTENDED_KDC_SIGN_IN_EVIDENCE_TKT_PAC";
+        goto end;
+    }
+
+    /* Get the PAC Logon Info. */
+    kerr = krb5_pac_get_buffer(context, pac, KRB5_PAC_LOGON_INFO, &linfo_blob);
+    if (kerr) {
+        st = "S4U2PROXY_NO_PAC_LOGON_INFO_IN_EVIDENCE_TKT";
+        goto end;
+    }
+
+    /* Parse the PAC Logon Info. */
+    tmpctx = talloc_new(NULL);
+    if (!tmpctx) {
+        st = "OUT_OF_MEMORY";
+        kerr = ENOMEM;
+        goto end;
+    }
+
+    linfo_data.length = linfo_blob.length;
+    linfo_data.data = (uint8_t *)linfo_blob.data;
+    ndr_err = ndr_pull_union_blob(&linfo_data, tmpctx, &linfo,
+                                  PAC_TYPE_LOGON_INFO,
+                                  (ndr_pull_flags_fn_t)ndr_pull_PAC_INFO);
+    if (!NDR_ERR_CODE_IS_SUCCESS(ndr_err)) {
+        st = "S4U2PROXY_CANNOT_PARSE_ENVIDENCE_TKT_PAC_LOGON_INFO";
+        kerr = EINVAL;
+        goto end;
+    }
+
+    /* Check that the extra SIDs array is not empty. */
+    if (linfo.info->info3.sidcount == 0) {
+        st = "S4U2PROXY_NO_EXTRA_SID";
+        kerr = ENOENT;
+        goto end;
+    }
+
+    /* Search for the S-1-18-2 domain SID, which indicates the ticket was
+     * obtained using S4U2Self */
+    kerr = ipadb_string_to_sid("S-1-18-2", &asserted_identity_sid);
+    if (kerr) {
+        st = "S4U2PROXY_CANNOT_CREATE_ASSERTED_IDENTITY_SID";
+        goto end;
+    }
+
+    for (i = 0; i < linfo.info->info3.sidcount; i++) {
+        if (dom_sid_check(&asserted_identity_sid,
+                          linfo.info->info3.sids[0].sid, true)) {
+            evtkt_is_s4u2self = true;
+            break;
+        }
+    }
+
+    /* If the ticket was obtained using S4U2Self, the proxy principal entry must
+     * have the "ok_to_auth_as_delegate" attribute set to true. */
+    if (evtkt_is_s4u2self) {
+        kerr = ipadb_get_principal(context, evidence_tkt->server, 0,
+                                   &proxy_entry);
+        if (kerr) {
+            st = "S4U2PROXY_CANNOT_FIND_PROXY_PRINCIPAL";
+            goto end;
+        }
+
+        if (!(proxy_entry->attributes & KRB5_KDB_OK_TO_AUTH_AS_DELEGATE)) {
+            /* This evidence ticket cannot be forwardable given the privileges
+             * of the proxy principal.
+             * This is a Bronze Bit attack. */
+            if (detected)
+                *detected = true;
+            st = "S4U2PROXY_BRONZE_BIT_ATTACK_DETECTED";
+            kerr = EBADE;
+            goto end;
+        }
+    }
+
+    kerr = 0;
+
+end:
+    if (st && status)
+        *status = st;
+
+    krb5_free_authdata(context, ifrel);
+    krb5_pac_free(context, pac);
+    krb5_free_data_contents(context, &linfo_blob);
+    krb5_free_data_contents(context, &fullsign);
+    talloc_free(tmpctx);
+    ipadb_free_principal(context, proxy_entry);
+    return kerr;
 }

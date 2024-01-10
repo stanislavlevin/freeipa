@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import re
 import six
 
 from ipalib import api, errors, constants
@@ -211,7 +212,7 @@ class baseuser(LDAPObject):
     takes_params = (
         Str('uid',
             pattern=constants.PATTERN_GROUPUSER_NAME,
-            pattern_errmsg='may only include letters, numbers, _, -, . and $',
+            pattern_errmsg=constants.ERRMSG_GROUPUSER_NAME.format('user'),
             maxlength=255,
             cli_name='login',
             label=_('User login'),
@@ -564,7 +565,10 @@ class baseuser_add(LDAPCreate):
         if entry_attrs.get('ipauserauthtype', None):
             add_missing_object_class(ldap, u'ipauserauthtypeclass', dn,
                                      entry_attrs, update=False)
-        if entry_attrs.get('ipaidpconfiglink', None):
+        if (
+            entry_attrs.get('ipaidpconfiglink', None)
+            or entry_attrs.get('ipaidpsub', None)
+        ):
             add_missing_object_class(ldap, 'ipaidpuser', dn,
                                      entry_attrs, update=False)
 
@@ -588,6 +592,8 @@ class baseuser_mod(LDAPUpdate):
     """
     Prototype command plugin to be implemented by real plugin
     """
+    NAME_PATTERN = re.compile(constants.PATTERN_GROUPUSER_NAME)
+
     def check_namelength(self, ldap, **options):
         if options.get('rename') is not None:
             config = ldap.get_ipa_config()
@@ -599,6 +605,14 @@ class baseuser_mod(LDAPUpdate):
                             len = int(config.get('ipamaxusernamelength')[0])
                         )
                     )
+
+    def check_name(self, entry_attrs):
+        if 'uid' in entry_attrs:
+            # Check the pattern if the user is renamed
+            if self.NAME_PATTERN.match(entry_attrs.single_value['uid']) is None:
+                raise errors.ValidationError(
+                    name='uid',
+                    error=constants.ERRMSG_GROUPUSER_NAME.format('user'))
 
     def preserve_krbprincipalname_pre(self, ldap, entry_attrs, *keys, **options):
         """
@@ -662,7 +676,7 @@ class baseuser_mod(LDAPUpdate):
         # Some attributes may require additional object classes
         special_attrs = {'ipasshpubkey', 'ipauserauthtype', 'userclass',
                          'ipatokenradiusconfiglink', 'ipatokenradiususername',
-                         'ipaidpconfiglink'}
+                         'ipaidpconfiglink', 'ipaidpsub'}
         if special_attrs.intersection(entry_attrs):
             if 'objectclass' in entry_attrs:
                 obj_classes = entry_attrs['objectclass']
@@ -691,13 +705,21 @@ class baseuser_mod(LDAPUpdate):
                     answer = self.api.Object['radiusproxy'].get_dn_if_exists(cl)
                     entry_attrs['ipatokenradiusconfiglink'] = answer
 
+            if 'ipaidpsub' in entry_attrs:
+                if 'ipaidpuser' not in obj_classes:
+                    entry_attrs['objectclass'].append('ipaidpuser')
+
             if 'ipaidpconfiglink' in entry_attrs:
                 cl = entry_attrs['ipaidpconfiglink']
                 if cl:
                     if 'ipaidpuser' not in obj_classes:
                         entry_attrs['objectclass'].append('ipaidpuser')
 
-                    answer = self.api.Object['idp'].get_dn_if_exists(cl)
+                    try:
+                        answer = self.api.Object['idp'].get_dn_if_exists(cl)
+                    except errors.NotFound:
+                        reason = "External IdP configuration {} not found"
+                        raise errors.NotFound(reason=_(reason).format(cl))
                     entry_attrs['ipaidpconfiglink'] = answer
 
             # Note: we could have used the method add_missing_object_class
@@ -715,6 +737,7 @@ class baseuser_mod(LDAPUpdate):
         add_sshpubkey_to_attrs_pre(self.context, attrs_list)
 
         self.check_namelength(ldap, **options)
+        self.check_name(entry_attrs)
 
         self.check_mail(entry_attrs)
 

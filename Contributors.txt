@@ -16,6 +16,7 @@ Developers:
 	Alexander Bokovoy
 	Alexander Koksharov
 	Alexander Scheel
+	Alexandra Nikandrova
 	Alexandre Mulatinho
 	Alexey Slaykovsky
 	Alexey Tikhonov
@@ -123,6 +124,7 @@ Developers:
 	Martin Nagy
 	Matt Rogers
 	Matthew Davis
+	mbhalodi
 	Michael Simacek
 	Michal Polovka
 	Michal Reznik
