@@ -15,3 +15,4 @@ ipatests == @VERSION@
 # ALTLInux P9 has 2.3.1
 pylint < 2.4
 astroid < 2.3
+netaddr == 0.8.0
