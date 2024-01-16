@@ -118,6 +118,7 @@ BuildRequires: python3(wheel)
 %if_with docs
 BuildRequires: python3(sphinx)
 BuildRequires: plantuml
+BuildRequires: fontconfig
 BuildRequires: fonts-ttf-google-noto-sans-vf
 %endif
 
