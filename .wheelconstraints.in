@@ -16,3 +16,5 @@ ipatests == @VERSION@
 pylint < 2.4
 astroid < 2.3
 netaddr == 0.8.0
+# f37 and f38 have python-cryptography 37.0.2
+cryptography == 37.0.2
