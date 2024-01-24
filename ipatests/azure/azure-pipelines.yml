@@ -151,7 +151,6 @@ jobs:
     vmImage: $(VM_IMAGE)
   dependsOn:
     - Build
-    - Lint
   variables:
     IPA_IMAGE_ARTIFACT: $[ dependencies.Build.outputs['artifacts_image.image'] ]
     IPA_PACKAGES_ARTIFACT: $[ dependencies.Build.outputs['artifacts_packages.packages'] ]
@@ -167,7 +166,6 @@ jobs:
     vmImage: $(VM_IMAGE)
   dependsOn:
     - Build
-    - Lint
   variables:
     IPA_IMAGE_ARTIFACT: $[ dependencies.Build.outputs['artifacts_image.image'] ]
     IPA_PACKAGES_ARTIFACT: $[ dependencies.Build.outputs['artifacts_packages.packages'] ]
@@ -184,7 +182,6 @@ jobs:
     vmImage: $(VM_IMAGE)
   dependsOn:
     - Build
-    - Lint
   variables:
     IPA_IMAGE_ARTIFACT: $[ dependencies.Build.outputs['artifacts_image.image'] ]
     IPA_PACKAGES_ARTIFACT: $[ dependencies.Build.outputs['artifacts_packages.packages'] ]
