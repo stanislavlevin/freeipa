@@ -52,7 +52,7 @@
 Name: freeipa
 # don't forget to update .gear/rules
 Version: 4.11.1
-Release: alt1
+Release: alt2
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1097,6 +1097,9 @@ fi
 %python3_sitelibdir/ipaplatform-*.egg-info/
 
 %changelog
+* Fri Jan 26 2024 Stanislav Levin <slev@altlinux.org> 4.11.1-alt2
+- Backported fix for cryptography 42.0.0.
+
 * Wed Jan 10 2024 Stanislav Levin <slev@altlinux.org> 4.11.1-alt1
 - 4.11.0 -> 4.11.1.
 
