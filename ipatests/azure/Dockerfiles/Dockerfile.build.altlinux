@@ -3,6 +3,8 @@ ENV container=docker LANG=en_US.utf8 LANGUAGE=en_US.utf8 LC_ALL=en_US.utf8
 
 COPY dist /root
 RUN \
+    apt-repo add task 343320 && \
+    apt-repo add task 343313 && \
     apt-get update \
     && apt-get install \
         -o 'Debug::pkgProblemResolver=yes' \

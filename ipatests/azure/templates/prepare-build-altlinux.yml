@@ -1,6 +1,8 @@
 steps:
 - script: |
     set -e
+    sudo apt-repo add task 343320
+    sudo apt-repo add task 343313
     sudo apt-get update
     echo "Installing base development environment"
     sudo apt-get install -y gear rpm-build rpm-build-python3
