@@ -41,7 +41,7 @@ IPA_TESTS_CLIENTS="${!IPA_TESTS_CLIENTS_VARNAME:-0}"
 IPA_TESTS_REPLICAS_VARNAME="IPA_TESTS_REPLICAS_${PROJECT_ID}"
 IPA_TESTS_REPLICAS="${!IPA_TESTS_REPLICAS_VARNAME:-0}"
 
-IPA_TESTS_CONTROLLER="${PROJECT_ID}_master_1"
+IPA_TESTS_CONTROLLER="${PROJECT_ID}-master-1"
 IPA_TESTS_LOGSDIR="${IPA_TESTS_REPO_PATH}/ipa_envs/${IPA_TESTS_ENV_NAME}/${CI_RUNNER_LOGS_DIR}"
 
 # path to azure scripts inside container
@@ -108,14 +108,14 @@ IPA_INSTALLED_PKGS_DIR="${project_dir}/installed_packages"
 BASH_CMD="/bin/bash --noprofile --norc"
 
 function containers() {
-    local _containers="${PROJECT_ID}_master_1"
+    local _containers="${PROJECT_ID}-master-1"
     # build list of replicas
     for i in $(seq 1 1 "$IPA_TESTS_REPLICAS"); do
-        _containers+=" ${PROJECT_ID}_replica_${i}"
+        _containers+=" ${PROJECT_ID}-replica-${i}"
     done
     # build list of clients
     for i in $(seq 1 1 "$IPA_TESTS_CLIENTS"); do
-        _containers+=" ${PROJECT_ID}_client_${i}"
+        _containers+=" ${PROJECT_ID}-client-${i}"
     done
     printf "$_containers"
 }
@@ -158,7 +158,7 @@ IPA_TESTS_CLIENT_MEMSWAP_LIMIT="$IPA_TESTS_CLIENT_MEMSWAP_LIMIT" \
 IPA_TESTS_CLIENT_MEM_RESERVATION="$IPA_TESTS_CLIENT_MEM_RESERVATION" \
 IPA_TESTS_SERVER_MEM_RESERVATION="$IPA_TESTS_SERVER_MEM_RESERVATION" \
 IPA_TESTS_REPLICA_MEM_RESERVATION="$IPA_TESTS_REPLICA_MEM_RESERVATION" \
-docker-compose -p "$PROJECT_ID" up \
+docker compose -p "$PROJECT_ID" up \
     --scale replica="$IPA_TESTS_REPLICAS" \
     --scale client="$IPA_TESTS_CLIENTS" \
     --force-recreate --remove-orphans -d
@@ -279,7 +279,7 @@ IPA_TESTS_CLIENT_MEMSWAP_LIMIT="$IPA_TESTS_CLIENT_MEMSWAP_LIMIT" \
 IPA_TESTS_CLIENT_MEM_RESERVATION="$IPA_TESTS_CLIENT_MEM_RESERVATION" \
 IPA_TESTS_SERVER_MEM_RESERVATION="$IPA_TESTS_SERVER_MEM_RESERVATION" \
 IPA_TESTS_REPLICA_MEM_RESERVATION="$IPA_TESTS_REPLICA_MEM_RESERVATION" \
-docker-compose -p "$PROJECT_ID" down
+docker compose -p "$PROJECT_ID" down
 popd
 
 exit $tests_result
