@@ -168,6 +168,7 @@ BuildRequires: keyutils
 BuildRequires: systemd
 BuildRequires: softhsm
 BuildRequires: nss-utils
+BuildRequires: gnupg2
 %endif
 
 %if_with lint
