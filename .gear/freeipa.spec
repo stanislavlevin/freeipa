@@ -510,7 +510,7 @@ Requires: sshpass
 Requires: iptables
 Requires: drill
 # Tests have a huge amount useless Provides
-%set_findprov_skiplist %python3_sitelibdir/ipatests/*
+%filter_from_provides /python3(ipatests\(\..*\)\?)/d
 
 %description -n python3-module-ipatests
 IPA is an integrated solution to provide centrally managed Identity (users,
