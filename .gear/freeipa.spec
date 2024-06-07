@@ -636,10 +636,6 @@ touch %buildroot%_sharedstatedir/bind/zone/dyndb-ldap/ipa
 touch %buildroot%_sharedstatedir/ipa/pki-ca/publish
 touch %buildroot%_sysconfdir/ipa/kdcproxy/ipa-kdc-proxy.conf
 
-mkdir -p %buildroot%_runtimedir
-install -d -m 0700 %buildroot%_runtimedir/ipa
-install -d -m 0700 %buildroot%_runtimedir/ipa/ccaches
-
 # install filetrigger
 mkdir -p %buildroot%_rpmlibdir
 install -D -p -m 0755 %SOURCE1 %buildroot%_rpmlibdir/freeipa-server.filetrigger
@@ -938,8 +934,6 @@ fi
 %python3_sitelibdir/ipaserver-*.egg-info/
 
 %files server-common
-%dir %attr(0700,root,root) %_runtimedir/ipa
-%dir %attr(0700,root,root) %_runtimedir/ipa/ccaches
 %dir %attr(0755,root,root) %_sysconfdir/ipa/kdcproxy
 %config(noreplace) %_sysconfdir/ipa/kdcproxy/kdcproxy.conf
 %_datadir/ipa/ipaca*.ini
