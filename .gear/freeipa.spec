@@ -230,6 +230,9 @@ Conflicts: nss-ldapd < 0.8.4
 
 %add_python3_path %_datadir/ipa/
 %add_python3_compile_exclude %_datadir/ipa/
+# not public packages and modules
+%filter_from_provides /python3(wsgi\(\..*\)\?)/d
+%filter_from_provides /python3(migration\(\..*\)\?)/d
 
 %description server
 IPA is an integrated solution to provide centrally managed Identity (users,
