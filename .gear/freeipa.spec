@@ -228,6 +228,9 @@ Requires: slapi-nis >= %slapi_nis_version
 # member.
 Conflicts: nss-ldapd < 0.8.4
 
+%add_python3_path %_datadir/ipa/
+%add_python3_compile_exclude %_datadir/ipa/
+
 %description server
 IPA is an integrated solution to provide centrally managed Identity (users,
 hosts, services), Authentication (SSO, 2FA), and Authorization
@@ -272,8 +275,6 @@ Summary: Common files used by IPA server
 Group: System/Base
 Requires: %name-client-common = %EVR
 Requires: apache2-base >= %apache_version
-%add_python3_path %_datadir/ipa/
-%add_python3_compile_exclude %_datadir/ipa/
 
 %description server-common
 IPA is an integrated solution to provide centrally managed Identity (users,
@@ -879,6 +880,9 @@ fi
 %attr(644,root,root) %_unitdir/ipa-otpd@.service
 %attr(644,root,root) %_unitdir/ipa-ccache-sweep.service
 %attr(644,root,root) %_unitdir/ipa-ccache-sweep.timer
+%attr(644,root,root) %_unitdir/ipa-custodia.service
+%ghost %attr(644,root,root) %etc_systemd_dir/httpd2.service.d/ipa.conf
+%_tmpfilesdir/ipa.conf
 # END
 %attr(755,root,root) %plugin_dir/libipa_pwd_extop.so
 %attr(755,root,root) %plugin_dir/libipa_enrollment_extop.so
@@ -921,6 +925,11 @@ fi
 %_man1dir/ipa-cert-fix.1*
 %_man1dir/ipa-acme-manage.1*
 %_man8dir/ipactl.8*
+# WSGI applications
+%_datadir/ipa/wsgi.py
+%_datadir/ipa/migration/migration.py
+%_datadir/ipa/kdcproxy.wsgi
+%_datadir/ipa/wsgi/plugins.py
 
 %_rpmlibdir/freeipa-server.filetrigger
 
@@ -933,11 +942,6 @@ fi
 %dir %attr(0700,root,root) %_runtimedir/ipa/ccaches
 %dir %attr(0755,root,root) %_sysconfdir/ipa/kdcproxy
 %config(noreplace) %_sysconfdir/ipa/kdcproxy/kdcproxy.conf
-/lib/tmpfiles.d/ipa.conf
-%attr(644,root,root) %_unitdir/ipa-custodia.service
-%ghost %attr(644,root,root) %etc_systemd_dir/httpd2.service.d/ipa.conf
-%_datadir/ipa/wsgi.py
-%_datadir/ipa/kdcproxy.wsgi
 %_datadir/ipa/ipaca*.ini
 %_datadir/ipa/*.ldif
 %exclude %_datadir/ipa/ipa-cldap-conf.ldif
@@ -947,9 +951,10 @@ fi
 %_datadir/ipa/profiles/
 %dir %_datadir/ipa/html
 %_datadir/ipa/html/*.html
-%_datadir/ipa/migration/
+%dir %_datadir/ipa/migration/
+%_datadir/ipa/migration/index.html
 %_datadir/ipa/ui/
-%_datadir/ipa/wsgi/
+%dir %_datadir/ipa/wsgi/
 %dir %_sysconfdir/ipa
 %dir %_sysconfdir/ipa/html
 %config(noreplace) %_sysconfdir/ipa/html/ssbrowser.html
