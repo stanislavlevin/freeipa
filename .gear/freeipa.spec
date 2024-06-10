@@ -934,7 +934,7 @@ fi
 
 %files -n python3-module-ipaserver
 %python3_sitelibdir/ipaserver/
-%python3_sitelibdir/ipaserver-*.egg-info/
+%python3_sitelibdir/ipaserver-%version-py%_python3_version.egg-info/
 
 %files server-common
 %dir %attr(0755,root,root) %_sysconfdir/ipa/kdcproxy
@@ -1016,7 +1016,7 @@ fi
 
 %files -n python3-module-ipatests
 %python3_sitelibdir/ipatests/
-%python3_sitelibdir/ipatests-*.egg-info
+%python3_sitelibdir/ipatests-%version-py%_python3_version.egg-info/
 %_bindir/ipa-run-tests
 %_bindir/ipa-test-config
 %_bindir/ipa-test-task
@@ -1066,7 +1066,7 @@ fi
 %files -n python3-module-ipaclient
 %python3_sitelibdir/ipaclient/
 %exclude %python3_sitelibdir/ipaclient/install/ipa_client_automount.py
-%python3_sitelibdir/ipaclient-*.egg-info/
+%python3_sitelibdir/ipaclient-%version-py%_python3_version.egg-info/
 
 %files client-common
 %dir %attr(0755,root,root) %_sysconfdir/ipa/
@@ -1095,9 +1095,9 @@ fi
 %python3_sitelibdir/ipapython/
 %python3_sitelibdir/ipalib/
 %python3_sitelibdir/ipaplatform/
-%python3_sitelibdir/ipapython-*.egg-info/
-%python3_sitelibdir/ipalib-*.egg-info/
-%python3_sitelibdir/ipaplatform-*.egg-info/
+%python3_sitelibdir/ipapython-%version-py%_python3_version.egg-info/
+%python3_sitelibdir/ipalib-%version-py%_python3_version.egg-info/
+%python3_sitelibdir/ipaplatform-%version-py%_python3_version.egg-info/
 
 %changelog
 * Tue May 28 2024 Stanislav Levin <slev@altlinux.org> 4.11.1-alt4
