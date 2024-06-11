@@ -159,14 +159,18 @@ TOMCAT_CONFIG_FILES = (
 )
 
 
-def not_enough_disk_space(host, path):
+def excludes_freespace_check(host, threshold=25):
+    """
+    if host's free space is less than threshold
+    configure ipahealthcheck to skip run of FileSystemSpaceCheck check
+    """
+    path = "/"
     cmd = ["stat", "-f", "--format=%a\n%b", path]
     result = host.run_command(cmd)
 
     free_blocks, total_blocks = result.stdout_text.rstrip().splitlines()
-    if int(int(free_blocks) * 100 / int(total_blocks)) < 20:
-        return True
-    return False
+    if int(int(free_blocks) * 100 / int(total_blocks)) < threshold:
+        set_excludes(host, "check", "FileSystemSpaceCheck")
 
 
 def run_healthcheck(host, source=None, check=None, output_type="json",
@@ -315,6 +319,8 @@ class TestIpaHealthCheck(IntegrationTest):
         """
         tasks.install_packages(self.master, HEALTHCHECK_PKG)
         set_excludes(self.master, "key", "DSCLE0004")
+        # CI may not have enough free space
+        excludes_freespace_check(self.master)
 
     def test_ipa_healthcheck_install_on_replica(self):
         """
@@ -322,6 +328,8 @@ class TestIpaHealthCheck(IntegrationTest):
         succesfully on IPA replica.
         """
         tasks.install_packages(self.replicas[0], HEALTHCHECK_PKG)
+        # CI may not have enough free space
+        excludes_freespace_check(self.replicas[0])
 
     def test_running_ipahealthcheck_ipaclient(self):
         """
@@ -378,8 +386,6 @@ class TestIpaHealthCheck(IntegrationTest):
 
         https://pagure.io/freeipa/issue/8892
         """
-        if not_enough_disk_space(self.master, "/"):
-            pytest.skip("requires at least 20% of free space for '/'")
         returncode, output = run_healthcheck(self.master, output_type="human",
                                              failures_only=True)
         assert returncode == 0
@@ -424,9 +430,6 @@ class TestIpaHealthCheck(IntegrationTest):
         Run ipa-healthcheck after ipa-certupdate to ensure that
         no problems are discovered.
         """
-        if not_enough_disk_space(self.master, "/"):
-            pytest.skip("requires at least 20% of free space for '/'")
-
         self.master.run_command([paths.IPA_CERTUPDATE])
         returncode, _data = run_healthcheck(self.master)
         assert returncode == 0
@@ -613,8 +616,6 @@ class TestIpaHealthCheck(IntegrationTest):
             self.replicas[0], 'ipauser1', first='Test', last='User',
         )
 
-        if not_enough_disk_space(self.replicas[0], "/"):
-            pytest.skip("requires at least 20% of free space for '/'")
         returncode, data = run_healthcheck(self.replicas[0],
                                            failures_only=True)
         assert returncode == 0
@@ -731,8 +732,6 @@ class TestIpaHealthCheck(IntegrationTest):
         cmd = tasks.install_kra(self.master)
         assert cmd.returncode == 0
 
-        if not_enough_disk_space(self.master, "/"):
-            pytest.skip("requires at least 20% of free space for '/'")
         returncode, _unused = run_healthcheck(
             self.master,
             failures_only=True
@@ -757,8 +756,6 @@ class TestIpaHealthCheck(IntegrationTest):
                 'output_type=human'
             ])
         )
-        if not_enough_disk_space(self.master, "/"):
-            pytest.skip("requires at least 20% of free space for '/'")
         set_excludes(self.master, "key", "DSCLE0004", config_file)
         returncode, output = run_healthcheck(
             self.master, failures_only=True, config=config_file
