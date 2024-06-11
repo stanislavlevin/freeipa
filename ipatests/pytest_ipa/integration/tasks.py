@@ -2800,7 +2800,21 @@ def get_openldap_client_version(host):
 
 
 def get_healthcheck_version(host):
-    return get_package_version(host, '*ipa-healthcheck')
+    healthcheck_pkg = "*ipa-healthcheck"
+
+    if host.osinfo.platform in ("altlinux",):
+        """
+        version is reported twice:
+
+        $ rpm -qa --qf "%{VERSION}" *ipa-healthcheck
+        0.170.17
+
+        $ rpm -qa *ipa-healthcheck
+        python3-module-freeipa-healthcheck-0.17-alt1.x86_64
+        freeipa-healthcheck-0.17-alt1.x86_64
+        """
+        healthcheck_pkg = "freeipa-healthcheck"
+    return get_package_version(host, healthcheck_pkg)
 
 
 def wait_for_ipa_to_start(host, timeout=60):
