@@ -2,5 +2,5 @@ steps:
 - script: |
     set -e
     sudo apt-get -y install python3-module-pip
-    python3 -m pip install --user --constraint .wheelconstraints.in --ignore-installed pylint
+    python3 -m pip install --user --constraint .wheelconstraints --ignore-installed pylint
   displayName: Install Lint dependencies
