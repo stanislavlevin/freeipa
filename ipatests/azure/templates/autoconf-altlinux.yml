@@ -7,6 +7,7 @@ steps:
     echo "Running autoconf generator"
     ./autogen.sh \
         ${{ parameters.options }} \
+        --enable-pylint \
         --with-password-quality-lib=no \
 
   displayName: Configure the project
