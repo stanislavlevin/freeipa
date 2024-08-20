@@ -11,7 +11,29 @@ variables:
 - template: ${{ parameters.VARIABLES_FILE }}
 
 jobs:
+- job: Precheck
+  displayName: Precheck CI run
+  pool:
+    vmImage: $(VM_IMAGE)
+  steps:
+    - script: |
+        set -e
+        git remote add gears https://git.altlinux.org/gears/f/freeipa.git
+        printf 'Fetching gears\n'
+        git fetch gears
+        # make sure CI runs over repo synced to distro
+        git merge-base --is-ancestor "gears/$(DISTRO_BRANCH)" @ ||
+          {
+             printf 'Error: CI branch is not descendant of distro one.\n' ;
+             printf 'Last distro tag: %s\n' "$(git describe --tags 'gears/$(DISTRO_BRANCH)')" ;
+             printf 'Last CI tag: %s\n' "$(git describe --tags  --abbrev=0 @)" ;
+             exit 1 ;
+          }
+      displayName: Check branch inheritence ($(DISTRO_BRANCH))
+
 - job: Build
+  dependsOn:
+    - Precheck
   pool:
     vmImage: $(VM_IMAGE)
   container:
@@ -62,6 +84,8 @@ jobs:
       displayName: Check NIGHTLY for consistency with PR-CI
 
 - job: Lint
+  dependsOn:
+    - Precheck
   pool:
     vmImage: $(VM_IMAGE)
   container:
@@ -89,6 +113,8 @@ jobs:
       condition: eq(variables['Build.Reason'], 'PullRequest')
 
 - job: Docs
+  dependsOn:
+    - Precheck
   pool:
     vmImage: $(VM_IMAGE)
   container:
@@ -105,6 +131,8 @@ jobs:
         displayName: Publish docs
 
 - job: Tox
+  dependsOn:
+    - Precheck
   pool:
     vmImage: $(VM_IMAGE)
   container:
@@ -128,6 +156,8 @@ jobs:
       condition: succeededOrFailed()
 
 - job: WebUI_Unit_Tests
+  dependsOn:
+    - Precheck
   pool:
     vmImage: $(VM_IMAGE)
   container:
