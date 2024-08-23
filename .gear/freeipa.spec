@@ -453,6 +453,7 @@ Requires: python3-module-qrcode
 Requires: python3-module-requests
 Requires: python3-module-sss-murmur
 Requires: python3-module-yubico
+Requires: python3-module-systemd
 %py3_provides ipaplatform
 %py3_provides ipaplatform.constants
 %py3_provides ipaplatform.osinfo
@@ -873,6 +874,7 @@ fi
 %attr(644,root,root) %_unitdir/ipa-otpd@.service
 %attr(644,root,root) %_unitdir/ipa-ccache-sweep.service
 %attr(644,root,root) %_unitdir/ipa-ccache-sweep.timer
+%attr(644,root,root) %_journal_catalogdir/ipa.catalog
 # END
 %attr(755,root,root) %plugin_dir/libipa_pwd_extop.so
 %attr(755,root,root) %plugin_dir/libipa_enrollment_extop.so
