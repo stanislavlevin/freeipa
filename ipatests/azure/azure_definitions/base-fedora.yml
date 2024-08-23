@@ -21,6 +21,7 @@ vms:
     - test_install
     - test_ipaclient
     - test_ipalib
+    - test_ipalib_install/test_kinit.py
     - test_ipaplatform
     - test_ipapython
     - test_ipaserver
