@@ -52,7 +52,7 @@
 Name: freeipa
 # don't forget to update .gear/rules
 Version: 4.9.14
-Release: alt0.p10.2
+Release: alt0.p10.3
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1094,6 +1094,11 @@ fi
 %python3_sitelibdir/ipaplatform-*.egg-info/
 
 %changelog
+* Fri Aug 23 2024 Stanislav Levin <slev@altlinux.org> 4.9.14-alt0.p10.3
+- Backported upstream fixes:
+  + synced to 81f61f81e72da0dc91be51857937ab1412e05299
+  + (fixes: CVE-2024-1481)
+
 * Mon Jun 10 2024 Stanislav Levin <slev@altlinux.org> 4.9.14-alt0.p10.2
 - Backported CVE fixes (fixes: CVE-2024-3183, CVE-2024-2698).
 
