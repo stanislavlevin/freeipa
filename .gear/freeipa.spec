@@ -467,6 +467,7 @@ Requires: python3-module-requests
 Requires: python3-module-urllib3 >= 1.26.8
 Requires: python3-module-sss-murmur
 Requires: python3-module-yubico
+Requires: python3-module-systemd
 %py3_provides ipaplatform
 %py3_provides ipaplatform.constants
 %py3_provides ipaplatform.osinfo
@@ -913,6 +914,7 @@ fi
 %attr(644,root,root) %_unitdir/ipa-custodia.service
 %ghost %attr(644,root,root) %etc_systemd_dir/httpd2.service.d/ipa.conf
 %_tmpfilesdir/ipa.conf
+%attr(644,root,root) %_journal_catalogdir/ipa.catalog
 # END
 %attr(755,root,root) %plugin_dir/libipa_pwd_extop.so
 %attr(755,root,root) %plugin_dir/libipa_enrollment_extop.so
