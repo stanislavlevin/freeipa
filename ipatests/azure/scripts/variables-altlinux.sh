@@ -9,3 +9,7 @@ HTTPD_BASEDIR='/etc/httpd2'
 HTTPD_ALIASDIR="${HTTPD_BASEDIR}/conf"
 BIND_BASEDIR='/var/lib/bind'
 BIND_DATADIR="${BIND_BASEDIR}/data"
+
+function installed_packages() {
+    rpm -qa | sort
+}
