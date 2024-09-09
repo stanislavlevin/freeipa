@@ -53,7 +53,7 @@ class Container:
         names of containers within group
         """
         if not hasattr(self, '_names'):
-            self._names = ['{}-{}-{}'.format(self.prefix, self.role, c)
+            self._names = ['{}_{}_{}'.format(self.prefix, self.role, c)
                            for c in range(1, self.num + 1)]
         return self._names
 
