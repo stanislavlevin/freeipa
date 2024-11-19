@@ -119,8 +119,8 @@ def encrypt(data, symmetric_key=None, public_key=None):
         return public_key_obj.encrypt(
             data,
             padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA1()),
-                algorithm=hashes.SHA1(),
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
                 label=None
             )
         )
@@ -154,8 +154,8 @@ def decrypt(data, symmetric_key=None, private_key=None):
             return private_key_obj.decrypt(
                 data,
                 padding.OAEP(
-                    mgf=padding.MGF1(algorithm=hashes.SHA1()),
-                    algorithm=hashes.SHA1(),
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
                     label=None
                 )
             )
@@ -550,10 +550,8 @@ class vault_mod(Local):
 class _KraConfigCache:
     """The KRA config cache stores vaultconfig-show result.
     """
-    def __init__(self):
-        self._dirname = os.path.join(
-            constants.USER_CACHE_PATH, 'ipa', 'kra-config'
-        )
+    def __init__(self, api):
+        self._dirname = os.path.join(api.env.cache_dir, 'kra-config')
 
     def _get_filename(self, domain):
         basename = DNSName(domain).ToASCII() + '.json'
@@ -629,7 +627,7 @@ class _KraConfigCache:
             return True
 
 
-_kra_config_cache = _KraConfigCache()
+_kra_config_cache = _KraConfigCache(api)
 
 
 @register(override=True, no_fail=True)
@@ -705,14 +703,39 @@ class ModVaultData(Local):
         return transport_cert, wrapping_algo
 
     def _do_internal(self, algo, transport_cert, raise_unexpected,
-                     *args, **options):
+                     use_oaep=False, *args, **options):
         public_key = transport_cert.public_key()
 
         # wrap session key with transport certificate
-        wrapped_session_key = public_key.encrypt(
-            algo.key,
-            padding.PKCS1v15()
-        )
+        # KRA may be configured using either the default PKCS1v15 or RSA-OAEP.
+        # there is no way to query this info using the REST interface.
+        if not use_oaep:
+            # PKCS1v15() causes an OpenSSL exception when FIPS is enabled
+            # if so, we fallback to RSA-OAEP
+            try:
+                wrapped_session_key = public_key.encrypt(
+                    algo.key,
+                    padding.PKCS1v15()
+                )
+            except ValueError:
+                wrapped_session_key = public_key.encrypt(
+                    algo.key,
+                    padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
+                )
+        else:
+            wrapped_session_key = public_key.encrypt(
+                algo.key,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+
         options['session_key'] = wrapped_session_key
 
         name = self.name + '_internal'
@@ -723,7 +746,7 @@ class ModVaultData(Local):
                 errors.ExecutionError,
                 errors.GenericError):
             _kra_config_cache.remove(self.api.env.domain)
-            if raise_unexpected:
+            if raise_unexpected and use_oaep:
                 raise
         return None
 
@@ -732,16 +755,28 @@ class ModVaultData(Local):
         Calls the internal counterpart of the command.
         """
         # try call with cached transport certificate
-        result = self._do_internal(algo, transport_cert, False,
-                                       *args, **options)
+        try:
+            result = self._do_internal(algo, transport_cert, False,
+                                       False, *args, **options)
+        except errors.EncodingError:
+            result = self._do_internal(algo, transport_cert, False,
+                                       True, *args, **options)
         if result is not None:
             return result
 
         # retrieve transport certificate (cached by vaultconfig_show)
         transport_cert = self._get_vaultconfig(force_refresh=True)[0]
+
         # call with the retrieved transport certificate
+        result = self._do_internal(algo, transport_cert, True,
+                                   False, *args, **options)
+
+        if result is not None:
+            return result
+
+        # call and use_oaep this time, last attempt
         return self._do_internal(algo, transport_cert, True,
-                                 *args, **options)
+                                 True, *args, **options)
 
 
 @register(no_fail=True)

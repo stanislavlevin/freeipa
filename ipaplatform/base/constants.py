@@ -121,17 +121,14 @@ class BaseConstantsNamespace:
     NAMED_OPTIONS_VAR = "OPTIONS"
     NAMED_OPENSSL_ENGINE = None
     NAMED_ZONE_COMMENT = ""
-    NAMED_RNDC_CONF_COMMENT = "//"
     PKI_USER = User("pkiuser")
     PKI_GROUP = Group("pkiuser")
-    CHECK_PACKAGE_OPT = "-q"
     # ntpd init variable used for daemon options
     NTPD_OPTS_VAR = "OPTIONS"
     # quote used for daemon options
     NTPD_OPTS_QUOTE = "\""
     ODS_USER = User("ods")
     ODS_GROUP = Group("ods")
-    PASSWORD_QUALITY_LIB = "libpwquality"
     # nfsd init variable used to enable kerberized NFS
     SECURE_NFS_VAR = "SECURE_NFS"
     SELINUX_BOOLEAN_ADTRUST = {
@@ -181,22 +178,6 @@ class BaseConstantsNamespace:
     # high ciphers without RC4, MD5, TripleDES, pre-shared key, secure
     # remote password, and DSA cert authentication.
     TLS_HIGH_CIPHERS = "HIGH:!aNULL:!eNULL:!MD5:!RC4:!3DES:!PSK:!SRP:!aDSS"
-    HTTPD_IPA_MODULES = None
-    HTTPD_IPA_CONFL_MODULES = None
-    TIME_SERVER_STRUCTURE = {
-        'CHRONY': {
-            'package_name': 'chrony',
-            'class_name': 'Chrony',
-        },
-        'NTPD': {
-            'package_name': 'ntpd',
-            'class_name': 'NTPD',
-        },
-        'OPENNTPD': {
-            'package_name': 'openntpd',
-            'class_name': 'OpenNTPD',
-        },
-    }
 
 
 constants = BaseConstantsNamespace()

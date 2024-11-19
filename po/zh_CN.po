@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: freeipa 4.9.0.dev201908140712+gitc9938e3d8\n"
 "Report-Msgid-Bugs-To: https://pagure.io/freeipa/new_issue\n"
-"POT-Creation-Date: 2023-08-21 14:51+0200\n"
+"POT-Creation-Date: 2024-05-28 15:09+0200\n"
 "PO-Revision-Date: 2019-11-11 10:25+0000\n"
 "Last-Translator: Copied by Zanata <copied-by-zanata@zanata.org>\n"
 "Language-Team: Chinese (China)\n"
@@ -6985,9 +6985,6 @@ msgstr "没有这样的虚拟命令"
 msgid "No system preferred enctypes ?!\n"
 msgstr "没有系统首选的加密类型？！\n"
 
-msgid "No trusted domain is not configured"
-msgstr "信任域已配置"
-
 #, c-format
 msgid "No values for %s"
 msgstr "%s没有值"
@@ -12211,19 +12208,13 @@ msgstr "{attr}：没有这样的属性"
 msgid "{role}: role not found"
 msgstr "{role}：角色没有找到"
 
-#~ msgid "Are you sure you want to rebuild auto membership?"
-#~ msgstr "你确定要重建自动成员吗？"
-
 #~ msgid "Delete a CA."
 #~ msgstr "删除一个CA。"
 
-#~ msgid "Maximum password life must be greater than minimum."
-#~ msgstr "最小密码生存周期必须比最小值大。"
+#~ msgid "No trusted domain is not configured"
+#~ msgstr "信任域已配置"
 
 #~ msgid ""
 #~ "Reverse zone for PTR record should be a sub-zone of one the following "
 #~ "fully qualified domains: %s"
 #~ msgstr "反向区域的PTR记录应该是下面完全其中一个限制域：%s的子区域"
-
-#~ msgid "Server location"
-#~ msgstr "服务器位置"

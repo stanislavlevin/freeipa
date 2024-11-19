@@ -343,7 +343,9 @@ class idrange(LDAPObject):
                 'without Samba 4 support installed. Make sure you have '
                 'installed server-trust-ad sub-package of IPA on the server'))
 
+        # pylint: disable=used-before-assignment
         domain_validator = ipaserver.dcerpc.DomainValidator(self.api)
+        # pylint: enable=used-before-assignment
 
         if not domain_validator.is_configured():
             raise errors.NotFound(reason=_('Cross-realm trusts are not '
@@ -550,6 +552,15 @@ class idrange_add(LDAPCreate):
         self.obj.handle_ipabaserid(entry_attrs, options)
         self.obj.handle_iparangetype(entry_attrs, options,
                                      keep_objectclass=True)
+
+        if entry_attrs.single_value.get('iparangetype') in (
+                'ipa-local', self.obj.range_types.get('ipa-local', None)):
+            self.add_message(
+                messages.ServiceRestartRequired(
+                    service=services.knownservices.dirsrv.service_instance(""),
+                    server=_('<all IPA servers>')
+                )
+            )
         return dn
 
 
@@ -563,7 +574,8 @@ class idrange_del(LDAPDelete):
         try:
             old_attrs = ldap.get_entry(dn, ['ipabaseid',
                                             'ipaidrangesize',
-                                            'ipanttrusteddomainsid'])
+                                            'ipanttrusteddomainsid',
+                                            'iparangetype'])
         except errors.NotFound:
             raise self.obj.handle_not_found(*keys)
 
@@ -597,6 +609,20 @@ class idrange_del(LDAPDelete):
                     key=keys[0],
                     dependent=trust_domains[0].dn[0].value)
 
+        self.add_message(
+            messages.ServiceRestartRequired(
+                service=services.knownservices['sssd'].systemd_name,
+                server=_('<all IPA servers>')
+            )
+        )
+
+        if old_attrs.single_value.get('iparangetype') == 'ipa-local':
+            self.add_message(
+                messages.ServiceRestartRequired(
+                    service=services.knownservices.dirsrv.service_instance(""),
+                    server=_('<all IPA servers>')
+                )
+            )
 
         return dn
 
@@ -801,10 +827,20 @@ class idrange_mod(LDAPUpdate):
         assert isinstance(dn, DN)
         self.obj.handle_ipabaserid(entry_attrs, options)
         self.obj.handle_iparangetype(entry_attrs, options)
+
+        if entry_attrs.single_value.get('iparangetype') in (
+                'ipa-local', self.obj.range_types.get('ipa-local', None)):
+            self.add_message(
+                messages.ServiceRestartRequired(
+                    service=services.knownservices.dirsrv.service_instance(""),
+                    server=_('<all IPA servers>')
+                )
+            )
+
         self.add_message(
             messages.ServiceRestartRequired(
                 service=services.knownservices['sssd'].systemd_name,
-                server=keys[0]
+                server=_('<all IPA servers>')
             )
         )
         return dn

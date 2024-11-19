@@ -18,6 +18,7 @@ import six
 from ipalib.constants import IPA_CA_CN
 from ipalib.install import certstore
 from ipalib.install.service import enroll_only, master_install_only, replica_install_only
+from ipaplatform.constants import constants
 from ipaserver.install import sysupgrade
 from ipapython.install import typing
 from ipapython.install.core import group, knob, extend_knob
@@ -141,6 +142,157 @@ def lookup_random_serial_number_version(api):
     return version
 
 
+def lookup_hsm_configuration(api):
+    """
+    If an HSM was configured on the initial install then return the
+    token name and PKCS#11 library path from that install.
+
+    Returns a tuple of (token_name, token_library_path) or (None, None)
+    """
+    dn = DN(('cn', IPA_CA_CN), api.env.container_ca, api.env.basedn)
+    token_name = None
+    token_library_path = None
+    try:
+        # we do not use api.Command.ca_show because it attempts to
+        # talk to the CA (to read certificate / chain), but the RA
+        # backend may be unavailable (ipa-replica-install) or unusable
+        # due to RA Agent cert not yet created (ipa-ca-install).
+        entry = api.Backend.ldap2.get_entry(dn)
+
+        # If the attribute doesn't exist then the remote didn't
+        # enable RSN.
+        if 'ipacahsmconfiguration' in entry:
+            val = entry['ipacahsmconfiguration'][0]
+            (token_name, token_library_path) = val.split(';')
+    except (errors.NotFound, KeyError):
+        # if the entry doesn't exist then the remote doesn't support
+        # HSM so there is nothing to do.
+        pass
+
+    return (token_name, token_library_path)
+
+
+def hsm_version():
+    """Return True if PKI supports working HSM code
+
+       The caller is responsible for raising the exception.
+    """
+    pki_version = pki.util.Version(pki.specification_version())
+    return pki_version >= pki.util.Version("11.5.0"), pki_version
+
+
+def hsm_validator(token_name, token_library, token_password):
+    """Do some basic validation of the HSM information provided.
+
+       - The local PKI server supports IPA HSM
+       - The token library exists
+       - The token name doesn't have a colon or semi-colon in it
+       - The token name exists after loading the library
+       - The token password works
+       - Super-simple test to see if the SELinux module is loaded
+    """
+    if not token_name:
+        logger.debug("No token name, assuming not an HSM install")
+        return
+    if not token_password:
+        raise ValueError("No token password provided")
+    val, pki_version = hsm_version()
+    if val is False:
+        raise ValueError(
+            "HSM is not supported in PKI version %s" % pki_version
+        )
+    if ':' in token_name or ';' in token_name:
+        raise ValueError(
+            "Colon and semi-colon are not allowed in a token name."
+        )
+    if not os.path.exists(token_library):
+        raise ValueError(
+            "Token library path '%s' does not exist" % token_library
+        )
+    pkiuser = constants.PKI_USER
+    pkigroup = constants.PKI_GROUP
+    if 'libsofthsm' in token_library:
+        import grp
+        group = grp.getgrnam(constants.ODS_GROUP)
+        if str(constants.PKI_USER) in group.gr_mem:
+            pkigroup = constants.ODS_GROUP
+    with certdb.NSSDatabase() as tempnssdb:
+        tempnssdb.create_db(user=str(pkiuser), group=str(pkigroup))
+        # Try adding the token library to the temporary database in
+        # case it isn't already available. Ignore all errors.
+        command = [
+            paths.MODUTIL,
+            '-dbdir', '{}:{}'.format(tempnssdb.dbtype, tempnssdb.secdir),
+            '-nocertdb',
+            '-add', 'test',
+            '-libfile', token_library,
+            '-force',
+        ]
+        # It may fail if p11-kit has already registered the library, that's
+        # ok.
+        ipautil.run(command, stdin='\n', cwd=tempnssdb.secdir,
+                    runas=pkiuser, suplementary_groups=[pkigroup],
+                    raiseonerr=False)
+
+        command = [
+            paths.MODUTIL,
+            '-dbdir', '{}:{}'.format(tempnssdb.dbtype, tempnssdb.secdir),
+            '-list',
+            '-force'
+        ]
+        lines = ipautil.run(
+            command, cwd=tempnssdb.secdir, capture_output=True,
+            runas=pkiuser, suplementary_groups=[pkigroup]).output
+        found = False
+        token_line = f'token: {token_name}'
+        for line in lines.split('\n'):
+            if token_line in line.strip():
+                found = True
+                break
+        if not found:
+            raise ValueError(
+                "Token named '%s' was not found. Check permissions"
+                % token_name
+            )
+        pwdfile = ipautil.write_tmp_file(token_password)
+        os.fchown(pwdfile.fileno(), pkiuser.uid, pkigroup.gid)
+        args = [
+            paths.CERTUTIL,
+            "-d", '{}:{}'.format(tempnssdb.dbtype, tempnssdb.secdir),
+            "-K",
+            "-h", token_name,
+            "-f", pwdfile.name,
+        ]
+        result = ipautil.run(args, cwd=tempnssdb.secdir,
+                             runas=pkiuser,
+                             suplementary_groups=[pkigroup],
+                             capture_error=True, raiseonerr=False)
+        if result.returncode != 0 and len(result.error_output):
+            if 'SEC_ERROR_BAD_PASSWORD' in result.error_output:
+                raise ValueError('Invalid HSM token password')
+            else:
+                raise ValueError(
+                    "Validating HSM password failed: %s" % result.error_output
+                )
+        # validate that the appropriate SELinux module is installed
+        # Only warn in case the expected paths don't match.
+        if 'nfast' in token_library:
+            module = 'ipa-nfast'
+        elif 'luna' in token_library:
+            module = 'ipa-luna'
+        else:
+            module = None
+        if module:
+            args = [paths.SEMODULE, "-l"]
+            result = ipautil.run(args, cwd=tempnssdb.secdir,
+                                 capture_output=True, raiseonerr=False)
+            if module not in result.output:
+                logger.info('\nWARNING: The associated SELinux module ,%s, '
+                            'for this HSM was not detected.\nVerify '
+                            'that the appropriate subpackage is installed '
+                            'for this HSM\n', module)
+
+
 def set_subject_base_in_config(subject_base):
     entry_attrs = api.Backend.ldap2.get_ipa_config()
     entry_attrs['ipacertificatesubjectbase'] = [str(subject_base)]
@@ -228,6 +380,13 @@ def install_check(standalone, replica_config, options):
         options._subject_base = options.subject_base
         options._ca_subject = options.ca_subject
         options._random_serial_numbers = options.random_serial_numbers
+        token_name = options.token_name
+        token_library_path = options.token_library_path
+        if "setup_ca" in options.__dict__:
+            setup_ca = options.setup_ca
+        else:
+            # We got here through ipa-ca-install
+            setup_ca = True
     else:
         # during replica install, this gets invoked before local DS is
         # available, so use the remote api.
@@ -248,6 +407,43 @@ def install_check(standalone, replica_config, options):
                 )
             except ValueError as e:
                 raise ScriptError(str(e))
+
+        (token_name, token_library_path) = lookup_hsm_configuration(_api)
+        # IPA version and dependency checking should prevent this but
+        # better to be safe and avoid a failed install.
+        if replica_config.setup_ca and token_name:
+            if not options.token_library_path:
+                options.token_library_path = token_library_path
+        setup_ca = replica_config.setup_ca
+
+    if setup_ca and token_name:
+        if (options.token_password_file and options.token_password):
+            raise ScriptError(
+                "token-password and token-password-file are mutually exclusive"
+            )
+        if options.token_password_file:
+            with open(options.token_password_file, "r") as fd:
+                options.token_password = fd.readline().strip()
+        if (
+            not options.token_password_file
+            and not options.token_password
+        ):
+            if options.unattended:
+                raise ScriptError("HSM token password required")
+            token_password = installutils.read_password(
+                f"HSM token '{token_name}'", confirm=False
+            )
+            if token_password is None:
+                raise ScriptError("HSM token password required")
+            else:
+                options.token_password = token_password
+
+        try:
+            hsm_validator(
+                token_name, token_library_path,
+                options.token_password)
+        except ValueError as e:
+            raise ScriptError(str(e))
 
     if replica_config is not None and not replica_config.setup_ca:
         return
@@ -317,7 +513,7 @@ def install_check(standalone, replica_config, options):
     if not options.external_cert_files:
         if not cainstance.check_ports():
             print(
-                "IPA requires ports 8090 and 8443 for PKI, but one or more "
+                "IPA requires ports 8080 and 8443 for PKI, but one or more "
                 "are currently in use."
             )
             raise ScriptError("Aborting installation")
@@ -378,6 +574,7 @@ def install_step_0(standalone, replica_config, options, custodia):
         else:
             cert_file = None
             cert_chain_file = None
+        token_name = options.token_name
 
         pkcs12_info = None
         master_host = None
@@ -386,10 +583,16 @@ def install_step_0(standalone, replica_config, options, custodia):
         ra_only = False
         promote = False
     else:
-        cafile = os.path.join(replica_config.dir, 'cacert.p12')
-        custodia.get_ca_keys(
-            cafile,
-            replica_config.dirman_password)
+        _api = api if standalone else options._remote_api
+        (token_name, _token_library_path) = lookup_hsm_configuration(api)
+        if not token_name:
+            cafile = os.path.join(replica_config.dir, 'cacert.p12')
+            if replica_config.setup_ca:
+                custodia.get_ca_keys(
+                    cafile,
+                    replica_config.dirman_password)
+        else:
+            cafile = None
 
         ca_signing_algorithm = None
         ca_type = None
@@ -438,6 +641,9 @@ def install_step_0(standalone, replica_config, options, custodia):
         use_ldaps=use_ldaps,
         pki_config_override=options.pki_config_override,
         random_serial_numbers=options._random_serial_numbers,
+        token_name=token_name,
+        token_library_path=options.token_library_path,
+        token_password=options.token_password,
     )
 
 

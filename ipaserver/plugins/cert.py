@@ -55,7 +55,7 @@ from ipapython.dn import DN
 from ipapython.ipautil import datetime_from_utctimestamp
 from ipaserver.plugins.service import normalize_principal, validate_realm
 from ipaserver.masters import (
-    ENABLED_SERVICE, CONFIGURED_SERVICE, is_service_enabled
+    ENABLED_SERVICE, CONFIGURED_SERVICE, HIDDEN_SERVICE, is_service_enabled
 )
 
 try:
@@ -300,7 +300,7 @@ def caacl_check(principal, ca, profile_id):
 def ca_kdc_check(api_instance, hostname):
     master_dn = api_instance.Object.server.get_dn(unicode(hostname))
     kdc_dn = DN(('cn', 'KDC'), master_dn)
-    wanted = {ENABLED_SERVICE, CONFIGURED_SERVICE}
+    wanted = {ENABLED_SERVICE, CONFIGURED_SERVICE, HIDDEN_SERVICE}
     try:
         kdc_entry = api_instance.Backend.ldap2.get_entry(
             kdc_dn, ['ipaConfigString'])
@@ -321,7 +321,10 @@ def bind_principal_can_manage_cert(cert):
         A python-cryptography ``Certificate`` object.
 
     """
-    bind_principal = kerberos.Principal(getattr(context, 'principal'))
+    op_account = getattr(context, 'principal', None)
+    if op_account is None:
+        return False
+    bind_principal = kerberos.Principal(op_account)
     if not bind_principal.is_host:
         return False
 
@@ -557,8 +560,7 @@ class BaseCertMethod(Method):
     def get_options(self):
         yield self.obj.params['cacn'].clone(query=True)
 
-        for option in super(BaseCertMethod, self).get_options():
-            yield option
+        yield from super(BaseCertMethod, self).get_options()
 
 
 @register()
@@ -691,7 +693,15 @@ class cert_request(Create, BaseCertMethod, VirtualCommand):
         principal_string = unicode(principal)
         principal_type = principal_to_principal_type(principal)
 
-        bind_principal = kerberos.Principal(getattr(context, 'principal'))
+        op_account = getattr(context, 'principal', None)
+        if op_account is None:
+            # Can the bound principal request certs for another principal?
+            # the virtual operation check will rely on LDAP ACIs, no need
+            # for the Kerberos principal here.
+            # Force the principal that cannot be matched in normal deployments
+            op_account = '<unknown>@<UNKNOWN>'
+
+        bind_principal = kerberos.Principal(op_account)
         bind_principal_string = unicode(bind_principal)
         bind_principal_type = principal_to_principal_type(bind_principal)
 
@@ -1331,8 +1341,7 @@ class cert(BaseCertObject):
 
 class CertMethod(BaseCertMethod):
     def get_options(self):
-        for option in super(CertMethod, self).get_options():
-            yield option
+        yield from super(CertMethod, self).get_options()
 
         for o in self.has_output:
             if isinstance(o, (output.Entry, output.ListOfEntries)):
@@ -1432,8 +1441,7 @@ class cert_revoke(PKQuery, CertMethod, VirtualCommand):
             autofill=True,
         )
 
-        for option in super(cert_revoke, self).get_options():
-            yield option
+        yield from super(cert_revoke, self).get_options()
 
     def execute(self, serial_number, **kw):
         ca_enabled_check(self.api)

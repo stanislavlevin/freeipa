@@ -13,7 +13,7 @@ import pytest
 
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.test_integration.test_ipahealthcheck import (
-    run_healthcheck, HEALTHCHECK_PKG
+    run_healthcheck, set_excludes, HEALTHCHECK_PKG
 )
 from ipatests.pytest_ipa.integration import tasks
 from ipatests.pytest_ipa.integration.tasks import (
@@ -26,6 +26,7 @@ from ipalib.constants import (
 )
 from ipaplatform.paths import paths
 from ipapython import certdb
+from ipatests.test_integration.test_cert import get_certmonger_fs_id
 from ipatests.test_integration.test_dns_locations import (
     resolve_records_from_server, IPA_DEFAULT_MASTER_SRV_REC
 )
@@ -983,6 +984,9 @@ class TestHiddenReplicaPromotion(IntegrationTest):
         # manually install KRA to verify that hidden state is synced
         tasks.install_kra(cls.replicas[0])
 
+        set_excludes(cls.master, "key", "DSCLE0004")
+        set_excludes(cls.replicas[0], "key", "DSCLE0004")
+
     def _check_dnsrecords(self, hosts_expected, hosts_unexpected=()):
         domain = DNSName(self.master.domain.name).make_absolute()
         rset = [
@@ -1238,6 +1242,23 @@ class TestHiddenReplicaPromotion(IntegrationTest):
             'ipa-crlgen-manage', 'status'])
         assert "CRL generation: enabled" in result.stdout_text
 
+    def test_hidden_replica_renew_pkinit_cert(self):
+        """Renew the PKINIT cert on a hidden replica.
+
+        Test for https://pagure.io/freeipa/issue/9611
+        """
+        # Get Request ID
+        cmd = ['getcert', 'list', '-f', paths.KDC_CERT]
+        result = self.replicas[0].run_command(cmd)
+        req_id = get_certmonger_fs_id(result.stdout_text)
+
+        self.replicas[0].run_command([
+            'getcert', 'resubmit', '-f', paths.KDC_CERT
+        ])
+        tasks.wait_for_certmonger_status(
+            self.replicas[0], ('MONITORING'), req_id, timeout=600
+        )
+
 
 class TestHiddenReplicaKRA(IntegrationTest):
     """Test KRA & hidden replica features.
@@ -1297,3 +1318,49 @@ class TestHiddenReplicaKRA(IntegrationTest):
             self.replicas[0].hostname, '--state=hidden'
         ])
         assert result.returncode == 0
+
+
+class TestReplicaConn(IntegrationTest):
+    num_replicas = 1
+    num_ad_domains = 1
+
+    @classmethod
+    def install(cls, mh):
+        cls.replica = cls.replicas[0]
+        cls.ad = cls.ads[0]
+        ad_domain = cls.ad.domain.name
+        cls.ad_admin = 'Administrator@{}'.format(ad_domain.upper())
+        cls.adview = 'Default Trust View'
+        tasks.install_master(cls.master, setup_adtrust=True)
+        tasks.configure_dns_for_trust(cls.master, cls.ad)
+        tasks.establish_trust_with_ad(cls.master, cls.ad.domain.name)
+        tasks.install_client(cls.master, cls.replica)
+
+    def test_replica_conncheck_ad_admin(self):
+        """
+        Test to verify that replica installation is not failing for
+        replica connection check when AD administrator
+        Administrator@AD.EXAMPLE.COM is used for the deployment
+        or promotion of a replica.
+
+        Related : https://pagure.io/freeipa/issue/9542
+        """
+        self.master.run_command(
+            ['ipa', 'idoverrideuser-add', self.adview, self.ad_admin]
+        )
+        self.master.run_command(
+            ["ipa", "group-add-member", "admins", "--idoverrideusers",
+             self.ad_admin]
+        )
+        tasks.clear_sssd_cache(self.master)
+
+        self.replica.run_command(
+            ["ipa-replica-install", "--setup-ca", "-U", "--ip-address",
+             self.replica.ip, "--realm", self.replica.domain.realm,
+             "--domain", self.replica.domain.name,
+             "--principal={0}".format(self.ad_admin),
+             "--password", self.master.config.ad_admin_password]
+        )
+        logs = self.replica.get_file_contents(paths.IPAREPLICA_CONNCHECK_LOG)
+        error = "not allowed to perform server connection check"
+        assert error.encode() not in logs

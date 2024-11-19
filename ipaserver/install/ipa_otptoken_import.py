@@ -547,7 +547,7 @@ class OTPTokenImport(admintool.AdminTool):
 
             # Load the keyfile.
             keyfile = self.safe_options.keyfile
-            with open(keyfile) as f:
+            with open(keyfile, "rb") as f:
                 self.doc.setKey(f.read())
 
     def run(self):

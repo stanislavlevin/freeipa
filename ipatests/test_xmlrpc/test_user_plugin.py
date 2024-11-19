@@ -968,6 +968,19 @@ class TestUserWithUPGDisabled(XMLRPC_test):
 
 @pytest.mark.tier1
 class TestManagers(XMLRPC_test):
+    def test_create_user_with_manager(self, user):
+        """ Create user using user-add with manager option set """
+        user.ensure_exists()
+        user_w_manager = UserTracker(
+            name='user_w_manager', givenname=u'Test', sn=u'User1',
+            manager=user.uid
+        )
+        user_w_manager.track_create()
+        command = user_w_manager.make_create_command()
+        result = command()
+        user_w_manager.check_create(result)
+        user_w_manager.delete()
+
     def test_assign_nonexistent_manager(self, user, user2):
         """ Try to assign user a non-existent manager """
         user.ensure_exists()
@@ -1033,8 +1046,8 @@ class TestAdmins(XMLRPC_test):
         tracker = Tracker()
         command = tracker.make_command('user_disable', admin1)
 
-        with raises_exact(errors.ProtectedEntryError(label=u'user',
-                          key=admin1, reason='privileged user')):
+        with raises_exact(errors.LastMemberError(label=u'group',
+                          key=admin1, container=admin_group)):
             command()
 
     def test_create_admin2(self, admin2):
@@ -1052,8 +1065,8 @@ class TestAdmins(XMLRPC_test):
         admin2.disable()
         tracker = Tracker()
 
-        with raises_exact(errors.ProtectedEntryError(label=u'user',
-                          key=admin1, reason='privileged user')):
+        with raises_exact(errors.LastMemberError(label=u'group',
+                          key=admin1, container=admin_group)):
             tracker.run_command('user_disable', admin1)
         admin2.delete()
 

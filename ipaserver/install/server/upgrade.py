@@ -27,6 +27,7 @@ from ipalib.facts import is_ipa_configured
 import SSSDConfig
 import ipalib.util
 import ipalib.errors
+from ipaclient.install import timeconf
 from ipaclient.install.client import sssd_enable_ifp
 from ipalib.install.dnsforwarders import detect_resolve1_resolv_conf
 from ipaplatform import services
@@ -479,6 +480,16 @@ def ca_ensure_lightweight_cas_container(ca):
         return False
 
     return cainstance.ensure_lightweight_cas_container()
+
+
+def ca_enable_lightweight_ca_monitor(ca):
+    logger.info('[Enabling LWCA monitor]')
+
+    if not ca.is_configured():
+        logger.info('CA is not configured')
+        return False
+
+    return cainstance.enable_lightweight_ca_monitor()
 
 
 def ca_add_default_ocsp_uri(ca):
@@ -1321,7 +1332,27 @@ def setup_kpasswd_server(krb):
         aug.close()
 
 
-def ntp_cleanup(fqdn):
+def ntpd_cleanup(fqdn, fstore):
+    sstore = sysrestore.StateFile(paths.SYSRESTORE)
+    timeconf.restore_forced_timeservices(sstore, 'ntpd')
+    if sstore.has_state('ntp'):
+        instance = services.service('ntpd', api)
+        sstore.restore_state(instance.service_name, 'enabled')
+        sstore.restore_state(instance.service_name, 'running')
+        sstore.restore_state(instance.service_name, 'step-tickers')
+        try:
+            instance.disable()
+            instance.stop()
+        except Exception:
+            logger.debug("Service ntpd was not disabled or stopped")
+
+    for ntpd_file in [paths.NTP_CONF, paths.NTP_STEP_TICKERS,
+                      paths.SYSCONFIG_NTPD]:
+        try:
+            fstore.restore_file(ntpd_file)
+        except ValueError as e:
+            logger.debug(e)
+
     try:
         api.Backend.ldap2.delete_entry(DN(('cn', 'NTP'), ('cn', fqdn),
                                        api.env.container_masters))
@@ -1329,9 +1360,9 @@ def ntp_cleanup(fqdn):
         logger.debug("NTP service entry was not found in LDAP.")
 
     ntp_role_instance = servroles.ServiceBasedRole(
-        u"ntp_server_server",
-        u"NTP server",
-        component_services=['NTP']
+         u"ntp_server_server",
+         u"NTP server",
+         component_services=['NTP']
     )
 
     updated_role_instances = tuple()
@@ -1340,6 +1371,7 @@ def ntp_cleanup(fqdn):
             updated_role_instances += tuple([role_instance])
 
     servroles.role_instances = updated_role_instances
+    sysupgrade.set_upgrade_state('ntpd', 'ntpd_cleaned', True)
 
 
 def update_replica_config(db_suffix):
@@ -1649,7 +1681,8 @@ def upgrade_configuration():
     if not ds_running:
         ds.start(ds.serverid)
 
-    ntp_cleanup(fqdn)
+    if not sysupgrade.get_upgrade_state('ntpd', 'ntpd_cleaned'):
+        ntpd_cleanup(fqdn, fstore)
 
     if tasks.configure_pkcs11_modules(fstore):
         print("Disabled p11-kit-proxy")
@@ -1668,6 +1701,7 @@ def upgrade_configuration():
         WSGI_PREFIX_DIR=paths.WSGI_PREFIX_DIR,
         WSGI_PROCESSES=constants.WSGI_PROCESSES,
         GSSAPI_SESSION_KEY=paths.GSSAPI_SESSION_KEY,
+        FONTS_DIR=paths.FONTS_DIR,
         FONTS_OPENSANS_DIR=paths.FONTS_OPENSANS_DIR,
         FONTS_FONTAWESOME_DIR=paths.FONTS_FONTAWESOME_DIR,
         IPA_CCACHES=paths.IPA_CCACHES,
@@ -1760,6 +1794,18 @@ def upgrade_configuration():
             else:
                 logger.info('ephemeralRequest is already enabled')
 
+            if tasks.is_fips_enabled():
+                logger.info('[Ensuring KRA OAEP wrap algo is enabled in FIPS]')
+                value = directivesetter.get_directive(
+                    paths.KRA_CS_CFG_PATH,
+                    'keyWrap.useOAEP',
+                    separator='=')
+                if value is None or value.lower() != 'true':
+                    logger.info('Use the OAEP key wrap algo')
+                    kra.enable_oaep_wrap_algo()
+                else:
+                    logger.info('OAEP key wrap algo is already enabled')
+
     # several upgrade steps require running CA.  If CA is configured,
     # always run ca.start() because we need to wait until CA is really ready
     # by checking status using http
@@ -1828,10 +1874,8 @@ def upgrade_configuration():
     update_ipa_httpd_service_conf(http)
     update_ipa_http_wsgi_conf(http)
     migrate_to_mod_ssl(http)
-    tasks.configure_ipa_gssproxy_dir()
     update_http_keytab(http)
     http.configure_gssproxy()
-    http.configure_httpd_mods()
     http.start()
 
     uninstall_selfsign(ds, http)
@@ -1882,6 +1926,7 @@ def upgrade_configuration():
         ca_configure_profiles_acl(ca),
         ca_configure_lightweight_ca_acls(ca),
         ca_ensure_lightweight_cas_container(ca),
+        ca_enable_lightweight_ca_monitor(ca),
         ca_add_default_ocsp_uri(ca),
         ca_disable_publish_cert(ca),
     ])

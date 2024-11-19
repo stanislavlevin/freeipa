@@ -35,6 +35,7 @@ from ipatests.pytest_ipa.integration.env_config import get_global_config
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.test_integration.test_caless import CALessBase, ipa_certs_cleanup
 from ipatests.test_integration.test_cert import get_certmonger_fs_id
+from ipatests.pytest_ipa.integration import skip_if_fips
 from ipaplatform import services
 
 
@@ -298,6 +299,7 @@ class TestInstallCA(IntegrationTest):
         tasks.install_replica(self.master, self.replicas[1], setup_ca=False)
         tasks.install_ca(self.replicas[1], extra_args=["--skip-schema-check"])
 
+    @skip_if_fips()
     def test_certmonger_reads_token_HSM(self):
         """Test if certmonger reads the token in HSM
 
@@ -695,7 +697,7 @@ def get_pki_tomcatd_pid(host):
 def get_ipa_services_pids(host):
     ipa_services_name = [
         "krb5kdc", "kadmin", "named", "httpd", "ipa-custodia",
-        "pki_tomcatd", "ipa-dnskeysyncd"
+        "pki_tomcatd"
     ]
     pids_of_ipa_services = {}
     for name in ipa_services_name:
@@ -1260,7 +1262,10 @@ class TestInstallMaster(IntegrationTest):
             tasks.uninstall_packages(self.master, [package_name])
             reinstall = True
         try:
-            tasks.install_master(self.master)
+            # Disable dnssec-validation as the test is calling dnf install
+            # and mirrors.fedoraproject.org have a broken trust chain
+            tasks.install_master(self.master,
+                                 extra_args=['--no-dnssec-validation'])
         finally:
             if reinstall:
                 tasks.install_packages(self.master, [package_name])
@@ -1567,6 +1572,8 @@ class TestKRAinstallAfterCertRenew(IntegrationTest):
         grace_date = cert_expiry - timedelta(days=10)
         grace_date = datetime.strftime(grace_date, "%Y-%m-%d %H:%M:%S")
         self.master.run_command(['date', '-s', grace_date])
+        # restart service after date change
+        self.master.run_command(['ipactl', 'restart'])
 
         # get the count of certs track by certmonger
         cmd = self.master.run_command(['getcert', 'list'])
@@ -1589,6 +1596,8 @@ class TestKRAinstallAfterCertRenew(IntegrationTest):
         cert_expiry = cert_expiry + timedelta(days=3)
         cert_expiry = datetime.strftime(cert_expiry, "%Y-%m-%d %H:%M:%S")
         self.master.run_command(['date', '-s', cert_expiry])
+        # restart service after date change
+        self.master.run_command(['ipactl', 'restart'])
 
         passwd = "{passwd}\n{passwd}\n{passwd}".format(passwd=admin_pass)
         self.master.run_command(['kinit', 'admin'], stdin_text=passwd)
@@ -2114,3 +2123,69 @@ class TestHostnameValidator(IntegrationTest):
         assert result.returncode == 1
         assert 'hostname cannot be the same as the domain name' \
             in result.stderr_text
+
+
+class TestNsslapdIgnoreTimeSkew(IntegrationTest):
+    """
+    Test to check nsslapd-ignore-time-skew is not disabled.
+    """
+    num_replicas = 1
+    topology = 'line'
+
+    @pytest.fixture
+    def update_time_skew(self):
+        """
+        Fixture enables nsslapd-ignore-time-skew
+        parameter and reverts it back
+        """
+        ldap = self.replicas[0].ldap_connect()
+        dn = DN(
+            ("cn", "config"),
+        )
+        entry = ldap.get_entry(dn)
+        entry.single_value["nsslapd-ignore-time-skew"] = 'on'
+        ldap.update_entry(entry)
+
+        yield
+
+        entry = ldap.get_entry(dn)
+        entry.single_value["nsslapd-ignore-time-skew"] = 'off'
+        ldap.update_entry(entry)
+
+    def test_check_nsslapd_ignore_time_skew(self):
+        """
+        This testcase checks that the ignore time skew parameter
+        is set to on during the directory server replica
+        installation (replication of the suffix) and during
+        the CA replica (replication of o=ipaca).
+        It also checks that the time skew is reverted during
+        pki_tomcat setup stage.
+        """
+        DIRSRV_LOG = (
+            "ignore time skew for initial replication"
+        )
+        PKI_TOMCAT_LOG = (
+            "revert time skew after initial replication"
+        )
+        install_msg = self.replicas[0].get_file_contents(
+            paths.IPAREPLICA_INSTALL_LOG, encoding="utf-8"
+        )
+        dirsrv_msg = re.findall(DIRSRV_LOG, install_msg)
+        assert len(dirsrv_msg) == 2
+        assert PKI_TOMCAT_LOG in install_msg
+
+    def test_forcesync_does_not_overwrite_ignore_time_skew(
+            self, update_time_skew):
+        """
+        This testcase checks that calling ipa-replica-manage
+        force-sync does not overwrite the value of ignore
+        time skew
+        """
+        result = self.replicas[0].run_command(
+            ["ipa-replica-manage", "force-sync",
+             "--from", self.master.hostname,
+             "--no-lookup", "-v"])
+        assert result.returncode == 0
+        conn = self.replicas[0].ldap_connect()
+        ldap_entry = conn.get_entry(DN("cn=config"))
+        assert ldap_entry.single_value['nsslapd-ignore-time-skew'] == "on"

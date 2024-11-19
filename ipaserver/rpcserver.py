@@ -54,8 +54,8 @@ from ipalib.errors import (
     ExecutionError, PasswordExpired, KrbPrincipalExpired, KrbPrincipalWrongFAST,
     UserLocked)
 from ipalib.request import context, destroy_context
-from ipalib.rpc import (xml_dumps, xml_loads,
-    json_encode_binary, json_decode_binary)
+from ipalib.rpc import xml_dumps, xml_loads
+from ipalib.ipajson import json_encode_binary, json_decode_binary
 from ipapython.dn import DN
 from ipaserver.plugins.ldap2 import ldap2
 from ipalib.backend import Backend
@@ -664,6 +664,10 @@ class KerberosSession(HTTP_Status):
         headers = []
         response = b''
 
+        logout_cookie = getattr(context, 'logout_cookie', None)
+        if logout_cookie is not None:
+            headers.append(('IPASESSION', logout_cookie))
+
         logger.debug('%s need login', status)
 
         start_response(status, headers)
@@ -689,6 +693,7 @@ class KerberosSession(HTTP_Status):
         creds = get_credentials_if_valid(name=gss_name,
                                          ccache_name=ccache_name)
         if not creds:
+            setattr(context, 'logout_cookie', 'MagBearerToken=')
             logger.debug(
                 'ccache expired or invalid, deleting session, need login')
             return None
@@ -1135,10 +1140,6 @@ class login_password(Backend, KerberosSession):
                 canonicalize=True,
                 lifetime=self.api.env.kinit_lifetime)
 
-            if armor_path:
-                logger.debug('Cleanup the armor ccache')
-                ipautil.run([paths.KDESTROY, '-A', '-c', armor_path],
-                            env={'KRB5CCNAME': armor_path}, raiseonerr=False)
         except RuntimeError as e:
             if ('kinit: Cannot read password while '
                     'getting initial credentials') in str(e):
@@ -1156,6 +1157,11 @@ class login_password(Backend, KerberosSession):
                 raise KrbPrincipalWrongFAST(principal=principal)
             raise InvalidSessionPassword(principal=principal,
                                          message=unicode(e))
+        finally:
+            if armor_path:
+                logger.debug('Cleanup the armor ccache')
+                ipautil.run([paths.KDESTROY, '-A', '-c', armor_path],
+                            env={'KRB5CCNAME': armor_path}, raiseonerr=False)
 
 
 class change_password(Backend, HTTP_Status):

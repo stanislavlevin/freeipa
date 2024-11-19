@@ -24,7 +24,7 @@ import logging
 from ipalib import api
 from ipalib import Bool, Int, Str, IA5Str, StrEnum, DNParam, Flag
 from ipalib import errors
-from ipalib.constants import MAXHOSTNAMELEN
+from ipalib.constants import MAXHOSTNAMELEN, IPA_CA_CN
 from ipalib.plugable import Registry
 from ipalib.request import context
 from ipalib.util import validate_domain_name
@@ -247,7 +247,8 @@ class config(LDAPObject):
             doc=_('Extra hashes to generate in password plug-in'),
             values=(u'AllowNThash',
                     u'KDC:Disable Last Success', u'KDC:Disable Lockout',
-                    u'KDC:Disable Default Preauth for SPNs'),
+                    u'KDC:Disable Default Preauth for SPNs',
+                    u'EnforceLDAPOTP'),
         ),
         Str('ipaselinuxusermaporder',
             label=_('SELinux user map order'),
@@ -366,6 +367,12 @@ class config(LDAPObject):
             label=_('NetBIOS name of the IPA domain'),
             doc=_('NetBIOS name of the IPA domain'),
             flags={'virtual_attribute', 'no_create'}
+        ),
+        Str(
+            'hsm_token_name?',
+            label=_('HSM token name'),
+            doc=_('The HSM token name storing the CA private keys'),
+            flags={'virtual_attribute', 'no_create', 'no_update'}
         ),
     )
 
@@ -509,7 +516,8 @@ class config_mod(LDAPUpdate):
     def _enable_sid(self, ldap, options):
         # the user must have the Replication Administrators privilege
         privilege = 'Replication Administrators'
-        if not principal_has_privilege(self.api, context.principal, privilege):
+        op_account = getattr(context, 'principal', None)
+        if not principal_has_privilege(self.api, op_account, privilege):
             raise errors.ACIError(
                 info=_("not allowed to enable SID generation"))
 
@@ -725,6 +733,16 @@ class config_show(LDAPRetrieve):
     __doc__ = _('Show the current configuration.')
 
     def post_callback(self, ldap, dn, entry_attrs, *keys, **options):
+        ca_dn = DN(('cn', IPA_CA_CN), api.env.container_ca, api.env.basedn)
+        try:
+            ca_entry = ldap.get_entry(ca_dn, ['ipacahsmconfiguration'])
+        except errors.NotFound:
+            pass
+        else:
+            if 'ipacahsmconfiguration' in ca_entry:
+                val = ca_entry['ipacahsmconfiguration'][0]
+                (token_name, _token_library_path) = val.split(';')
+                entry_attrs.update({'hsm_token_name': token_name})
         self.obj.show_servroles_attributes(
             entry_attrs, "CA server", "KRA server", "IPA master",
             "DNS server", **options)

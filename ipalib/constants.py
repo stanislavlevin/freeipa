@@ -24,6 +24,7 @@ All constants centralised in one file.
 
 import os
 import string
+import uuid
 import warnings
 
 warnings.filterwarnings(
@@ -62,6 +63,8 @@ TLS_VERSION_MINIMAL = "tls1.2"
 TLS_VERSION_MAXIMAL = "tls1.3"
 TLS_VERSION_DEFAULT_MIN = None
 TLS_VERSION_DEFAULT_MAX = None
+
+SD_IPA_API_MESSAGE_ID = uuid.uuid3(uuid.NAMESPACE_DNS, 'IPA.API')
 
 # regular expression NameSpace member names must match:
 NAME_REGEX = r'^[a-z][_a-z0-9]*[a-z0-9]$|^[a-z]$'
@@ -281,6 +284,7 @@ DEFAULT_CONFIG = (
     ('conf_default', object),  # File containing context independent config
     ('plugins_on_demand', object),  # Whether to finalize plugins on-demand (bool)
     ('nss_dir', object),  # Path to nssdb, default {confdir}/nssdb
+    ('cache_dir', object),  # ~/.cache/ipa directory, may use XDG_CACHE_HOME env
     ('tls_ca_cert', object),  # Path to CA cert file
 
     # Set in Env._finalize_core():

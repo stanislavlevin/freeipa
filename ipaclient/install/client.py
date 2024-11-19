@@ -34,13 +34,13 @@ import warnings
 from configparser import RawConfigParser
 from urllib.parse import urlparse, urlunparse
 
-from ipalib import api, errors, x509, createntp
+from ipalib import api, errors, x509
 from ipalib import sysrestore
 from ipalib.constants import FQDN, IPAAPI_USER, MAXHOSTNAMELEN
 from ipalib.install import certmonger, certstore, service
 from ipalib.install import hostname as hostname_
 from ipalib.facts import is_ipa_client_configured, is_ipa_configured
-from ipalib.install.kinit import kinit_keytab, kinit_password, kinit_pkinit
+from ipalib.kinit import kinit_keytab, kinit_password, kinit_pkinit
 from ipalib.install.service import enroll_only, prepare_only
 from ipalib.rpc import delete_persistent_client_session_data
 from ipalib.util import (
@@ -53,15 +53,7 @@ from ipaplatform import services
 from ipaplatform.constants import constants
 from ipaplatform.paths import paths
 from ipaplatform.tasks import tasks
-from ipapython import (
-    certdb,
-    kernel_keyring,
-    ntpmethods,
-    ipaldap,
-    ipautil,
-    dnsutil,
-)
-from ipapython.ntpmethods import TIME_SERVER
+from ipapython import certdb, kernel_keyring, ipaldap, ipautil, dnsutil
 from ipapython.admintool import ScriptError
 from ipapython.dn import DN
 from ipapython.install import typing
@@ -77,7 +69,7 @@ from ipapython.ssh import SSHPublicKey
 from ipapython import version
 from ipapython.errors import SetseboolError
 
-from . import automount, sssd
+from . import automount, timeconf, sssd
 from ipaclient import discovery
 from ipapython.ipachangeconf import IPAChangeConf
 
@@ -175,7 +167,8 @@ def get_cert_path(cert_path):
     if cert_path is not None:
         return cert_path
 
-    if os.path.exists(paths.IPA_CA_CRT):
+    if os.path.exists(paths.IPA_CA_CRT) and \
+            os.stat(paths.IPA_CA_CRT).st_size != 0:
         return paths.IPA_CA_CRT
 
     return None
@@ -1152,7 +1145,21 @@ def configure_ssh_config(fstore, options):
 def modify_ssh_config(options):
     changes = {'PubkeyAuthentication': 'yes'}
 
-    if options.sssd and os.path.isfile(paths.SSS_SSH_KNOWNHOSTSPROXY):
+    # sss_ssh_knownhostsproxy is deprecated in favor of sss_ssh_knownhosts
+    # use sss_ssh_knownhosts when possible
+    enableknownhosts = bool(
+        options.sssd and os.path.isfile(paths.SSS_SSH_KNOWNHOSTS)
+    )
+
+    enableproxy = bool(
+        options.sssd and os.path.isfile(paths.SSS_SSH_KNOWNHOSTSPROXY)
+        and not enableknownhosts
+    )
+
+    if options.sssd and enableknownhosts:
+        changes[
+            'KnownHostsCommand'] = '%s %%H' % paths.SSS_SSH_KNOWNHOSTS
+    if options.sssd and enableproxy:
         changes[
             'ProxyCommand'] = '%s -p %%p %%h' % paths.SSS_SSH_KNOWNHOSTSPROXY
         changes['GlobalKnownHostsFile'] = paths.SSSD_PUBCONF_KNOWN_HOSTS
@@ -1164,14 +1171,23 @@ def modify_ssh_config(options):
 
 def create_ssh_ipa_config(options):
     """Add the IPA snippet for ssh"""
+    # sss_ssh_knownhostsproxy is deprecated in favor of sss_ssh_knownhosts
+    # use sss_ssh_knownhosts when possible
+    enableknownhosts = bool(
+        options.sssd and os.path.isfile(paths.SSS_SSH_KNOWNHOSTS)
+    )
+
     enableproxy = bool(
         options.sssd and os.path.isfile(paths.SSS_SSH_KNOWNHOSTSPROXY)
+        and not enableknownhosts
     )
 
     ipautil.copy_template_file(
         os.path.join(paths.SSH_IPA_CONFIG_TEMPLATE),
         paths.SSH_IPA_CONFIG,
         dict(
+            ENABLEKNOWNHOSTS='' if enableknownhosts else '#',
+            KNOWNHOSTSCOMMAND=paths.SSS_SSH_KNOWNHOSTS,
             ENABLEPROXY='' if enableproxy else '#',
             KNOWNHOSTSPROXY=paths.SSS_SSH_KNOWNHOSTSPROXY,
             KNOWNHOSTS=paths.SSSD_PUBCONF_KNOWN_HOSTS,
@@ -1281,7 +1297,7 @@ def create_sshd_ipa_config(options):
     logger.info('Configured %s', paths.SSHD_IPA_CONFIG)
 
 
-def configure_automount(options):
+def configure_automount(options, statestore):
     logger.info('\nConfiguring automount:')
 
     args = [
@@ -1294,12 +1310,15 @@ def configure_automount(options):
     if not options.sssd:
         args.append('--no-sssd')
 
+    statestore.backup_state('installation', 'automount', True)
     try:
         result = run(args)
     except Exception as e:
         logger.error('Automount configuration failed: %s', str(e))
     else:
         logger.info('%s', result.output_log)
+    finally:
+        statestore.delete_state('installation', 'automount')
 
 
 def configure_nisdomain(options, domain, statestore):
@@ -2191,31 +2210,20 @@ def install_check(options):
             "using 'ipa-client-install --uninstall'.")
         raise ScriptError(rval=CLIENT_ALREADY_CONFIGURED)
 
-    if TIME_SERVER is None and options.conf_ntp:
-        raise ScriptError(
-            "NTP client/server was not found in your system. "
-            "Please, install one of supported NTP client/server ({}) "
-            "and try again or use --no-ntp flag.".format(
-                ", ".join(
-                    [
-                        ntp["package_name"]
-                        for ntp in constants.TIME_SERVER_STRUCTURE.values()
-                    ]
-                )
-            )
-        )
-
     check_ldap_conf()
 
     if options.conf_ntp:
         try:
-            ntpmethods.check_timedate_services()
-        except ntpmethods.NTPConflictingService as e:
-            print("WARNING: conflicting time&date synchronization service '{}'"
-                  " will be disabled".format(e.conflicting_service))
-            print("in favor of {}".format(TIME_SERVER))
-            print("")
-        except ntpmethods.NTPConfigurationError:
+            timeconf.check_timedate_services()
+        except timeconf.NTPConflictingService as e:
+            print(
+                "WARNING: conflicting time&date synchronization service "
+                "'{}' will be disabled in favor of chronyd\n".format(
+                    e.conflicting_service
+                )
+            )
+
+        except timeconf.NTPConfigurationError:
             pass
 
     if options.unattended and (
@@ -2532,8 +2540,7 @@ def install_check(options):
     if options.conf_ntp:
         if not options.on_master and not options.unattended and not (
                 options.ntp_servers or options.ntp_pool):
-            options.ntp_servers, options.ntp_pool = \
-                ntpmethods.get_time_source(logger)
+            options.ntp_servers, options.ntp_pool = timeconf.get_time_source()
 
     cli_realm = ds.realm
     cli_realm_source = ds.realm_source
@@ -2635,6 +2642,73 @@ def update_ipa_nssdb():
                                    (nickname, sys_db.secdir, e))
 
 
+def sync_time(ntp_servers, ntp_pool, fstore, statestore):
+    """
+    Will disable any other time synchronization service and configure chrony
+    with given ntp(chrony) server and/or pool using Augeas.
+    If there is no option --ntp-server set IPADiscovery will try to find ntp
+    server in DNS records.
+    """
+    # We assume that NTP servers are discoverable through SRV records in DNS.
+
+    # disable other time&date services first
+    timeconf.force_chrony(statestore)
+
+    if not ntp_servers and not ntp_pool:
+        # autodiscovery happens in case that NTP configuration isn't explicitly
+        # disabled and user did not provide any NTP server addresses or
+        # NTP pool address to the installer interactively or as an cli argument
+        ds = discovery.IPADiscovery()
+        ntp_servers = ds.ipadns_search_srv(
+            cli_domain, '_ntp._udp', None, break_on_first=False
+        )
+        if ntp_servers:
+            for server in ntp_servers:
+                # when autodiscovery found server records
+                logger.debug("Found DNS record for NTP server: \t%s", server)
+
+    logger.info('Synchronizing time')
+
+    configured = False
+    if ntp_servers or ntp_pool:
+        configured = timeconf.configure_chrony(ntp_servers, ntp_pool,
+                                               fstore, statestore)
+    else:
+        logger.warning("No SRV records of NTP servers found and no NTP server "
+                       "or pool address was provided.")
+
+    if not configured:
+        print("Using default chrony configuration.")
+
+    return timeconf.sync_chrony()
+
+
+def restore_time_sync(statestore, fstore):
+    if statestore.has_state('chrony'):
+        chrony_enabled = statestore.restore_state('chrony', 'enabled')
+        restored = False
+
+        try:
+            # Restore might fail due to missing file(s) in backup.
+            # One example is if the client was updated from a previous version
+            # not configured with chrony. In such a cast it is OK to fail.
+            restored = fstore.restore_file(paths.CHRONY_CONF)
+        except ValueError:  # this will not handle possivble IOError
+            logger.debug("Configuration file %s was not restored.",
+                         paths.CHRONY_CONF)
+
+        if not chrony_enabled:
+            services.knownservices.chronyd.stop()
+            services.knownservices.chronyd.disable()
+        elif restored:
+            services.knownservices.chronyd.restart()
+
+    try:
+        timeconf.restore_forced_timeservices(statestore)
+    except CalledProcessError as e:
+        logger.error('Failed to restore time synchronization service: %s', e)
+
+
 def configure_selinux_for_client(statestore):
     def backup_state(key, value):
         statestore.backup_state('selinux', key, value)
@@ -2701,24 +2775,15 @@ def _install(options, tdict):
         tasks.set_hostname(options.hostname)
 
     if options.conf_ntp:
-        # Attempt to configure and sync time with NTP server.
-        if not createntp.sync_time_client(
-                fstore, statestore, cli_domain,
-                options.ntp_servers, options.ntp_pool):
-            print("Warning: IPA client was unable to sync time "
-                  "with IPA server!")
-            print("         Time synchronization is required for IPA "
-                  "to work correctly!")
-        else:
-            print("Time successfully synchronized with IPA server")
+        # Attempt to configure and sync time with NTP server (chrony).
+        sync_time(options.ntp_servers, options.ntp_pool, fstore, statestore)
     elif options.on_master:
         # If we're on master skipping the time sync here because it was done
         # in ipa-server-install
         logger.debug("Skipping attempt to configure and synchronize time with"
-                     " %s server as it has been already done on master.",
-                     TIME_SERVER)
+                     " chrony server as it has been already done on master.")
     else:
-        logger.info("Skipping time synchronization")
+        logger.info("Skipping chrony configuration")
 
     if not options.unattended:
         if (options.principal is None and options.password is None and
@@ -3160,7 +3225,6 @@ def _install(options, tdict):
         tasks.modify_nsswitch_pam_stack(
             sssd=options.sssd,
             mkhomedir=options.mkhomedir,
-            fstore=fstore,
             statestore=statestore,
             sudo=options.conf_sudo,
             subid=options.subid
@@ -3273,7 +3337,11 @@ def _install(options, tdict):
         configure_sshd_config(fstore, options)
 
     if options.location:
-        configure_automount(options)
+        configure_automount(options, statestore)
+
+        # Reload the state as automount install may have modified it
+        fstore._load()
+        statestore._load()
 
     if options.configure_firefox:
         configure_firefox(options, statestore, cli_domain)
@@ -3336,13 +3404,15 @@ def uninstall(options):
     fstore = sysrestore.FileStore(paths.IPA_CLIENT_SYSRESTORE)
     statestore = sysrestore.StateFile(paths.IPA_CLIENT_SYSRESTORE)
 
-    if os.path.isfile(paths.IPA_CLIENT_AUTOMOUNT):
-        try:
-            run([paths.IPA_CLIENT_AUTOMOUNT, "--uninstall", "--debug"])
-        except CalledProcessError as e:
-            if e.returncode != CLIENT_NOT_CONFIGURED:
-                logger.error(
-                    "Unconfigured automount client failed: %s", str(e))
+    statestore.backup_state('installation', 'automount', True)
+    try:
+        run([paths.IPA_CLIENT_AUTOMOUNT, "--uninstall", "--debug"])
+    except CalledProcessError as e:
+        if e.returncode != CLIENT_NOT_CONFIGURED:
+            logger.error(
+                "Unconfigured automount client failed: %s", str(e))
+    finally:
+        statestore.delete_state('installation', 'automount')
 
     # Reload the state as automount unconfigure may have modified it
     fstore._load()
@@ -3385,7 +3455,7 @@ def uninstall(options):
         # - sssd was removed after install and before uninstall
         # - there are no active domains
         # in both cases we cannot continue with SSSD
-        pass
+        all_domains = []
 
     if hostname is None:
         hostname = FQDN
@@ -3444,7 +3514,9 @@ def uninstall(options):
         if result.returncode != 0:
             logger.error("Unenrolling host failed: %s", result.error_log)
 
-    if os.path.exists(paths.IPA_DEFAULT_CONF):
+    if os.path.exists(paths.IPA_DEFAULT_CONF) and os.path.exists(
+        paths.KRB5_KEYTAB
+    ):
         logger.info(
             "Removing Kerberos service principals from /etc/krb5.keytab")
         try:
@@ -3496,6 +3568,18 @@ def uninstall(options):
     # Clean up the SSSD cache before SSSD service is stopped or restarted
     remove_file(paths.SSSD_MC_GROUP)
     remove_file(paths.SSSD_MC_PASSWD)
+    remove_file(paths.SSSD_MC_INITGROUPS)
+    remove_file(paths.SSSD_MC_SID)
+
+    for root, _dirs, files in os.walk(paths.SSSD_PIPES):
+        for file in files:
+            remove_file(os.path.join(root, file))
+
+    for domain in all_domains:
+        name = f"domain_realm_{domain.replace('.', '_')}"
+        filename = os.path.join(paths.SSSD_PUBCONF_KRB5_INCLUDE_D_DIR, name)
+        if os.path.exists(filename):
+            remove_file(filename)
 
     if was_sssd_installed:
         try:
@@ -3514,6 +3598,20 @@ def uninstall(options):
         sssd_domain_ccache = "ccache_" + ipa_domain.upper()
         sssd_ccache_file = os.path.join(paths.SSSD_DB, sssd_domain_ccache)
         remove_file(sssd_ccache_file)
+
+        remove_file(paths.SSSD_LDB)
+        remove_file(paths.SSSD_CONFIG_LDB)
+        # Stop sssd-kcm.service before removing the KCM ccaches database
+        # it is socket-activated and will be restarted whenever needed
+        try:
+            services.service('sssd-kcm', api).stop()
+        except Exception as e:
+            logger.warning("Failed to stop sssd-kcm: %s", e)
+        remove_file(paths.SSSD_SECRETS)
+
+        sssd_timestamps = "timestamps_" + ipa_domain + ".ldb"
+        sssd_timestamps_file = os.path.join(paths.SSSD_DB, sssd_timestamps)
+        remove_file(sssd_timestamps_file)
 
     # Next if-elif-elif construction deals with sssd.conf file.
     # Old pre-IPA domains are preserved due merging the old sssd.conf
@@ -3623,10 +3721,7 @@ def uninstall(options):
                 service.service_name
             )
 
-    createntp.uninstall_client(fstore, statestore)
-    # restore ntp state
-    if TIME_SERVER is not None:
-        restore_state(ntpmethods.SERVICE_API, statestore)
+    restore_time_sync(statestore, fstore)
 
     if was_sshd_configured and services.knownservices.sshd.is_running():
         remove_file(paths.SSHD_IPA_CONFIG)
@@ -3669,12 +3764,16 @@ def uninstall(options):
         logger.warning(
             'Some installation state has not been restored.\n'
             'This may cause re-installation to fail.\n'
-            'It should be safe to remove /var/lib/ipa-client/sysrestore.state '
+            'It should be safe to remove %s '
             'but it may\n mean your system hasn\'t been restored '
-            'to its pre-installation state.')
+            'to its pre-installation state.',
+            os.path.join(paths.IPA_CLIENT_SYSRESTORE,
+                         sysrestore.SYSRESTORE_STATEFILE)
+        )
 
     # Remove the IPA configuration file
     remove_file(paths.IPA_DEFAULT_CONF)
+    remove_file(paths.IPA_DEFAULT_CONF + '.ipabkp')
 
     # Remove misc backups
     remove_file(paths.OPENLDAP_LDAP_CONF + '.ipabkp')

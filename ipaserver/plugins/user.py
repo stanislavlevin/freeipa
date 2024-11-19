@@ -146,8 +146,7 @@ PROTECTED_USERS = ('admin',)
 def check_protected_member(user, protected_group_name=u'admins'):
     '''
     Ensure admin and the last enabled member of a protected group cannot
-    be deleted or disabled by raising ProtectedEntryError or
-    LastMemberError as appropriate.
+    be deleted.
     '''
 
     if user in PROTECTED_USERS:
@@ -157,6 +156,12 @@ def check_protected_member(user, protected_group_name=u'admins'):
             reason=_("privileged user"),
         )
 
+
+def check_last_member(user, protected_group_name=u'admins'):
+    '''
+    Ensure the last enabled member of a protected group cannot
+    be disabled.
+    '''
     # Get all users in the protected group
     result = api.Command.user_find(in_group=protected_group_name)
 
@@ -807,6 +812,7 @@ class user_del(baseuser_del):
         # If the target entry is a Delete entry, skip the orphaning/removal
         # of OTP tokens.
         check_protected_member(keys[-1])
+        check_last_member(keys[-1])
 
         preserve = options.get('preserve', False)
 
@@ -932,8 +938,13 @@ class user_find(baseuser_find):
                                  *keys, **options)
 
         if options.get('whoami'):
+            op_account = getattr(context, 'principal', None)
+            if op_account is None:
+                new_base_dn = DN(ldap.conn.whoami_s()[4:])
+                return ("(objectclass=posixaccount)", new_base_dn, scope)
+
             return ("(&(objectclass=posixaccount)(krbprincipalname=%s))"%\
-                        getattr(context, 'principal'), base_dn, scope)
+                    op_account, base_dn, scope)
 
         preserved = options.get('preserved', False)
         if preserved is None:
@@ -1147,7 +1158,7 @@ class user_disable(LDAPQuery):
     def execute(self, *keys, **options):
         ldap = self.obj.backend
 
-        check_protected_member(keys[-1])
+        check_last_member(keys[-1])
 
         dn, _oc = self.obj.get_either_dn(*keys, **options)
         ldap.deactivate_entry(dn)

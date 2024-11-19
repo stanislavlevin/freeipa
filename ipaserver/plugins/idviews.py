@@ -617,7 +617,9 @@ def resolve_object_to_anchor(ldap, obj_type, obj, fallback_to_ldap):
     # If not successful, try looking up the object in the trusted domain
     try:
         if _dcerpc_bindings_installed:
+            # pylint: disable=used-before-assignment
             domain_validator = ipaserver.dcerpc.DomainValidator(api)
+            # pylint: enable=used-before-assignment
             if domain_validator.is_configured():
                 sid = domain_validator.get_trusted_domain_object_sid(obj,
                         fallback_to_ldap=fallback_to_ldap)
@@ -692,6 +694,20 @@ def resolve_anchor_to_object_name(ldap, obj_type, anchor):
 
                 if type_correct:
                     return name
+        else:
+            # Without the DCERPC bindings the sid is not resolvable, return
+            # ipaAnchorUUID
+            _dn = DN(("cn", api.packages[0].idviews.DEFAULT_TRUST_VIEW_NAME),
+                     api.env.container_views + api.env.basedn)
+            try:
+                entry = ldap.find_entry_by_attr(attr="ipaanchoruuid",
+                                                value=anchor,
+                                                object_class="ipaUserOverride",
+                                                attrs_list=["ipaoriginaluid"],
+                                                base_dn=_dn)
+                return entry.single_value("ipaoriginaluid")
+            except (errors.EmptyResult, errors.NotFound):
+                pass
 
     # No acceptable object was found
     raise errors.NotFound(

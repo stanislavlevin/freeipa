@@ -86,12 +86,12 @@ ACME_CONFIG_FILES = (
 
 
 def check_ports():
-    """Check that dogtag ports (8090, 8443) are available.
+    """Check that dogtag ports (8080, 8443) are available.
 
     Returns True when ports are free, False if they are taken.
     """
     return all([ipautil.check_port_bindable(8443),
-                ipautil.check_port_bindable(8090)])
+                ipautil.check_port_bindable(8080)])
 
 
 def get_preop_pin(instance_root, instance_name):
@@ -345,7 +345,9 @@ class CAInstance(DogtagInstance):
                            ra_p12=None, ra_only=False,
                            promote=False, use_ldaps=False,
                            pki_config_override=None,
-                           random_serial_numbers=False):
+                           random_serial_numbers=False,
+                           token_name=None, token_library_path=None,
+                           token_password=None):
         """Create a CA instance.
 
            To create a clone, pass in pkcs12_info.
@@ -391,6 +393,10 @@ class CAInstance(DogtagInstance):
         self.use_ldaps = use_ldaps
         self.pki_config_override = pki_config_override
 
+        self.tokenname = token_name
+        self.token_library_path = token_library_path
+        self.token_password = token_password
+
         # Determine if we are installing as an externally-signed CA and
         # what stage we're in.
         if csr_file is not None:
@@ -410,7 +416,11 @@ class CAInstance(DogtagInstance):
             if promote:
                 # Setup Database
                 self.step("creating certificate server db", self.__create_ds_db)
+                self.step("ignore time skew for initial replication",
+                          self.replica_ignore_initial_time_skew)
                 self.step("setting up initial replication", self.__setup_replication)
+                self.step("revert time skew after initial replication",
+                          self.replica_revert_time_skew)
                 self.step("creating ACIs for admin", self.add_ipaca_aci)
                 self.step("creating installation admin user", self.setup_admin)
             self.step("configuring certificate server instance",
@@ -435,6 +445,8 @@ class CAInstance(DogtagInstance):
                       configure_lightweight_ca_acls)
             self.step("Ensure lightweight CAs container exists",
                       ensure_lightweight_cas_container)
+            self.step("Enable lightweight CA monitor",
+                      enable_lightweight_ca_monitor)
             self.step(
                 "Ensuring backward compatibility",
                 self.__dogtag10_migration)
@@ -485,6 +497,8 @@ class CAInstance(DogtagInstance):
                     if not self.clone:
                         self.step("Recording random serial number state",
                                   self.__store_random_serial_number_state)
+                        self.step("Recording HSM configuration state",
+                                  self.__store_hsm_configuration_state)
                 else:
                     # Re-import profiles in the promote case to pick up any
                     # that will only be triggered by an upgrade.
@@ -520,6 +534,17 @@ class CAInstance(DogtagInstance):
         cfg = dict(
             pki_ds_secure_connection=self.use_ldaps
         )
+
+        if self.tokenname:
+            module_name = os.path.basename(
+                self.token_library_path
+            ).split('.', 1)[0]
+            cfg['pki_hsm_enable'] = True
+            cfg['pki_hsm_modulename'] = module_name
+            cfg['pki_hsm_libfile'] = self.token_library_path
+            cfg['pki_token_name'] = self.tokenname
+            cfg['pki_token_password'] = self.token_password
+            cfg['pki_sslserver_token'] = 'internal'
 
         if self.ca_signing_algorithm is not None:
             cfg['ipa_ca_signing_algorithm'] = self.ca_signing_algorithm
@@ -565,9 +590,13 @@ class CAInstance(DogtagInstance):
             # if paths.TMP_CA_P12 exists and is not owned by root,
             # shutil.copy will fail if when fs.protected_regular=1
             # so remove the file first
-            ipautil.remove_file(paths.TMP_CA_P12)
-            shutil.copy(cafile, paths.TMP_CA_P12)
-            self.service_user.chown(paths.TMP_CA_P12)
+            if cafile:
+                ipautil.remove_file(paths.TMP_CA_P12)
+                shutil.copy(cafile, paths.TMP_CA_P12)
+                self.service_user.chown(paths.TMP_CA_P12)
+                clone_pkcs12_path = paths.TMP_CA_P12
+            else:
+                clone_pkcs12_path = None
 
             if self.random_serial_numbers:
                 cfg.update(
@@ -585,7 +614,7 @@ class CAInstance(DogtagInstance):
             self._configure_clone(
                 cfg,
                 security_domain_hostname=self.master_host,
-                clone_pkcs12_path=paths.TMP_CA_P12,
+                clone_pkcs12_path=clone_pkcs12_path,
             )
 
         # External CA
@@ -615,6 +644,7 @@ class CAInstance(DogtagInstance):
                 ext_cert = x509.load_unknown_x509_certificate(f.read())
             cert_file.write(ext_cert.public_bytes(x509.Encoding.PEM))
             ipautil.flush_sync(cert_file)
+            self.service_user.chown(cert_file.name)
 
             result = ipautil.run(
                 [paths.OPENSSL, 'crl2pkcs7',
@@ -637,6 +667,8 @@ class CAInstance(DogtagInstance):
             )
 
         nolog_list = [self.dm_password, self.admin_password, pki_pin]
+        if self.token_password:
+            nolog_list.append(self.token_password)
 
         config = self._create_spawn_config(cfg)
         self.set_hsm_state(config)
@@ -903,7 +935,7 @@ class CAInstance(DogtagInstance):
 
         agent_args = [paths.CERTMONGER_DOGTAG_SUBMIT,
                       "--cafile", chain_file.name,
-                      "--ee-url", 'http://%s:8090/ca/ee/ca/' % self.fqdn,
+                      "--ee-url", 'http://%s:8080/ca/ee/ca/' % self.fqdn,
                       "--agent-url",
                       'https://%s:8443/ca/agent/ca/' % self.fqdn,
                       "--certfile", agent_cert.name,
@@ -1083,6 +1115,9 @@ class CAInstance(DogtagInstance):
             except OSError as e:
                 logger.warning("Error while removing CRL publish "
                                "directory: %s", e)
+
+        ipautil.remove_file(paths.DOGTAG_ADMIN_P12)
+        ipautil.remove_file(paths.CACERT_P12)
 
     def unconfigure_certmonger_renewal_guard(self):
         if not self.is_configured():
@@ -1352,6 +1387,8 @@ class CAInstance(DogtagInstance):
         generation master:
         - in CS.cfg ca.crl.MasterCRL.enableCRLCache=true
         - in CS.cfg ca.crl.MasterCRL.enableCRLUpdates=true
+        - in CS.cfg ca.listenToCloneModifications=true
+        - in CS.cfg ca.certStatusUpdateInterval != 0
         - in /etc/httpd/conf.d/ipa-pki-proxy.conf the RewriteRule
         ^/ipa/crl/MasterCRL.bin is disabled (commented or removed)
 
@@ -1367,14 +1404,29 @@ class CAInstance(DogtagInstance):
             updates = directivesetter.get_directive(
                 self.config, 'ca.crl.MasterCRL.enableCRLUpdates', '=')
             enableCRLUpdates = updates.lower() == 'true'
+            listen = directivesetter.get_directive(
+                self.config, 'ca.listenToCloneModifications', '=')
+            enableToClone = listen.lower() == 'true'
+            updateinterval = directivesetter.get_directive(
+                self.config, 'ca.certStatusUpdateInterval', '=')
 
             # If the values are different, the config is inconsistent
-            if enableCRLCache != enableCRLUpdates:
+            if not (enableCRLCache == enableCRLUpdates == enableToClone):
                 raise InconsistentCRLGenConfigException(
                     "Configuration is inconsistent, please check "
-                    "ca.crl.MasterCRL.enableCRLCache and "
-                    "ca.crl.MasterCRL.enableCRLUpdates in {} and "
+                    "ca.crl.MasterCRL.enableCRLCache, "
+                    "ca.crl.MasterCRL.enableCRLUpdates and "
+                    "ca.listenToCloneModifications in {} and "
                     "run ipa-crlgen-manage [enable|disable] to repair".format(
+                        self.config))
+            # If they are the same then we are the CRL renewal master. Ensure
+            # the update task is configured.
+            if enableCRLCache and updateinterval == '0':
+                raise InconsistentCRLGenConfigException(
+                    "Configuration is inconsistent, please check "
+                    "ca.certStatusUpdateInterval in {}. It should "
+                    "be either not present or not zero. Run "
+                    "ipa-crlgen-manage [enable|disable] to repair".format(
                         self.config))
         except IOError:
             raise RuntimeError(
@@ -1432,6 +1484,11 @@ class CAInstance(DogtagInstance):
             str_value = str(setup_crlgen).lower()
             ds.set('ca.crl.MasterCRL.enableCRLCache', str_value)
             ds.set('ca.crl.MasterCRL.enableCRLUpdates', str_value)
+            ds.set('ca.listenToCloneModifications', str_value)
+            if setup_crlgen:
+                ds.set('ca.certStatusUpdateInterval', None)
+            else:
+                ds.set('ca.certStatusUpdateInterval', '0')
 
         # Start pki-tomcat
         logger.info("Starting %s", self.service_name)
@@ -1593,6 +1650,22 @@ class CAInstance(DogtagInstance):
                 api.env.basedn)
         entry_attrs = api.Backend.ldap2.get_entry(dn)
         entry_attrs['ipaCaRandomSerialNumberVersion'] = value
+        api.Backend.ldap2.update_entry(entry_attrs)
+
+    def __store_hsm_configuration_state(self):
+        """
+        Save the HSM token configuration.
+
+        This data is used during replica install to determine whether
+        the remote server uses an HSM.
+        """
+        if not self.token_name or self.token_name == 'internal':
+            return
+        dn = DN(('cn', ipalib.constants.IPA_CA_CN), api.env.container_ca,
+                api.env.basedn)
+        entry_attrs = api.Backend.ldap2.get_entry(dn)
+        entry_attrs['ipaCaHSMConfiguration'] = '{};{}'.format(
+            self.token_name, self.token_library_path)
         api.Backend.ldap2.update_entry(entry_attrs)
 
 
@@ -1781,6 +1854,28 @@ def ensure_lightweight_cas_container():
         objectclass=['top', 'organizationalUnit'],
         ou=['authorities'],
     )
+
+
+def enable_lightweight_ca_monitor():
+
+    # Check LWCA monitor
+    value = directivesetter.get_directive(
+        paths.CA_CS_CFG_PATH,
+        'ca.authorityMonitor.enable',
+        separator='=')
+
+    if value == 'true':
+        return False  # already enabled; restart not needed
+
+    # Enable LWCA monitor
+    directivesetter.set_directive(
+        paths.CA_CS_CFG_PATH,
+        'ca.authorityMonitor.enable',
+        'true',
+        quotes=False,
+        separator='=')
+
+    return True  # restart needed
 
 
 def minimum_acme_support(data=None):

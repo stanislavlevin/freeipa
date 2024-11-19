@@ -40,6 +40,7 @@ from .baseldap import (
     LDAPObject,
     LDAPQuery)
 from .dns import dns_container_exists
+from ipaplatform.paths import paths
 from ipapython.dn import DN
 from ipapython.ipautil import realm_to_suffix
 from ipalib import api, Str, StrEnum, Password, Bool, _, ngettext, Int, Flag
@@ -241,6 +242,7 @@ def verify_samba_component_presence(ldap, api):
         )
 
     # We're ok in this case, bail out
+    # pylint: disable-next=used-before-assignment
     if adtrust_present and _bindings_installed:
         return
 
@@ -339,7 +341,9 @@ def add_range(myapi, trustinstance, range_name, dom_sid, *keys, **options):
             + basedn
 
         # Get the domain validator
+        # pylint: disable=used-before-assignment
         domain_validator = ipaserver.dcerpc.DomainValidator(myapi)
+        # pylint: enable=used-before-assignment
         if not domain_validator.is_configured():
             raise errors.NotFound(
                 reason=_('Cannot search in trusted domains without own '
@@ -969,7 +973,12 @@ ipa idrange-del before retrying the command with the desired range type.
             self.realm_admin,
             self.realm_passwd
         )
-        dom_sid = self.trustinstance.remote_domain.info['sid']
+
+        dom_sid = self.trustinstance.remote_domain.info.get('sid', None)
+        if dom_sid is None:
+            raise errors.RemoteRetrieveError(
+                reason=_('Unable to read domain information, check {}'
+                         ).format(paths.VAR_LOG_HTTPD_ERROR))
 
         if old_range:
             old_dom_sid = old_range['result']['ipanttrusteddomainsid'][0]
@@ -1870,7 +1879,8 @@ class trust_enable_agent(Command):
 
         # the user must have the Replication Administrators privilege
         privilege = u'Replication Administrators'
-        if not principal_has_privilege(self.api, context.principal, privilege):
+        op_account = getattr(context, 'principal', None)
+        if not principal_has_privilege(self.api, op_account, privilege):
             raise errors.ACIError(
                 info=_("not allowed to remotely add agent"))
 

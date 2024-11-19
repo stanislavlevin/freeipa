@@ -1,13 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) YEAR FreeIPA Contributors
 # This file is distributed under the same license as the freeipa package.
-# Temuri Doghonadze <temuri.doghonadze@gmail.com>, 2022.
+# Temuri Doghonadze <temuri.doghonadze@gmail.com>, 2022, 2023, 2024.
+# Weblate Translation Memory <noreply-mt-weblate-translation-memory@weblate.org>, 2024.
 msgid ""
 msgstr ""
 "Project-Id-Version: freeipa 4.10.0.dev202204261349+gitfbfd64fc2\n"
 "Report-Msgid-Bugs-To: https://pagure.io/freeipa/new_issue\n"
-"POT-Creation-Date: 2022-06-29 16:26+0200\n"
-"PO-Revision-Date: 2022-08-18 12:19+0000\n"
+"POT-Creation-Date: 2024-05-28 15:09+0200\n"
+"PO-Revision-Date: 2024-02-22 14:36+0000\n"
 "Last-Translator: Temuri Doghonadze <temuri.doghonadze@gmail.com>\n"
 "Language-Team: Georgian <https://translate.fedoraproject.org/projects/"
 "freeipa/master/ka/>\n"
@@ -16,7 +17,100 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 4.13\n"
+"X-Generator: Weblate 5.4\n"
+
+msgid ""
+"\n"
+"\n"
+"EXAMPLES:\n"
+msgstr ""
+"\n"
+"\n"
+"მაგალითები\n"
+
+msgid ""
+"\n"
+"Certificate Identity Mapping\n"
+msgstr ""
+"\n"
+"სერტიფიკატის იდენტიფიკატორის ასახვა\n"
+
+msgid ""
+"\n"
+"DNS server configuration\n"
+msgstr ""
+"\n"
+"DNS სერვერის მორგება\n"
+
+msgid ""
+"\n"
+"EXAMPLES:\n"
+msgstr ""
+"\n"
+"მაგალითები\n"
+
+msgid ""
+"\n"
+"IPA certificate operations\n"
+msgstr ""
+"\n"
+"IPA სერტიფიკატის ოპერაციები\n"
+
+msgid ""
+"\n"
+"IPA locations\n"
+msgstr ""
+"\n"
+"IPA-ის მდებარეობები\n"
+
+msgid ""
+"\n"
+"IPA server roles\n"
+msgstr ""
+"\n"
+"IPA სერვერის როლები\n"
+
+msgid ""
+"\n"
+"IPA servers\n"
+msgstr ""
+"\n"
+"IPA-ის სერვერები\n"
+
+msgid ""
+"\n"
+"Manage Certificate Authorities\n"
+msgstr ""
+"\n"
+"სერტიფიკატის გამომმცემლების მართვა\n"
+
+msgid ""
+"\n"
+"Manage Passkey configuration.\n"
+msgstr ""
+"\n"
+"საკვანძო გასაღების მორგების მართვა.\n"
+
+msgid ""
+"\n"
+"Managed permissions\n"
+msgstr ""
+"\n"
+"მართული წვდომები\n"
+
+msgid ""
+"\n"
+"Manipulate DNS server configuration\n"
+msgstr ""
+"\n"
+"DNS სერვერის კონფიგურაციის შეცვლა\n"
+
+msgid ""
+"\n"
+"Passkey configuration\n"
+msgstr ""
+"\n"
+"საკვანძო გასაღების მორგება\n"
 
 msgid ""
 "\n"
@@ -25,12 +119,176 @@ msgstr ""
 "\n"
 "წვდომები\n"
 
+msgid ""
+"\n"
+"RADIUS Proxy Servers\n"
+msgstr ""
+"\n"
+"RADIUS-ის პროქსი სერვერები\n"
+
+msgid ""
+"\n"
+"Sudo Rules\n"
+msgstr ""
+"\n"
+"Sudo-ის წესები\n"
+
+msgid ""
+"\n"
+"Vaults\n"
+msgstr ""
+"\n"
+"საცავები\n"
+
+msgid ""
+"\n"
+"YubiKey Tokens\n"
+msgstr ""
+"\n"
+"YubiKey კოდები\n"
+
+msgid "    * 0 - unspecified\n"
+msgstr "    * 0 - მიუთითებელი\n"
+
+msgid "    * 6 - certificateHold\n"
+msgstr "    * 6 - სერტიფიკატის შეჩერება\n"
+
+#, python-format
+msgid "%(exception)s"
+msgstr "%(exception)s"
+
+#, python-format
+msgid "%(host)s failed"
+msgstr "%(host)s ჩავარდა"
+
+#, python-format
+msgid "%(info)s"
+msgstr "%(info)s"
+
+#, python-format
+msgid "%(line)s"
+msgstr "%(line)s"
+
+#, python-format
+msgid "%(reason)s"
+msgstr "%(reason)s"
+
+#, python-format
+msgid "%(value)s"
+msgstr "%(value)s"
+
+#, python-format
+msgid "%i service added."
+msgstr "დაემატა %i სერვისი."
+
+#, python-format
+msgid "%i services added."
+msgstr "დაემატა %i სერვისი."
+
 #, python-format
 msgid "%s"
 msgstr "%s"
 
+#, python-format
+msgid "%s Record"
+msgstr "%s ჩანაწერი"
+
+#, python-format
+msgid "%s record"
+msgstr "%s ჩანაწერი"
+
+#, python-format
+msgid "%s to add"
+msgstr "დასამატებელი %s"
+
+#, python-format
+msgid "%s: group not found"
+msgstr "%s: ჯგუფი ვერ ვიპოვე"
+
+#, python-format
+msgid "'%(name)s' is required"
+msgstr "\"%(name)s\" აუცილებელია"
+
+msgid "(deprecated)"
+msgstr "(მოძველებულია)"
+
+msgid "(server-side) "
+msgstr "(სერვერის-მხარეს) "
+
+msgid "<all IPA DNS servers>"
+msgstr "<ყველა IPA DNS სერვერი>"
+
+msgid "A Create reverse"
+msgstr "A უკუჩანაწერის შექმნა"
+
 msgid "A IP Address"
 msgstr "IP მისამართი"
+
+msgid "A description of this host"
+msgstr "ამ ჰოსტის აღწერა"
+
+msgid "A host willing to act as a mail exchanger"
+msgstr "ჰოსტი, რომელსაც ელფოსტის მიმომცვლელობა სურს"
+
+msgid "A hostname which this alias hostname points to"
+msgstr "ჰოსტის სახელი, რომელზეც ეს ფსევდონიმი ჰოსტის სახელი მიუთითებს"
+
+msgid "A record"
+msgstr "A ჩანაწერი"
+
+msgid "A6 Record data"
+msgstr "A6 ჩანაწერის მონაცემები"
+
+msgid "A6 record"
+msgstr "A6 ჩანაწერი"
+
+msgid "AA Compromise"
+msgstr "AA კომპრომისი"
+
+msgid "AAAA Create reverse"
+msgstr "AAAA უკუჩანაწერის შექმნა"
+
+msgid "AAAA IP Address"
+msgstr "AAAA IP მისამართი"
+
+msgid "AAAA record"
+msgstr "AAAA ჩანაწერი"
+
+msgid "ACI"
+msgstr "ACI"
+
+msgid "ACI name"
+msgstr "ACI სახელი"
+
+msgid "ACI prefix"
+msgstr "ACI პრეფიქსი"
+
+msgid "ACI prefix is required"
+msgstr "ACI პრეფიქსი აუცილებელია"
+
+msgid "ACIs"
+msgstr "ACI-ები"
+
+msgid "ACL name"
+msgstr "ACL-ის სახელი"
+
+msgid "AD Trust setup"
+msgstr "AD ნდობის მორგება"
+
+msgid "AFSDB Hostname"
+msgstr "AFSDB ჰოსტის სახელი"
+
+msgid "AFSDB Subtype"
+msgstr "AFSDB ქვეტიპი"
+
+msgid "AFSDB record"
+msgstr "AFSDB ჩანაწერი"
+
+msgid "API Browser"
+msgstr "API-ის ბრაუზერი"
+
+msgid "APL record"
+msgstr "APL ჩანაწერი"
 
 msgid "About"
 msgstr "შესახებ"
@@ -38,11 +296,30 @@ msgstr "შესახებ"
 msgid "Access Denied"
 msgstr "წვდომა აკრძალულია"
 
+msgid "Access Granted"
+msgstr "წვდომა გაცემულია"
+
+#, python-format
+msgid "Access granted: %s"
+msgstr "წვდომა მინიჭებულია: %s"
+
+msgid "Access time"
+msgstr "წვდომის დრო"
+
+msgid "Accessing"
+msgstr "წვდომა"
+
 msgid "Account"
 msgstr "ანგარიში"
 
 msgid "Account Settings"
 msgstr "ანგარიშის მორგება"
+
+msgid "Account Status"
+msgstr "ანგარიშის სტატუსი"
+
+msgid "Account disabled"
+msgstr "ანგარიში გათიშულია"
 
 msgid "Actions"
 msgstr "ქმედებები"
@@ -53,11 +330,185 @@ msgstr "აქტივაცია"
 msgid "Active Directory domain"
 msgstr "Active Directory-ის დომენი"
 
+msgid "Active Directory domain administrator"
+msgstr "Active Directory-ის დომენის ადმინისტრატორი"
+
+msgid "Active Directory domain administrator's password"
+msgstr "Active Directory-ის დომენის ადმინისტრატორის პაროლი"
+
+msgid "Active Directory domain range"
+msgstr "Active Directory-ის დომენის დიაპაზონი"
+
+msgid "Active Directory domain with POSIX attributes"
+msgstr "Active Directory-ის დომენი POSIX ატრიბუტებით"
+
+msgid "Active Directory trust range with POSIX attributes"
+msgstr "Active Directory-ის ნდობის შუალედი POSIX ატრიბუტებით"
+
+msgid "Active Directory winsync"
+msgstr "Active Directory-ის winsync"
+
+msgid "Active directory domain administrator's password"
+msgstr "Active Directory-ის დომენის ადმინისტრატორის პაროლი"
+
+msgid "Active users"
+msgstr "აქტიური მომხმარებლები"
+
+msgid "Active zone"
+msgstr "აქტიური ზონა"
+
 msgid "Add"
 msgstr "დამატება"
 
+msgid "Add Custom Attribute"
+msgstr "მომხმარებლის ატრიბუტის დამატება"
+
+msgid "Add DNS resource record"
+msgstr "DNS რესურსის ჩანაწერის დამატება"
+
+msgid "Add DNS zone"
+msgstr "DNS-ის ზონის დამატება"
+
+msgid "Add HBAC rule"
+msgstr "HBAC წესის დამატება"
+
+msgid "Add HBAC service"
+msgstr "HBAC სერვისის დამატება"
+
+msgid "Add HBAC service group"
+msgstr "HBAC სერვისის ჯგუფის დამატება"
+
+msgid "Add ID range"
+msgstr "ID-ის დიაპაზონის დამატება"
+
+msgid "Add ID view"
+msgstr "ID ხედის დამატება"
+
+msgid "Add IPA location"
+msgstr "IPA მდებარეობის დამატება"
+
+msgid "Add Passkey"
+msgstr "საკვანძო სიტყვის დამატება"
+
+msgid "Add RADIUS server"
+msgstr "RADIUS სერვერის დამატება"
+
+msgid "Add SELinux user map"
+msgstr "SELinux-ის მომხმარებლის რუკის წესის დამატება"
+
+msgid "Add SIDs"
+msgstr "SID-ების დამატება"
+
+msgid "Add a new DNS server."
+msgstr "ახალი DNS სერვერის დამატება."
+
+msgid "Add a new Group ID override."
+msgstr "ახალი ჯგუფის ID-ის გადაფარვის დამატება."
+
+msgid "Add a new HBAC service."
+msgstr "ახალი HBAC სერვისის დამატება."
+
+msgid "Add a new ID View."
+msgstr "ახალი ID ხედის დამატება."
+
+msgid "Add a new ID override."
+msgstr "ახალი ID-ის გადაფარვის დამატება."
+
+msgid "Add a new IPA location."
+msgstr "ახალი IPA მდებარეობის დამატება."
+
+msgid "Add a new IPA new service."
+msgstr "IPA-ის ახალი სერვისის დამატება."
+
+msgid "Add a new IPA service."
+msgstr "ახალი IPA-ის სერვისის დამატება."
+
+msgid "Add a new OTP token."
+msgstr "ახალი OTP კოდის დამატება."
+
+msgid "Add a new SMB service."
+msgstr "ახალი SMB სერვისის დამატება."
+
+msgid "Add a new User ID override."
+msgstr "ახალი მომხმარებლის ID-ის გადაფარვის დამატება."
+
+msgid "Add a new delegation."
+msgstr "ახალი დელეგაციის დამატება."
+
 msgid "Add a new host."
 msgstr "ახალი ჰოსტის დამატება."
+
+msgid "Add a new hostgroup."
+msgstr "ახალი ჰოსტების ჯგუფის დამატება."
+
+msgid "Add a new netgroup."
+msgstr "ახალი ქსელურ ჯგუფის დამატება."
+
+msgid "Add a new permission."
+msgstr "ახალი წვდომის დამატება."
+
+msgid "Add a new privilege."
+msgstr "ახალი პრივილეგიის დამატება."
+
+msgid "Add a new role."
+msgstr "ახალი როლის დამატება."
+
+msgid "Add a new segment."
+msgstr "ახალი სეგმენტის დამატება."
+
+msgid "Add a new stage user."
+msgstr "ახალი დროებითი მომხმარებლის დამატება."
+
+msgid "Add a new subordinate id."
+msgstr "ახალი დამხმარე ID-ის დამატება."
+
+msgid "Add a new user."
+msgstr "ახალი მომხმარებლის დამატება."
+
+msgid "Add a vault."
+msgstr "საცავის დამატება."
+
+msgid "Add and Close"
+msgstr "დამატება და დახურვა"
+
+msgid "Add automount location"
+msgstr "ავტომიმაგრების მდებარეობის დამატება"
+
+msgid "Add certificate authority"
+msgstr "სერტიფიკატების გამომცემლის დამატება"
+
+msgid "Add certificate mapping data"
+msgstr "სერტიფიკატის ასახვის მონაცემების დამატება"
+
+msgid "Add certificates to host entry"
+msgstr "ჰოსტის ჩანაწერში სერტიფიკატების დამატება"
+
+msgid "Add custom value"
+msgstr "მომხმარებლის მნიშვნელობის დამატება"
+
+msgid "Add domain"
+msgstr "დომენის დამატება"
+
+msgid "Add host"
+msgstr "ჰოსტის დამატება"
+
+msgid "Add host group"
+msgstr "ჰოსტების ჯგუფის დამატება"
+
+msgid "Add netgroup"
+msgstr "ქსელურ ჯგუფის დამატება"
+
+msgid "Add new DNS resource record."
+msgstr "ახალი DNS რესურსის ჩანაწერის დამატება."
+
+msgid "Add password policy"
+msgstr "პაროლის პოლიტიკის დამატება"
+
+msgid "Add permission"
+msgstr "წვდომის დამატება"
+
+msgid "Add privilege"
+msgstr "პრივილეგიის დამატება"
 
 msgid "Add role"
 msgstr "როლის დამატება"
@@ -65,14 +516,108 @@ msgstr "როლის დამატება"
 msgid "Add rule"
 msgstr "წესის დამატება"
 
+msgid "Add self service permission"
+msgstr "თვითმომსახურების სერვისის წვდომის დამატება"
+
 msgid "Add service"
 msgstr "სერვისის დამატება"
+
+msgid "Add services to a CA ACL."
+msgstr "CA ACL-სთვის სერვისების დამატება."
+
+msgid "Add services to an HBAC rule."
+msgstr "სერვისების დამატება HBAC წესისთვის."
+
+msgid "Add stage user"
+msgstr "დროებითი მომხმარებლის დამატება"
+
+msgid "Add subid"
+msgstr "ქვეID-ის დამატება"
+
+msgid "Add sudo command"
+msgstr "'sudo' ბრძანების დამატება"
+
+msgid "Add sudo command group"
+msgstr "Sudo-ის ბრძანებების ჯგუფის დამატება"
+
+msgid "Add sudo rule"
+msgstr "Sudo წესის დამატება"
+
+msgid "Add trust"
+msgstr "ნდობის დამატება"
 
 msgid "Add user"
 msgstr "მომხმარებლის დამატება"
 
+msgid "Add user ID override"
+msgstr "ID-ის გადაფარვის დამატება"
+
+msgid "Add user group"
+msgstr "მომხმარებლის ჯგუფის დამატება"
+
+msgid "Add vault"
+msgstr "საცავის დამატება"
+
+#, python-format
+msgid "Added %(map)s"
+msgstr "დაემატა %(map)s"
+
+#, python-format
+msgid "Added HBAC rule \"%(value)s\""
+msgstr "დაემატა HBAC წესი \"%(value)s\""
+
+#, python-format
+msgid "Added HBAC service \"%(value)s\""
+msgstr "დაემატა HBAC სერვისი \"%(value)s\""
+
+#, python-format
+msgid "Added HBAC service group \"%(value)s\""
+msgstr "დაემატა HBAC სერვისის ჯგუფი \"%(value)s\""
+
+#, python-format
+msgid "Added group \"%(value)s\""
+msgstr "დაემატა ჯგუფი \"%(value)s\""
+
+#, python-format
+msgid "Added host \"%(value)s\""
+msgstr "დაემატა ჰოსტი \"%(value)s\""
+
+#, python-format
+msgid "Added role \"%(value)s\""
+msgstr "დაემატა როლი \"%(value)s\""
+
+#, python-format
+msgid "Added segment \"%(value)s\""
+msgstr "დაემატა სეგმენტი \"%(value)s\""
+
+#, python-format
+msgid "Added selfservice \"%(value)s\""
+msgstr "დაემატა თვითმომსახურება \"%(value)s\""
+
+#, python-format
+msgid "Added service \"%(value)s\""
+msgstr "დაემატა სერვისი \"%(value)s\""
+
+#, python-format
+msgid "Added stage user \"%(value)s\""
+msgstr "დაემატა დროებითი მომხმარებელი \"%(value)s\""
+
+#, python-format
+msgid "Added user \"%(value)s\""
+msgstr "დაემატა მომხმარებელი \"%(value)s\""
+
+#, python-format
+msgid "Added vault \"%(value)s\""
+msgstr "დაემატა საცავი \"%(value)s\""
+
 msgid "Administrative account"
 msgstr "ადმინისტრატიული წვდომა"
+
+msgid "Administrator e-mail address"
+msgstr "ადმინისტრატორის ელფოსტის მისამართი"
+
+msgid "Affiliation Changed"
+msgstr "დაქვემდებარება შეიცვალა"
 
 msgid "Algorithm"
 msgstr "ალგორითმი"
@@ -83,23 +628,71 @@ msgstr "ყველა"
 msgid "Allow"
 msgstr "დაშვება"
 
+msgid "Allow dynamic updates."
+msgstr "დინამიკური განახლებების დაშვება."
+
+msgid "Allow query"
+msgstr "მოთხოვნის დაშვება"
+
+msgid "Allow transfer"
+msgstr "გადაცემის დაშვება"
+
+msgid "Allowed Target"
+msgstr "დაშვებული სამიზნე"
+
 msgid "Altitude"
 msgstr "სიმაღლე"
 
 msgid "Always ask"
 msgstr "ყოველთვის კითხვა"
 
+msgid "Any Command"
+msgstr "ნებისმიერი ბრძანება"
+
+msgid "Any Group"
+msgstr "ნებისმიერი ჯგუფი"
+
+msgid "Any Host"
+msgstr "ნებისმიერი ჰოსტი"
+
+msgid "Any Profile"
+msgstr "ნებისმიერი პროფილი"
+
 msgid "Any Service"
 msgstr "ნებისმიერი სერვისი"
+
+msgid "Anyone"
+msgstr "ნებისმიერი"
 
 msgid "Apply"
 msgstr "გამოყენება"
 
+msgid "Apply to host groups"
+msgstr "ჰოსტების ჯგუფზე გადატარება"
+
+msgid "Archive data into a vault."
+msgstr "მონაცემების დაარქივება საცავში."
+
+msgid "Asymmetric"
+msgstr "ასიმეტრიული"
+
 msgid "Attribute"
 msgstr "ატრიბუტი"
 
+msgid "Attribute Key"
+msgstr "ატრიბუტის გასაღები"
+
+msgid "Attribute breakdown"
+msgstr "ატრიბუტის დაშლა"
+
 msgid "Attributes"
 msgstr "ატრიბუტები"
+
+msgid "Attributes to replicate"
+msgstr "ატრიბუტები რეპლიკაციისთვის"
+
+msgid "Attributes to strip"
+msgstr "მოსაცილებელი ატრიბუტები"
 
 msgid "Audit"
 msgstr "აუდიტი"
@@ -110,29 +703,126 @@ msgstr "ავთენტიკაცია"
 msgid "Authentication"
 msgstr "ავთენტიკაცია"
 
+msgid "Authentication Indicators"
+msgstr "ავთენტიკაციის ინდიკატორები"
+
+msgid "Authentication indicator"
+msgstr "ავთენტიკაციის ინდიკატორი"
+
+msgid "Authentication indicators"
+msgstr "ავთენტიკაციის ინდიკატორები"
+
+msgid "Authoritative nameserver"
+msgstr "ავტორიტეტული DNS სერვერი"
+
+msgid "Authoritative nameserver domain name"
+msgstr "ავტორიტეტული DNS სერვერის დომენის სახელი"
+
+msgid "Authorization URI"
+msgstr "ავტორიზაციის URI"
+
+msgid "Auto private groups"
+msgstr "ავტომატური პირადი ჯგუფები"
+
+msgid "Automember"
+msgstr "ავტოწევრი"
+
+msgid "Automount"
+msgstr "ავტომატური მიმაგრება"
+
+msgid "Automount Location"
+msgstr "ავტომიმაგრების მდებარეობა"
+
+msgid "Automount Location Settings"
+msgstr "ავტომიმაგრების მდებარეობის მორგება"
+
+msgid "Automount Locations"
+msgstr "ავტომიმაგრების მდებარეობები"
+
+msgid "Automount master file."
+msgstr "ძირითადი ფაილის ავტომიმაგრება."
+
 msgid "Available"
 msgstr "ხელმისაწვდომია"
+
+msgid "BIND update policy"
+msgstr "BIND-ის განახლების პოლიტიკა"
 
 msgid "Back"
 msgstr "უკან"
 
+msgid "Bad format in credentials cache"
+msgstr "არასწორი ფორმატი ავტორიზაციის დეტალების კეშში"
+
 msgid "Base DN"
 msgstr "საბაზისო DN"
+
+msgid "Base ID"
+msgstr "საბაზისო ID"
 
 msgid "Base URL"
 msgstr "ძირითადი URL"
 
+msgid "Binary data to archive"
+msgstr "დასაარქივებელია ბინარული მონაცემები"
+
 msgid "CA"
 msgstr "CA"
+
+msgid "CA Compromise"
+msgstr "CA-ის კომპრომისი"
 
 msgid "CA certificate"
 msgstr "CA სერტიფიკატი"
 
+msgid "CAs"
+msgstr "CA-ები"
+
+msgid "CERT Algorithm"
+msgstr "CERT ალგორითმი"
+
+msgid "CERT Certificate Type"
+msgstr "CERT სერტიფიკატის ტიპი"
+
+msgid "CERT Certificate/CRL"
+msgstr "CERT სერტიფიკატი/CRL"
+
+msgid "CERT Key Tag"
+msgstr "CERT გასაღების ჭდე"
+
+msgid "CERT record"
+msgstr "CERT ჩანაწერი"
+
+msgid "CIFS credentials object"
+msgstr "CIFS ავტორიზაციის დეტალის ობიექტი"
+
+msgid "CLI name"
+msgstr "CLI-ის სახელი"
+
+msgid "CNAME Hostname"
+msgstr "CNAME-ის ჰოსტის სახელი"
+
+msgid "CNAME record"
+msgstr "CNAME ჩანაწერი"
+
+msgid "CSR"
+msgstr "CSR"
+
 msgid "Cancel"
 msgstr "გაუქმება"
 
+#, c-format
+msgid "Cannot get host's FQDN!\n"
+msgstr "ჰოსტის FQDN ვერ მივიღე!\n"
+
+msgid "Car License"
+msgstr "ტარების უფლება"
+
 msgid "Certificate"
 msgstr "სერტიფიკატი"
+
+msgid "Certificate Association Data"
+msgstr "სერტიფიკატის ასოცირების მონაცემები"
 
 msgid "Certificate Authorities"
 msgstr "სერტიფიკატების გამომცემელი"
@@ -140,17 +830,88 @@ msgstr "სერტიფიკატების გამომცემე�
 msgid "Certificate Authority"
 msgstr "სერტიფიკატების გამომცემელი"
 
+msgid "Certificate Data"
+msgstr "სერტიფიკატის მონაცემები"
+
+msgid "Certificate For Match"
+msgstr "სერტიფიკატების დამთხვევისთვის"
+
 msgid "Certificate Hold"
 msgstr "სერტიფიკატის შეჩერება"
+
+msgid "Certificate Hold Removed"
+msgstr "სერტიფიკატის შეჩერება გაუქმდა"
+
+msgid "Certificate Identity Mapping Rule"
+msgstr "სერტიფიკატის იდენტიფიკაციის ასახვის წესი"
+
+msgid "Certificate Identity Mapping Rule name"
+msgstr "სერტიფიკატის იდენტიფიკაციის ასახვის წესის სახელი"
+
+msgid "Certificate Identity Mapping Rules"
+msgstr "სერტიფიკატის იდენტიფიკაციის ასახვის წესები"
+
+msgid "Certificate Mapping Match"
+msgstr "სერტიფიკატის ასახვა ემთხვევა"
+
+msgid "Certificate Profile"
+msgstr "სერტიფიკატის პროფილი"
+
+msgid "Certificate Profile to use"
+msgstr "გამოსაყენებელი სერტიფიკატის პროფილები"
+
+msgid "Certificate Profiles"
+msgstr "სერტიფიკატის პროფილები"
+
+msgid "Certificate Profiles to add"
+msgstr "დასამატებელი სერტიფიკატის პროფილები"
+
+msgid "Certificate Profiles to remove"
+msgstr "წასაშლელი სერტიფიკატის პროფილები"
+
+msgid "Certificate Revoked"
+msgstr "სერტიფიკატი გაუქმდა"
+
+msgid "Certificate Subject base"
+msgstr "სერტიფიკატის თემის ბაზა"
 
 msgid "Certificate Type"
 msgstr "სერტიფიკატის ტიპი"
 
+msgid "Certificate Usage"
+msgstr "სერტიფიკატის გამოყენება"
+
+msgid "Certificate chain"
+msgstr "სერტიფიკატების ჯაჭვი"
+
+msgid "Certificate mapping data"
+msgstr "სერტიფიკატის ის ასახვის მონაცემები"
+
+msgid "Certificate requested"
+msgstr "სერტიფიკატი მოთხოვნილია"
+
+#, python-format
+msgid "Certificate(s) stored in file '%(file)s'"
+msgstr "ფაილში \"%(file)s\" დამახსოვრებული სერტიფიკატ(ებ)-ი"
+
+msgid "Certificate/CRL"
+msgstr "სერტიფიკატი/CRL"
+
 msgid "Certificates"
 msgstr "სერტიფიკატები"
 
+msgid "Cessation of Operation"
+msgstr "ოპერაცის დასრულება"
+
 msgid "Change password"
 msgstr "პაროლის შეცვლა"
+
+#, python-format
+msgid "Changed password for \"%(value)s\""
+msgstr "პაროლი შეცვლილია მომხმარებლისთვის \"%(value)s\""
+
+msgid "Character classes"
+msgstr "სიმბოლოს კლასები"
 
 msgid "City"
 msgstr "ქალაქი"
@@ -164,8 +925,18 @@ msgstr "გაწმენდა"
 msgid "Close"
 msgstr "დახურვა"
 
+#, c-format
+msgid "Closing keytab failed\n"
+msgstr "გასაღებების ცხრილის დახურვა ჩავარდა\n"
+
 msgid "Collapse All"
 msgstr "ყველას ჩაკეცვა"
+
+msgid "Comma separated encryption types list"
+msgstr "მძიმით გამოყოფილი დაშიფვრის ტიპების სია"
+
+msgid "Command name"
+msgstr "ბრძანების სახელი"
 
 msgid "Commands"
 msgstr "ბრძანებები"
@@ -176,6 +947,12 @@ msgstr "სახელი"
 msgid "Configuration"
 msgstr "მორგება"
 
+msgid "Configuration string"
+msgstr "კონფიგურაციის სტრიქონი"
+
+msgid "Configure your token"
+msgstr "მოირგეთ თქვენი კოდი"
+
 msgid "Confirm (password)"
 msgstr "დადასტურება (პაროლი)"
 
@@ -185,14 +962,50 @@ msgstr "დასტური"
 msgid "Connectivity"
 msgstr "დაკავშირება"
 
+msgid "Contact Settings"
+msgstr "კონტაქტის მორგება"
+
+msgid "Contact this specific KDC Server"
+msgstr "მითითებულ KDC სერვერთან დაკავშირება"
+
 msgid "Continue"
 msgstr "გაგრძელება"
+
+msgid "Counter"
+msgstr "მთვლელი"
+
+msgid "Create a new HBAC rule."
+msgstr "ახალი HBAC წესის შექმნა."
+
+msgid "Create a new group."
+msgstr "ახალი ჯგუფის შექმნა."
+
+msgid "Create a new vault."
+msgstr "ახალი საცავის შექმნა."
+
+msgid "Create new ACI."
+msgstr "ახალი ACI-ის შექმნა."
+
+msgid "Create reverse"
+msgstr "უკუჩანაწერის შექმნა"
+
+msgid "Credential type"
+msgstr "ავტორიზაციის დეტალის ტიპი"
 
 msgid "Credentials"
 msgstr "მომხმ/პაროლი"
 
+msgid "Credentials cache permissions incorrect"
+msgstr "ავტორიზაციის დეტალების ქეშის წვდომები არასწორია"
+
+msgid "Current DNS record contents:\n"
+msgstr "მიმდინარე DNS ჩანაწერის შემცველობა:\n"
+
 msgid "Current Password"
 msgstr "მიმდინარე პაროლი"
+
+msgid "Current password is required"
+msgstr "აუცილებელია მიმდინარე პაროლი"
 
 msgid "Custom value"
 msgstr "მითითებული მნიშვნელობა"
@@ -200,14 +1013,76 @@ msgstr "მითითებული მნიშვნელობა"
 msgid "Customization"
 msgstr "ხელით შეტანილი ცვლილებები"
 
+msgid "DHCID record"
+msgstr "DHCID ჩანაწერი"
+
+msgid "DLV Algorithm"
+msgstr "DLV ალგორითმი"
+
+msgid "DLV Digest"
+msgstr "DLV დაიჯესტი"
+
+msgid "DLV Digest Type"
+msgstr "DLV დაიჯესტის ტიპი"
+
+msgid "DLV Key Tag"
+msgstr "DLV გასაღების ჭდე"
+
+msgid "DLV record"
+msgstr "DLV ჩანაწერი"
+
+msgid "DNAME Target"
+msgstr "DNAME სამიზნე"
+
+msgid "DNAME record"
+msgstr "DNAME ჩანაწერი"
+
 msgid "DNS"
 msgstr "DNS"
+
+#, c-format
+msgid "DNS Discovery failed\n"
+msgstr "DNS აღმოჩენა ჩავარდა\n"
+
+msgid "DNS Global Configuration"
+msgstr "DNS-ის გლობალური კონფიგურაცია"
+
+msgid "DNS Resource Record"
+msgstr "DNS რესურსის ჩანაწერი"
+
+msgid "DNS Resource Records"
+msgstr "DNS რესურსის ჩანაწერები"
 
 msgid "DNS Server"
 msgstr "DNS სერვერი"
 
+msgid "DNS Server name"
+msgstr "DNS სერვერის სახელი"
+
 msgid "DNS Servers"
 msgstr "DNS სერვერები"
+
+msgid "DNS Zone"
+msgstr "DNS ზონა"
+
+msgid "DNS Zone Settings"
+msgstr "DNS-ის ზონის მორგება"
+
+msgid "DNS Zones"
+msgstr "DNS ზონები"
+
+msgid "DNS class"
+msgstr "DNS კლასი"
+
+msgid "DNS configuration options"
+msgstr "DNS-ის კონფიგურაციის პარამეტრები"
+
+#, c-format
+msgid "DNS discovery for domain %s\n"
+msgstr "DNS აღმოჩენა დომენისთვის %s\n"
+
+msgid "DNS forwarder"
+msgstr "DNS გადამგზავნი"
 
 msgid "DNS label cannot be longer than 63 characters"
 msgstr "DNS-ის ჭდე 64 სიმბოლოზე გრძელი არ შეიძლება იყოს"
@@ -215,11 +1090,44 @@ msgstr "DNS-ის ჭდე 64 სიმბოლოზე გრძელი �
 msgid "DNS label cannot be longer that 63 characters"
 msgstr "DNS-ის ჭდე არ შეიძლება 63 სიმბოლოზე გრძელი იყოს"
 
+msgid "DNS resource record"
+msgstr "DNS რესურსის ჩანაწერი"
+
+msgid "DNS resource record type"
+msgstr "DNS რესურსის ჩანაწერის ტიპი"
+
+msgid "DNS resource records"
+msgstr "DNS რესურსის ჩანაწერები"
+
 msgid "DNS server"
 msgstr "DNS სერვერი"
 
 msgid "DNS servers"
 msgstr "DNS სერვერები"
+
+msgid "DNS zone"
+msgstr "DNS ზონა"
+
+msgid "DNS zones"
+msgstr "DNS ზონები"
+
+msgid "DNSKEY record"
+msgstr "DNSKEY ჩანაწერი"
+
+msgid "DS Algorithm"
+msgstr "DS ალგორითმი"
+
+msgid "DS Digest"
+msgstr "DS დაიჯესტი"
+
+msgid "DS Digest Type"
+msgstr "DS დაიჯესტის ტიპი"
+
+msgid "DS Key Tag"
+msgstr "DS გასაღების ჭდე"
+
+msgid "DS record"
+msgstr "DS ჩანაწერი"
 
 msgid "Data"
 msgstr "მონაცემები"
@@ -228,10 +1136,140 @@ msgid "Debugging output"
 msgstr "დამატებითი ინფორმაციის გამოტანა"
 
 msgid "Default"
-msgstr "ნაგულისხმები"
+msgstr "ნაგულისხმევი"
+
+msgid "Default PAC types"
+msgstr "ნაგულისხმევი PAC ტპები"
+
+msgid "Default SELinux user"
+msgstr "ნაგულისხმევი SELinux-ის მომხმარებელი"
+
+msgid "Default attributes"
+msgstr "ნაგულისხმევი ატრიბუტები"
+
+msgid "Default e-mail domain"
+msgstr "ნაგულისხმევი ელფოსტის დომენი"
+
+msgid "Default from"
+msgstr "ნაგულისხმევს წყარო"
+
+msgid "Default group for new users"
+msgstr "ნაგულისხმევი ჯგუფი ახალი მომხმარებლებისთვის"
+
+msgid "Default group objectclasses"
+msgstr "ნაგულისხმები ჯგუფის objectclass-ები"
+
+msgid "Default host group"
+msgstr "ნაგულისხმევი ჰოსტების ჯგუფი"
+
+msgid "Default location of home directories"
+msgstr "საწყისი საქაღალდეების ნაგულისხმევი მდებარეობა"
+
+msgid "Default shell"
+msgstr "ნაგულისხმევი გარსი"
+
+msgid "Default shell for new users"
+msgstr "ნაგულისხმევი გარსი ახალი მომხმარებლებისთვის"
+
+msgid "Default types of PAC supported for services"
+msgstr "სერვისებისთვის მხარდაჭერილი PAC-ის ნაგულისხმევი ტიპები"
+
+msgid "Default user authentication types"
+msgstr "ნაგულისხმევი მომხმარებლის ავთენტიკაციის ტიპები"
+
+msgid "Default user group"
+msgstr "ნაგულისხმევი მომხმარებლის ჯგუფი"
+
+msgid "Default user objectclasses"
+msgstr "ნაგულისხმები მომხმარებლის objectclass-ები"
+
+msgid "Default users group"
+msgstr "ნაგულისხმევი მომხმარებლების ჯგუფი"
+
+msgid "Degrees Latitude"
+msgstr "განედი გრადუსებში"
+
+msgid "Delegation"
+msgstr "დელეგაცია"
+
+msgid "Delegation name"
+msgstr "დელეგაციის სახელი"
+
+msgid "Delegations"
+msgstr "დელეგაციები"
 
 msgid "Delete"
 msgstr "წაშლა"
+
+#, python-format
+msgid "Delete %(name)s '%(value)s'?"
+msgstr "წავშალო %(name)s '%(value)s'?"
+
+msgid "Delete ACI."
+msgstr "ACI-ის წაშლა."
+
+msgid "Delete DNS record entry."
+msgstr "DNS ჩანაწერის ელემენტის წაშლა."
+
+msgid "Delete DNS resource record."
+msgstr "DNS რესურსის ჩანაწერის წაშლა."
+
+msgid "Delete IPA server."
+msgstr "IPA სერვერის წაშლა."
+
+msgid "Delete Server"
+msgstr "სერვერის წაშლა"
+
+msgid "Delete Sudo Rule."
+msgstr "Sudo წესის წაშლა."
+
+msgid "Delete a CA ACL."
+msgstr "CA ACL-ის წაშლა."
+
+msgid "Delete a Certificate Profile."
+msgstr "სერტიფიკატის პროფილის წაშლა."
+
+msgid "Delete a DNS server"
+msgstr "DNS სერვერის წაშლა"
+
+msgid "Delete a RADIUS proxy server."
+msgstr "RADIUS-ის პროქსი სერვერის წაშლა."
+
+msgid "Delete a SELinux User Map."
+msgstr "SELinux -ის მომხმარებლის რუკის წაშლა."
+
+msgid "Delete a delegation."
+msgstr "დელეგაციის წაშლა."
+
+msgid "Delete a host."
+msgstr "ჰოსტის წაშლა."
+
+msgid "Delete a hostgroup."
+msgstr "ჰოსტის ჯგუფის წაშლა."
+
+msgid "Delete a netgroup."
+msgstr "ქსელური ჯგუფის წაშლა."
+
+msgid "Delete a permission."
+msgstr "წვდომის წაშლა."
+
+msgid "Delete a privilege."
+msgstr "პრივილეგიის წაშლა."
+
+msgid "Delete a role."
+msgstr "როლის წაშლა."
+
+msgid "Delete a segment."
+msgstr "სეგმენტის წაშლა."
+
+msgid "Delete a stage user."
+msgstr "დროებითი მომხმარებლის წაშლა."
+
+msgid "Delete a subordinate id."
+msgstr "დამხმარის ID-ის წაშლა."
+
+msgid "Delete a trust."
+msgstr "ნდობის წაშლა."
 
 msgid "Delete a user"
 msgstr "მომხმარებლის წაშლა"
@@ -239,11 +1277,137 @@ msgstr "მომხმარებლის წაშლა"
 msgid "Delete a user."
 msgstr "მომხმარებლის წაშლა."
 
+msgid "Delete a vault container."
+msgstr "საცავის კონტეინერის წაშლა."
+
+msgid "Delete a vault."
+msgstr "საცავის წაშლა."
+
+msgid "Delete all associated records"
+msgstr "ყველა ასოცირებული ჩანაწერის წაშლა"
+
 msgid "Delete all?"
 msgstr "წავშალო ყველა?"
 
+msgid "Delete an Group ID override."
+msgstr "ჯგუფის ID-ის გადაფარვის წაშლა."
+
+msgid "Delete an HBAC rule."
+msgstr "HBAC წესის წაშლა."
+
+msgid "Delete an HBAC service group."
+msgstr "HBAC სერვისის ჯგუფის წაშლა."
+
+msgid "Delete an ID View."
+msgstr "ID-ის ხედის წაშლა."
+
+msgid "Delete an ID override."
+msgstr "ID-ის გადაფარვის წაშლა."
+
+msgid "Delete an ID range."
+msgstr "ID-ის დიაპაზონის წაშლა."
+
+msgid "Delete an IPA service."
+msgstr "IPA სერვისის წაშლა."
+
+msgid "Delete an OTP token."
+msgstr "OTP კოდის წაშლა."
+
+msgid "Delete an User ID override."
+msgstr "მომხმარებლის ID-ის გადაფარვის წაშლა."
+
+msgid "Delete an automember rule."
+msgstr "ავტოწევრის წესის წაშლა."
+
+msgid "Delete an automount key."
+msgstr "ავტომატური მიმაგრების გასაღების წაშლა."
+
+msgid "Delete an automount map."
+msgstr "ავტომიმაგრების რუკის წაშლა."
+
+msgid "Delete an existing HBAC service."
+msgstr "არსებული HBAC სერვისის წაშლა."
+
+msgid "Delete domain"
+msgstr "დომენის წაშლა"
+
+msgid "Delete group."
+msgstr "ჯგუფის წაშლა."
+
+msgid "Delete mode"
+msgstr "რეჟიმის წაშლა"
+
+#, python-format
+msgid "Deleted ACI \"%(value)s\""
+msgstr "წაიშალა ACI \"%(value)s\""
+
+#, python-format
+msgid "Deleted CA \"%(value)s\""
+msgstr "წაიშალა CA \"%(value)s\""
+
+#, python-format
+msgid "Deleted HBAC service \"%(value)s\""
+msgstr "წაიშალა HBAC სერვისი \"%(value)s\""
+
+#, python-format
+msgid "Deleted group \"%(value)s\""
+msgstr "წაიშალა ჯგუფი \"%(value)s\""
+
+#, python-format
+msgid "Deleted host \"%(value)s\""
+msgstr "წაიშალა ჰოსტი \"%(value)s\""
+
+#, python-format
+msgid "Deleted profile \"%(value)s\""
+msgstr "წაიშალა პროფილი \"%(value)s\""
+
+#, python-format
+msgid "Deleted record \"%(value)s\""
+msgstr "წაიშალა ჩანაწერი \"%(value)s\""
+
+#, python-format
+msgid "Deleted role \"%(value)s\""
+msgstr "წაიშალა როლი \"%(value)s\""
+
+#, python-format
+msgid "Deleted segment \"%(value)s\""
+msgstr "წაიშალა სეგმენტი \"%(value)s\""
+
+#, python-format
+msgid "Deleted selfservice \"%(value)s\""
+msgstr "წაიშალა თვითსერვისი \"%(value)s\""
+
+#, python-format
+msgid "Deleted service \"%(value)s\""
+msgstr "წაიშალა სერვისი \"%(value)s\""
+
+#, python-format
+msgid "Deleted stage user \"%(value)s\""
+msgstr "წაიშალა დროებითი მომხმარებელი \"%(value)s\""
+
+#, python-format
+msgid "Deleted trust \"%(value)s\""
+msgstr "წაიშალა ნდობა \"%(value)s\""
+
+#, python-format
+msgid "Deleted user \"%(value)s\""
+msgstr "წაიშალა მომხმარებელი \"%(value)s\""
+
+#, python-format
+msgid "Deleted vault \"%(value)s\""
+msgstr "წაიშალა საცავი \"%(value)s\""
+
+msgid "Deleted vault container"
+msgstr "საცავის კონტეინერი წაიშალა"
+
 msgid "Deny"
 msgstr "უარყოფა"
+
+msgid "Department Number"
+msgstr "განყოფილების ნომერი"
+
+msgid "Deprecated options"
+msgstr "მოძველებული პარამეტრები"
 
 msgid "Description"
 msgstr "აღწერა"
@@ -254,20 +1418,73 @@ msgstr "დადგენა"
 msgid "Digest"
 msgstr "დაიჯესტი"
 
+msgid "Digest Type"
+msgstr "დაიჯესტის ტიპი"
+
+msgid "Digits"
+msgstr "ციფრები"
+
 msgid "Direct"
 msgstr "პირდაპირი"
 
 msgid "Disable"
 msgstr "გამორთვა"
 
+msgid "Disable DNS Zone."
+msgstr "DNS-ის ზონის გათიშვა."
+
+msgid "Disable a CA."
+msgstr "CA-ის გამორთვა."
+
+msgid "Disable an HBAC rule."
+msgstr "HBAC წესის გათიშვა."
+
+msgid "Disable token"
+msgstr "კოდის გამორთვა"
+
 msgid "Disabled"
 msgstr "გამორთულია"
+
+#, python-format
+msgid "Disabled service \"%(value)s\""
+msgstr "გაითიშა სერვისი \"%(value)s\""
+
+#, c-format
+msgid "Discovered server %s\n"
+msgstr "აღმოჩენილია სერვერი %s\n"
+
+msgid "Display DNS resource."
+msgstr "DNS რესურსის ჩვენება."
+
+msgid "Display Sudo Rule."
+msgstr "Sudo-ის წესის ჩვენება."
+
+msgid "Display a segment."
+msgstr "სეგმენტის ჩვენება."
+
+msgid "Display an automount key."
+msgstr "ავტომატური მიმაგრების გასაღების ჩვენება."
+
+msgid "Display an automount map."
+msgstr "ავტომიმაგრების რუკის ჩვენება."
+
+msgid "Display information about a delegation."
+msgstr "ინფორმაციის გამოტანა დელეგაციის შესახებ."
+
+msgid "Display information about a role."
+msgstr "ინფორმაციის გამოტანა როლის შესახებ."
 
 msgid "Display name"
 msgstr "ნაჩვენები სახელი"
 
+msgid "Display the properties of an HBAC rule."
+msgstr "HBAC წესის თვისებების ჩვენება."
+
 msgid "Documentation"
 msgstr "დოკუმენტაცია"
+
+msgid "Dogtag Authority ID"
+msgstr "Dogtag ავტორიტეტის ID"
 
 msgid "Domain"
 msgstr "დომენი"
@@ -275,8 +1492,17 @@ msgstr "დომენი"
 msgid "Domain GUID"
 msgstr "დომენის GUID"
 
+msgid "Domain Level"
+msgstr "დომენის დონე"
+
+msgid "Domain NetBIOS name"
+msgstr "დომენის NETBIOS სახელი"
+
 msgid "Domain SID"
 msgstr "დომენის SID"
+
+msgid "Domain enabled"
+msgstr "დომენის ჩართულია"
 
 msgid "Domain name"
 msgstr "დომენის სახელი"
@@ -284,23 +1510,77 @@ msgstr "დომენის სახელი"
 msgid "Download"
 msgstr "გადმოწერა"
 
+msgid "Dynamic update"
+msgstr "დინამიკური განახლება"
+
 msgid "Edit"
 msgstr "ჩასწორება"
+
+#, python-brace-format
+msgid "Edit ${entity}"
+msgstr "${entity}-ის ჩასწორება"
+
+msgid "Effective attributes"
+msgstr "ეფექტური ატრიბუტები"
 
 msgid "Email address"
 msgstr "ელფოსტის მისამართი"
 
+msgid "Employee Information"
+msgstr "თანამშრომლის ინფორმაცია"
+
+msgid "Employee Number"
+msgstr "თანამშრომლის ნომერი"
+
+msgid "Employee Type"
+msgstr "თანამშრომლის ტიპი"
+
 msgid "Enable"
 msgstr "ჩართვა"
+
+msgid "Enable DNS Zone."
+msgstr "DNS-ის ზონის ჩანრთვა."
+
+msgid "Enable a CA."
+msgstr "CA-ის ჩართვა."
+
+msgid "Enable an HBAC rule."
+msgstr "HBAC წესის ჩართვა."
+
+msgid "Enable migration mode"
+msgstr "მიგრაციის რეჟიმის ჩართვა"
+
+msgid "Enable token"
+msgstr "კოდის ჩართვა"
 
 msgid "Enabled"
 msgstr "ჩართულია"
 
+msgid "Encryption types to request"
+msgstr "გამოსათხოვი დაშიფვრის ტიპები"
+
+msgid "Enter LDAP password"
+msgstr "შეიყვანეთ LDAP პაროლი"
+
 msgid "Entry"
 msgstr "ჩანაწერი"
 
+#, python-format
+msgid "Entry %s not found"
+msgstr "ჩანაწერი %s ვერ ვიპოვე"
+
 msgid "Error"
 msgstr "შეცდომა"
+
+#, c-format
+msgid "Error parsing \"%1$s\": %2$s.\n"
+msgstr "\"%1$s\"-ის დამუშავების შეცდომა: %2$s.\n"
+
+msgid "Exchanger"
+msgstr "გადამცვლელი"
+
+msgid "Exclude from"
+msgstr "ამოღება"
 
 msgid "Excluded attributes"
 msgstr "გაფართოებული ატრიბუტები"
@@ -308,8 +1588,14 @@ msgstr "გაფართოებული ატრიბუტები"
 msgid "Exclusive"
 msgstr "ექსკლუზიური"
 
+msgid "Exclusive Regex"
+msgstr "ექსკლუზიური რეგგამოსი"
+
 msgid "Expand All"
 msgstr "ყველას ამოკეცვა"
+
+msgid "Expires On"
+msgstr "ვადა იწურება"
 
 msgid "Expression"
 msgstr "გამოსახულება"
@@ -317,11 +1603,152 @@ msgstr "გამოსახულება"
 msgid "External"
 msgstr "გარე"
 
+msgid "External IdP configuration"
+msgstr "გარე IdP-ის მორგება"
+
+msgid "External User"
+msgstr "გარე მომხმარებელი"
+
+msgid "External host"
+msgstr "გარე ჰოსტი"
+
+msgid "External member"
+msgstr "გარე წევრი"
+
+msgid "External trust"
+msgstr "გარე ნდობა"
+
+msgid "Failed CAs"
+msgstr "ჩავარდნილი CA-ები"
+
+msgid "Failed hosts/hostgroups"
+msgstr "ჩავარდნილი ჰოსტები/ჰოსტის ჯგუფები"
+
+msgid "Failed logins"
+msgstr "ჩავარდნილი შესვლები"
+
+msgid "Failed managedby"
+msgstr "ჩავარდნილი managedby"
+
+msgid "Failed owners"
+msgstr "ჩავარდნილი მფლობელები"
+
+msgid "Failed profiles"
+msgstr "ჩავარდნილი პროფილები"
+
+msgid "Failed targets"
+msgstr "ჩავარდნილი სამიზნეები"
+
 msgid "Failed to add"
 msgstr "დამატების შეცდომა"
 
+#, c-format
+msgid "Failed to bind to server!\n"
+msgstr "სერვერზე მიმაგრება ჩავარდა!\n"
+
+msgid "Failed to call DBus"
+msgstr "DBus-ის გამოძახება ჩავარდა"
+
+#, c-format
+msgid "Failed to create control!\n"
+msgstr "კონტროლის შექმნა ჩავარდა!\n"
+
+msgid "Failed to create key!\n"
+msgstr "გასაღების შექმნა ჩავარდა!\n"
+
+msgid "Failed to decode control reply!\n"
+msgstr "საკონტროლო პასუხის გაშიფვრის შეცდომა!\n"
+
+#, c-format
+msgid "Failed to get keytab\n"
+msgstr "შეცდომა Keytab-ის მიღებისას\n"
+
+#, c-format
+msgid "Failed to get keytab!\n"
+msgstr "შეცდომა keytab-ის მიღებისას\n"
+
+#, c-format
+msgid "Failed to get result: %s\n"
+msgstr "ვერ მივიღე შედეგი: %s\n"
+
+#, c-format
+msgid "Failed to open Keytab\n"
+msgstr "შეცდომა Keytab-ის გახნისას\n"
+
+#, c-format
+msgid "Failed to open config file %s\n"
+msgstr "კონფიგურაციის ფაილის გახსნის შეცდომა: %s\n"
+
+#, c-format
+msgid "Failed to open keytab\n"
+msgstr "შეცდომა keytab-ის გახსნისას\n"
+
+#, c-format
+msgid "Failed to open keytab '%1$s': %2$s\n"
+msgstr "ჩავარდა გახსნა გასაღებების ცხრილისთვის '%1$s': %2$s\n"
+
+#, c-format
+msgid "Failed to parse config file %s\n"
+msgstr "კონფიგურაციის ფაილის (%s) დამუშავების შეცდომა\n"
+
+#, c-format
+msgid "Failed to parse extended result: %s\n"
+msgstr "ჩავარდა დამუშავება გაფართოებული შედეგისთვის: %s\n"
+
+#, c-format
+msgid "Failed to parse result: %s\n"
+msgstr "ჩავარდა დამუშავება შედეგისთვის: %s\n"
+
+msgid "Failed to remove"
+msgstr "წაშლის შეცდომა"
+
+#, c-format
+msgid "Failed to retrieve any keys"
+msgstr "ყველა გასაღების მიღება ჩავარდა"
+
+#, c-format
+msgid "Failed to set cursor '%1$s'\n"
+msgstr "ჩავარდა დაყენება კურსორისთვის '%1$s'\n"
+
 msgid "False"
 msgstr "მცდარი"
+
+msgid "Fax Number"
+msgstr "ფაქსის ნომერი"
+
+msgid "Fetch domains"
+msgstr "დომენების გამოთხოვა"
+
+#, python-format
+msgid "File %(file)s not found"
+msgstr "ფაილი %(file)s ვერ ვიპოვე"
+
+msgid "File containing data to archive"
+msgstr "დასაარქივებელი მონაცემების შემცველი ფაილი"
+
+msgid "File containing the new vault public key"
+msgstr "ახალი საცავის საჯარო გასაღების შემცველი ფაილი"
+
+msgid "File containing the old vault private key"
+msgstr "ძველი საცავის პირადი გასაღების შემცველი ფაილი"
+
+msgid "File containing the vault password"
+msgstr "საცავის პაროლის შემცველი ფაილი"
+
+msgid "File containing the vault private key"
+msgstr "საცავის პირადი გასაღების შემცველი ფაილი"
+
+msgid "File containing the vault public key"
+msgstr "საცავის საჯარო გასაღების შემცველი ფაილი"
+
+msgid "File to load the certificate from"
+msgstr "ფაილი, საიდანაც სერტიფიკატი უნდა წავიკითხო"
+
+msgid "File to load the certificate from."
+msgstr "ფაილი, საიდანაც სერტიფიკატი უნდა წავიკითხო."
+
+msgid "File to store retrieved data"
+msgstr "ფაილი, რომელშიც მიღებულ მონაცემებს შევინახავ"
 
 msgid "Filter"
 msgstr "ფილტრი"
@@ -332,11 +1759,26 @@ msgstr "მოძებნა"
 msgid "Fingerprint"
 msgstr "ანაბეჭდი"
 
+msgid "Fingerprint (SHA1)"
+msgstr "ანაბეჭდი (SHA1)"
+
+msgid "Fingerprint (SHA256)"
+msgstr "ანაბეჭდი (SHA256)"
+
+msgid "Fingerprint Type"
+msgstr "თითის ანაბეჭდის ტიპი"
+
 msgid "Fingerprints"
 msgstr "თითის ანაბეჭდები"
 
 msgid "First"
 msgstr "პირველი"
+
+msgid "First Code"
+msgstr "პირველი კოდი"
+
+msgid "First OTP"
+msgstr "პირველი OTP"
 
 msgid "First name"
 msgstr "სახელი"
@@ -347,8 +1789,20 @@ msgstr "ალმები"
 msgid "Force"
 msgstr "ძალა"
 
+msgid "Force Update"
+msgstr "ნაძალადევი განახლება"
+
+msgid "Format error"
+msgstr "ფორმატის შეცდომა"
+
+msgid "Forwarders"
+msgstr "გადამმისამართებლები"
+
 msgid "Full name"
 msgstr "სრული სახელი"
+
+msgid "GECOS"
+msgstr "GECOS"
 
 msgid "GID"
 msgstr "GID"
@@ -359,20 +1813,144 @@ msgstr "GSSAPI|EXTERNAL"
 msgid "General"
 msgstr "ზოგადი"
 
+msgid "Generate OTP"
+msgstr "OTP-ის გენერაცია"
+
+msgid "Generated OTP"
+msgstr "გენერირებული OTP"
+
 msgid "Get"
 msgstr "მიღება"
+
+msgid "Get Certificate"
+msgstr "სერტიფიკატის მიღება"
+
+msgid "Github"
+msgstr "Github"
+
+msgid "Global DNS configuration is empty"
+msgstr "გლობალური DNS-ის კონფიგურაცია ცარიელია"
+
+msgid "Global Trust Configuration"
+msgstr "გლობალური ნდობის მორგება"
 
 msgid "Google"
 msgstr "Google"
 
+msgid "Granted to Privilege"
+msgstr "მინიჭებულია პრივილეგიებზე"
+
 msgid "Group"
 msgstr "ჯგუფი"
+
+#, python-format
+msgid "Group '%s' does not exist"
+msgstr "ჯგუფი '%s' არ არსებობს"
+
+msgid "Group ID Number"
+msgstr "ჯგუფის ID ნომერი"
+
+msgid "Group Options"
+msgstr "ჯგუფის მორგება"
+
+msgid "Group Settings"
+msgstr "ჯგუფის პარამეტრები"
+
+msgid "Group Type"
+msgstr "ჯგუფის ტიპი"
+
+msgid "Group categories"
+msgstr "ჯგუფის კატეგორიები"
+
+msgid "Group container"
+msgstr "ჯგუფის კონტეინერი"
+
+msgid "Group description"
+msgstr "ჯგუფის აღწერა"
 
 msgid "Group name"
 msgstr "ჯგუფის სახელი"
 
+msgid "Group search fields"
+msgstr "ჯგუფის ძებნის ველები"
+
+msgid "Grouping Type"
+msgstr "დაჯგუფების ტიპი"
+
 msgid "Groups"
 msgstr "ჯგუფები"
+
+msgid "HBAC Rule"
+msgstr "HBAC წესი"
+
+msgid "HBAC Rules"
+msgstr "HBAC წესები"
+
+msgid "HBAC Service"
+msgstr "HBAC სერვისი"
+
+msgid "HBAC Service Group"
+msgstr "HBAC სერვისის ჯგუფი"
+
+msgid "HBAC Service Groups"
+msgstr "HBAC სერვისის ჯგუფები"
+
+msgid "HBAC Services"
+msgstr "HBAC სერვისები"
+
+msgid "HBAC rule"
+msgstr "HBAC წესი"
+
+msgid "HBAC rules"
+msgstr "HBAC წესები"
+
+msgid "HBAC service"
+msgstr "HBAC სერვისი"
+
+msgid "HBAC service description"
+msgstr "HBAC სერვისის აღწერა"
+
+msgid "HBAC service group"
+msgstr "HBAC სერვისის ჯგუფი"
+
+msgid "HBAC service group description"
+msgstr "HBAC სერვისი ჯგუფის აღწერა"
+
+msgid "HBAC service groups"
+msgstr "HBAC სერვისის ჯგუფები"
+
+msgid "HBAC service groups to remove"
+msgstr "წასაშლელი HBAC სერვისის ჯგუფები"
+
+msgid "HBAC services"
+msgstr "HBAC სერვისები"
+
+msgid "HBAC services to add"
+msgstr "დასამატებელი HBAC სერვისები"
+
+msgid "HBAC services to remove"
+msgstr "წასაშლელი HBAC სერვისები"
+
+msgid "HIP record"
+msgstr "HIP ჩანაწერი"
+
+msgid "HOTP Authentication Window"
+msgstr "HOTP ავთენტიკაციის ფანჯარა"
+
+msgid "HOTP Synchronization Window"
+msgstr "HOTP სინქრონიზაციის ფანჯარა"
+
+msgid "HTTP Error"
+msgstr "HTTP შეცდომა"
+
+msgid "Hidden IPA CA servers"
+msgstr "დამალული IPA CA სერვერები"
+
+msgid "Hidden IPA DNS servers"
+msgstr "დამალული IPA DNS სერვერები"
+
+msgid "Hidden IPA KRA servers"
+msgstr "დამალული IPA KRA სერვერები"
 
 msgid "Hide"
 msgstr "დამალვა"
@@ -380,23 +1958,57 @@ msgstr "დამალვა"
 msgid "Hide details"
 msgstr "დეტალების დამალვა"
 
+msgid "History size"
+msgstr "ისტორიის ზომა"
+
 msgid "Home directory"
 msgstr "საწყისი საქაღალდე"
+
+msgid "Home directory base"
+msgstr "საწყისი საქაღალდის ბაზა"
+
+msgid "Horizontal Precision"
+msgstr "ჰორიზონტალური სიზუსტე"
 
 msgid "Host"
 msgstr "ჰოსტი"
 
+msgid "Host Certificate"
+msgstr "ჰოსტის სერტიფიკატი"
+
 msgid "Host Group"
 msgstr "ჰოსტების ჯგუფი"
+
+msgid "Host Group Settings"
+msgstr "ჰოსტების ჯგუფის მორგება"
 
 msgid "Host Groups"
 msgstr "ჰოსტის ჯგუფები"
 
+msgid "Host Masks"
+msgstr "ჰოსტის ნიღბები"
+
 msgid "Host Name"
-msgstr "ჰოსტი"
+msgstr "ჰოსტის სახელი"
+
+msgid "Host Settings"
+msgstr "ჰოსტის მორგება"
+
+msgid "Host category"
+msgstr "ჰოსტის კატეგორია"
+
+msgid "Host group rule"
+msgstr "ჰოსტების ჯგუფის წესი"
+
+msgid "Host group rules"
+msgstr "ჰოსტების ჯგუფის წესები"
+
+#, c-format
+msgid "Host is already joined.\n"
+msgstr "ჰოსტი უკვე მიერთებულია.\n"
 
 msgid "Host name"
-msgstr "ჰოსტი"
+msgstr "ჰოსტის სახელი"
 
 msgid "Host-group"
 msgstr "ჰოსტების ჯგუფი"
@@ -404,8 +2016,20 @@ msgstr "ჰოსტების ჯგუფი"
 msgid "Hostname"
 msgstr "ჰოსტის სახელი"
 
+msgid "Hostname (FQDN)"
+msgstr "ჰოსტის სახელი (FQDN)"
+
+msgid "Hostname of this server"
+msgstr "ამ სერვერის ჰოსტის სახელი"
+
 msgid "Hosts"
 msgstr "ჰოსტები"
+
+msgid "ID View"
+msgstr "ID ხედი"
+
+msgid "ID Views"
+msgstr "ID ხედები"
 
 msgid "IP Address"
 msgstr "IP მისამართი"
@@ -416,23 +2040,135 @@ msgstr "IPA CA სერტიფიკატი"
 msgid "IPA CA servers"
 msgstr "IPCA CA სერვერები"
 
+msgid "IPA DNS Server is not installed"
+msgstr "IPA DNS სერვერი დაყენებული არააა"
+
+msgid "IPA DNS records"
+msgstr "IPA DNS-ის ჩანაწერები"
+
 msgid "IPA DNS servers"
 msgstr "IPA DNS სერვერები"
+
+msgid "IPA DNS version"
+msgstr "IPA DNS-ის ვერსია"
+
+msgid "IPA DNSSec key master"
+msgstr "IPA DNSSec გასაღების მთავარი სერვერი"
+
+msgid "IPA Error"
+msgstr "IPA შეცდომა"
 
 msgid "IPA KRA servers"
 msgstr "IPA KRA სერვერები"
 
+msgid "IPA Location"
+msgstr "IPA მდებარეობა"
+
+msgid "IPA Location description"
+msgstr "IPA მდებარეობის აღწერა"
+
+msgid "IPA Locations"
+msgstr "IPA მდებარეობები"
+
+msgid "IPA Server"
+msgstr "IPA სერვერი"
+
+msgid "IPA Server Role"
+msgstr "IPA სერვერის როლი"
+
+msgid "IPA Server Roles"
+msgstr "IPA სერვერის როლები"
+
+msgid "IPA Server to use"
+msgstr "გამოსაყენებელი IPA სერვერი"
+
+msgid "IPA Servers"
+msgstr "IPA სერვერები"
+
+msgid "IPA location name"
+msgstr "IPA მდებარეობის სახელი"
+
+msgid "IPA location records"
+msgstr "IPA მდებარეობის ჩანაწერები"
+
+msgid "IPA masters"
+msgstr "IPA ძირითადი სერვერები"
+
+msgid "IPA role name"
+msgstr "IPA როლის სახელი"
+
+msgid "IPA server hostname"
+msgstr "IPA სერვერის ჰოსტის სახელი"
+
+msgid "IPA server role name"
+msgstr "IPA სერვერის როლის სახელი"
+
+msgid "IPA trust"
+msgstr "IPA ნდობა"
+
+msgid "IPSECKEY record"
+msgstr "IPSECKEY ჩანაწერი"
+
 msgid "Identity"
 msgstr "იდენტიფიკაცია"
+
+msgid "Identity Settings"
+msgstr "იდენტიფიკაციის მორგება"
+
+msgid "Ignore group attribute"
+msgstr "ჯგუფის ატრიბუტის იგნორი"
+
+msgid "Ignore user attribute"
+msgstr "მომხმარებლის ატრიბუტის იგნორი"
+
+msgid "Ignored keys:"
+msgstr "გამოტოვებული გასაღბები:"
+
+msgid "Import a Certificate Profile."
+msgstr "სერტიფიკატის პროფილის შემოტანა."
+
+msgid "Imported keys:"
+msgstr "შემოტანილი გასაღებები:"
+
+msgid "Imported maps:"
+msgstr "შემოტანილი რუკები:"
+
+msgid "Include Disabled"
+msgstr "გამორთულების ჩათვლით"
+
+msgid "Include Enabled"
+msgstr "ჩასმა ჩართულია"
+
+msgid "Include IPA master entries"
+msgstr "IPA-ის მთავარი ჩანაწერების ჩასმა"
+
+msgid "Include in"
+msgstr "რაში ჩასმა"
 
 msgid "Included attributes"
 msgstr "ჩასმული ატრიბუტები"
 
+msgid "Inclusive"
+msgstr "ჩათვლით"
+
+msgid "Inclusive Regex"
+msgstr "ინკლუზიური რეგგამოსი"
+
+#, c-format
+msgid "Incompatible options provided (-r and -P)\n"
+msgstr "მიწოდებულია შეუთავსებელი პარამეტრები (-r და -P)\n"
+
 msgid "Indirect"
 msgstr "არაპირდაპირი"
 
+msgid "Inherited from server configuration"
+msgstr "მემკვიდრეობით სერვერის კონფიგურაციიდან"
+
 msgid "Initials"
 msgstr "ინიციალები"
+
+msgid "Input data specified multiple times"
+msgstr "შეყვანილი მონაცემები ერთზე მეტჯერაა მითითებული"
 
 msgid "Input file"
 msgstr "შეყვანის ფაილი"
@@ -443,32 +2179,173 @@ msgstr "შეიყვანეთ ფაილის სახელი"
 msgid "Internal Error"
 msgstr "შიდა შეცდომა"
 
+#, c-format
+msgid "Invalid SASL bind mechanism\n"
+msgstr "არასწორი SASL მიმაგრების მექანიზმი\n"
+
+#, c-format
+msgid "Invalid Service Principal Name\n"
+msgstr "არასწორი სერვისის პრინციპალის სახელი\n"
+
+msgid "Invalid credentials"
+msgstr "არასწორი ავტორიზაციის დეტალები"
+
 msgid "Invalid number of parts!"
 msgstr "ნაწილების რაოდენობა არასწორია!"
+
+msgid "Invalid vault type"
+msgstr "არასწორი საცავის ტიპი"
+
+msgid "Is zone active?"
+msgstr "ზონა აქტიურია?"
 
 msgid "Issue"
 msgstr "Პრობლემა"
 
+msgid "Issue new certificate"
+msgstr "ახალი სერტიფიკატის გამოცემა"
+
+msgid "Issued By"
+msgstr "გამომცემელი"
+
 msgid "Issued On"
 msgstr "გამოცემის თარიღი"
+
+msgid "Issued To"
+msgstr "ვისთვისაა გამოცემული"
+
+msgid "Issued on from"
+msgstr "გამოცემულია ვისგან"
+
+msgid "Issued on to"
+msgstr "გამოცემულია ვისთვის"
 
 msgid "Issuer"
 msgstr "გამომცემელი"
 
+msgid "Issuer DN"
+msgstr "გამომცემლის DN"
+
+msgid "Issuer of the certificate"
+msgstr "სერთიფიკატის გამცემი"
+
+#, c-format
+msgid "JSON-RPC call failed: %s\n"
+msgstr "JSON-RPC გამოძახება ჩავარდა: %s\n"
+
+#, c-format
+msgid ""
+"JSON-RPC request:\n"
+"%s\n"
+msgstr ""
+"JSON-RPC მოთხოვნა:\n"
+"%s\n"
+
+#, c-format
+msgid ""
+"JSON-RPC response:\n"
+"%s\n"
+msgstr ""
+"JSON-RPC პასუხი:\n"
+"%s\n"
+
 msgid "Job Title"
 msgstr "პროფესია"
+
+msgid "KEY Algorithm"
+msgstr "KEY ალგორითმი"
+
+msgid "KEY Flags"
+msgstr "KEY ალმები"
+
+msgid "KEY Protocol"
+msgstr "KEY პროტოკოლი"
+
+msgid "KEY Public Key"
+msgstr "KEY საჯარო გასაღები"
+
+msgid "KEY record"
+msgstr "KEY ჩანაწერი"
+
+msgid "KX Exchanger"
+msgstr "KX გადამცვლელი"
+
+msgid "KX Preference"
+msgstr "KX პრიორიტეტი"
+
+msgid "KX record"
+msgstr "KX ჩანაწერი"
+
+msgid "Kerberos Service Principal Name"
+msgstr "Kerberos-ის სერვისის პრინციპალის სახელი"
+
+#, c-format
+msgid "Kerberos context initialization failed\n"
+msgstr "Kerberos-ის კონტექსტის ინიციალიზაცია ჩავარდა\n"
+
+#, c-format
+msgid "Kerberos context initialization failed: %1$s (%2$d)\n"
+msgstr "Kerberos-ის კონტექსტის ინიციალიზაცია ჩავარდა: %1$s (%2$d)\n"
+
+msgid "Kerberos principal name for this host"
+msgstr "Kerberos პრინციპალის სახელი ამ ჰოსტისთვის"
 
 msgid "Key"
 msgstr "გასაღები"
 
+msgid "Key Compromise"
+msgstr "გასაღების კომპრომისი"
+
+msgid "Key Tag"
+msgstr "გასაღების ჭდე"
+
+msgid "Keytab"
+msgstr "გასაღებების ცხრილი"
+
+msgid "Keytab File Name"
+msgstr "გასაღებების ცხრილის ფაილის სახელი"
+
 msgid "LDAP DN"
 msgstr "LDAP DN"
+
+msgid "LDAP URI"
+msgstr "LDAP URI"
 
 msgid "LDAP basedn"
 msgstr "LDAP basedn"
 
 msgid "LDAP password"
 msgstr "LDAP პაროლი"
+
+msgid "LDAP schema"
+msgstr "LDAP-ის სქემა"
+
+msgid "LDAP timeout"
+msgstr "LDAP-ის მოლოდინის დრო"
+
+msgid "LOC Altitude"
+msgstr "LOC სიმაღლე"
+
+msgid "LOC Degrees Latitude"
+msgstr "LOC განედი გრადუსებში"
+
+msgid "LOC Horizontal Precision"
+msgstr "LOC ჰორიზონტალური სიზუსტე"
+
+msgid "LOC Minutes Latitude"
+msgstr "LOC განედი წუთებში"
+
+msgid "LOC Seconds Latitude"
+msgstr "LOC განედი წამებში"
+
+msgid "LOC Size"
+msgstr "LOC-ის ზომა"
+
+msgid "LOC Vertical Precision"
+msgstr "LOC ვერტიკალური სიზუსტე"
+
+msgid "LOC record"
+msgstr "LOC ჩანაწერი"
 
 msgid "Label"
 msgstr "ჭდე"
@@ -479,6 +2356,9 @@ msgstr "ჭდეები"
 msgid "Last"
 msgstr "ბოლო"
 
+msgid "Last failed authentication"
+msgstr "ბოლო ჩავარდნილი ავთენტიკაცია"
+
 msgid "Last name"
 msgstr "გვარი"
 
@@ -488,11 +2368,29 @@ msgstr "დონე"
 msgid "Loading"
 msgstr "ჩატვირთვა"
 
+msgid "Loading data"
+msgstr "მონაცემების ჩატვირთვა"
+
+msgid "Local domain"
+msgstr "ლოკალური დომენი"
+
 msgid "Locality"
 msgstr "რაიონი"
 
 msgid "Location"
 msgstr "მდებარეობა"
+
+msgid "Location name"
+msgstr "მდებარეობის სახელი"
+
+msgid "Location of the ACI"
+msgstr "ACI-ის მდებარეობა"
+
+msgid "Lockout duration"
+msgstr "დაბლოკვის ხანგრძლივობა"
+
+msgid "Log In Using Certificate"
+msgstr "სერტიფიკატით შესვლა"
 
 msgid "Log in"
 msgstr "შესვლა"
@@ -500,14 +2398,47 @@ msgstr "შესვლა"
 msgid "Log out"
 msgstr "გასვლა"
 
+msgid "Log out error"
+msgstr "გასვლის შეცდომა"
+
+msgid "Login shell"
+msgstr "შესვლს გარსი"
+
 msgid "MAC address"
 msgstr "MAC მისამართი"
+
+msgid "MX Exchanger"
+msgstr "MX გადამცვლელი"
+
+msgid "MX Preference"
+msgstr "MX პრიორიტეტი"
+
+msgid "MX record"
+msgstr "MX ჩანაწერი"
+
+msgid "Mailing Address"
+msgstr "ფოსტის მისამართი"
+
+msgid "Managed by"
+msgstr "მმართველია"
+
+msgid "Managedby permission"
+msgstr "Managedby წვდომა"
 
 msgid "Manager"
 msgstr "მმართველი"
 
+msgid "Managing"
+msgstr "მართვა"
+
 msgid "Map"
 msgstr "რუკა"
+
+msgid "Map Type"
+msgstr "რუკის ტიპი"
+
+msgid "Master file"
+msgstr "ძირითადი ფაილი"
 
 msgid "Match"
 msgstr "დამთხვევა"
@@ -515,11 +2446,107 @@ msgstr "დამთხვევა"
 msgid "Matched"
 msgstr "ემთხვევა"
 
+msgid "Matched Users"
+msgstr "მომხმარებლები, რომლებიც ემთხვევა"
+
+msgid "Matched rules"
+msgstr "წესები, რომლებიც ემთხვევა"
+
+msgid "Matching Type"
+msgstr "ტიპი, რომელიც ემთხვევა"
+
+msgid "Matching rule"
+msgstr "წესი, რომელიც ემთხვევა"
+
+msgid "Max failures"
+msgstr "მაქს ჩავარდნები"
+
+msgid "Maximum serial number"
+msgstr "მაქსიმალური სერიული ნომერი"
+
+msgid "Maximum username length"
+msgstr "მაქსიმალური მომხმარებლის სახელის სიგრძე"
+
+msgid "Member Group"
+msgstr "წევრი ჯგუფი"
+
+msgid "Member HBAC service"
+msgstr "წევრი HBAC სერვისი"
+
+msgid "Member HBAC service groups"
+msgstr "წევრის HBAC სერვისის ჯგუფები"
+
+msgid "Member Host"
+msgstr "წევრი ჰოსტი"
+
+msgid "Member Hostgroup"
+msgstr "წევრი ჰოსტების ჯგუფი"
+
+msgid "Member User"
+msgstr "წევრი მომხმარებელი"
+
+msgid "Member groups"
+msgstr "წევრი ჯგუფები"
+
+msgid "Member host-groups"
+msgstr "წევრი ჰოსტის ჯგუფები"
+
+msgid "Member hosts"
+msgstr "წევრი ჰოსტები"
+
+msgid "Member netgroups"
+msgstr "წევრი ქსელური ჯგუფები"
+
 msgid "Member of"
 msgstr "წარმოადგენს წევრს"
 
+msgid "Member of HBAC rule"
+msgstr "HBAC წესის წევრი"
+
+msgid "Member of HBAC service groups"
+msgstr "HBAC სერვისის ჯგუფების წევრი"
+
+msgid "Member of Sudo rule"
+msgstr "Sudo წესის წევრი"
+
+msgid "Member of a group"
+msgstr "ჯგუფის წევრი"
+
+msgid "Member of group"
+msgstr "ჯგუფის წევრი"
+
+msgid "Member of groups"
+msgstr "ჯგუფების წევრი"
+
+msgid "Member of host-groups"
+msgstr "ჰოსტის ჯგუფის წევრები"
+
+msgid "Member of netgroups"
+msgstr "ქსელური ჯგუფების წევრი"
+
+msgid "Member service groups"
+msgstr "წევრი სერვისის ჯგუფები"
+
+msgid "Member services"
+msgstr "წევრის სერვისები"
+
+msgid "Member user group"
+msgstr "წევრის მომხმარებლების ჯგუფი"
+
+msgid "Member users"
+msgstr "წევრი მომხმარებლები"
+
 msgid "Members"
 msgstr "წევრები"
+
+msgid "Members that could not be added"
+msgstr "წევრები, რომლებიც არ დაემატება"
+
+msgid "Members that could not be removed"
+msgstr "წევრები, რომლებიც ვერ წავშალე"
+
+msgid "Method name"
+msgstr "მეთოდის სახელი"
 
 msgid "Migrate"
 msgstr "მიგრაცია"
@@ -527,8 +2554,40 @@ msgstr "მიგრაცია"
 msgid "Migrating"
 msgstr "მიგრირება"
 
+msgid "Min length"
+msgstr "მინ. სიგრძე"
+
 msgid "Minimum length of password"
 msgstr "პაროლის მინიმალური სიგრძე"
+
+msgid "Minimum serial number"
+msgstr "მინიმალური სერიული ნომერი"
+
+msgid "Minutes Latitude"
+msgstr "განედი წუთებში"
+
+msgid "Misc. Information"
+msgstr "სხვადასხვა ინფორმაცია"
+
+msgid "Missing new vault public key"
+msgstr "ახალი საცავის საჯარო გასაღები ვერ ვიპოვე"
+
+#, c-format
+msgid "Missing reply control list!\n"
+msgstr "აკლია პასუხის კონტროლის სია!\n"
+
+#, c-format
+msgid "Missing reply control!\n"
+msgstr "აკლია პასუხის კონტროლი!\n"
+
+msgid "Missing vault private key"
+msgstr "საცავის პირადი გასაღები ვერ ვიპოვე"
+
+msgid "Missing vault public key"
+msgstr "საცავის საჯარო გასაღები ვერ ვიპოვე"
+
+msgid "Mobile Telephone Number"
+msgstr "მობილური ტელეფონის ნომერი"
 
 msgid "Model"
 msgstr "მოდელი"
@@ -536,41 +2595,326 @@ msgstr "მოდელი"
 msgid "Modified"
 msgstr "შეცვლილია"
 
+#, python-format
+msgid "Modified \"%(value)s\" trust configuration"
+msgstr "შეიცვალა \"%(value)s\"-ის ნდობის კონფიგურაცია"
+
+#, python-format
+msgid "Modified HBAC service \"%(value)s\""
+msgstr "შეიცვალა HBAC სერვისი \"%(value)s\""
+
+#, python-format
+msgid "Modified privilege \"%(value)s\""
+msgstr "შეიცვალა პრივილეგია \"%(value)s\""
+
+#, python-format
+msgid "Modified role \"%(value)s\""
+msgstr "შეიცვალა როლი \"%(value)s\""
+
+#, python-format
+msgid "Modified segment \"%(value)s\""
+msgstr "შეიცვალა სეგმენტი \"%(value)s\""
+
+#, python-format
+msgid "Modified selfservice \"%(value)s\""
+msgstr "შეიცვალა თვითსერვისი \"%(value)s\""
+
+#, python-format
+msgid "Modified service \"%(value)s\""
+msgstr "შეიცვალა სერვისი \"%(value)s\""
+
+#, python-format
+msgid "Modified stage user \"%(value)s\""
+msgstr "შეიცვალა დროებითი მომხმარებელი \"%(value)s\""
+
+#, python-format
+msgid "Modified user \"%(value)s\""
+msgstr "შეიცვალა მომხმარებელი \"%(value)s\""
+
+#, python-format
+msgid "Modify %(name)s '%(value)s'?"
+msgstr "შევცვალო %(name)s '%(value)s'?"
+
+msgid "Modify ACI."
+msgstr "ACI-ის შეცვლა."
+
+msgid "Modify CA configuration."
+msgstr "CA-ის კონფიგურაციის შეცვლა."
+
+msgid "Modify DNS server configuration"
+msgstr "DNS სერვერის კონფიგურაციის შეცვლა"
+
+msgid "Modify OTP configuration options."
+msgstr "OTP-ის პარამეტრების შეცვლა."
+
+msgid "Modify Passkey configuration."
+msgstr "საკვანძო გასაღების კონფიგურაციის შეცვლა."
+
+msgid "Modify a DNS resource record."
+msgstr "DNS რესურსის ჩანაწერის ჩასწორება."
+
+msgid "Modify a SELinux User Map."
+msgstr "SELinux-ის მომხმარებლის რუკის შეცვლა."
+
+msgid "Modify a delegation."
+msgstr "დელეგაციის შეცვლა."
+
+msgid "Modify a group."
+msgstr "ჯგუფის შეცვლა."
+
+msgid "Modify a hostgroup."
+msgstr "ჰოსტების ჯგუფის შეცვლა."
+
+msgid "Modify a netgroup."
+msgstr "ქსელური ჯგუფის შეცვლა."
+
+msgid "Modify a permission."
+msgstr "წვდომის შეცვლა."
+
+msgid "Modify a privilege."
+msgstr "პრივილეგის შეცვლა."
+
+msgid "Modify a role."
+msgstr "როლის შეცვლა."
+
+msgid "Modify a vault."
+msgstr "საცავის შეცვლა."
+
+msgid "Modify an HBAC rule."
+msgstr "HBAC წესის შეცვლა."
+
+msgid "Modify an HBAC service."
+msgstr "HBAC სერვისი შეცვლა."
+
+msgid "Modify configuration options."
+msgstr "კონფიგურაციის პარამეტრების შეცვლა."
+
+msgid "Modify global DNS configuration."
+msgstr "გლობალური DNS კონფიგურაციის შეცვლა."
+
+msgid "Modify global trust configuration."
+msgstr "გლობალური ნდობის კონფიგურაციის შეცვლა."
+
+msgid "Modify information about a host."
+msgstr "ინფორმაციის შეცვლა ჰოსტის შესახებ."
+
+msgid "Mount information"
+msgstr "მიმაგრების ინფორმაცია"
+
 msgid "Mount point"
 msgstr "მიმაგრების წერტილი"
+
+msgid "Multi-value"
+msgstr "ერთზე მეტი მნიშვნელობა"
+
+msgid "Must be a decimal number"
+msgstr "უნდა წარმოადგენდეს ათობით რიცხვს"
 
 msgid "Must be a positive number"
 msgstr "უნდა წარმოადგენდეს დადებით რიცხვს"
 
+msgid "Must be an integer"
+msgstr "უნდა წარმოადგენდეს მთელ რიცხვს"
+
+msgid "NAPTR Flags"
+msgstr "NAPTR ალმები"
+
+msgid "NAPTR Order"
+msgstr "NAPTR მიმდევრობა"
+
+msgid "NAPTR Preference"
+msgstr "NAPTR პრიორიტეტი"
+
+msgid "NAPTR Regular Expression"
+msgstr "NAPTR რეგულარული გამოსახულება"
+
+msgid "NAPTR Replacement"
+msgstr "NAPTR შემცვლელი"
+
+msgid "NAPTR Service"
+msgstr "NAPTR სერვისი"
+
+msgid "NAPTR record"
+msgstr "NAPTR ჩანაწერი"
+
+msgid "NIS domain name"
+msgstr "NIS დომენის სახელი"
+
+msgid "NS Hostname"
+msgstr "NS ჰოსტის სახელი"
+
+msgid "NS record"
+msgstr "NS ჩანაწერი"
+
+msgid "NSEC Next Domain Name"
+msgstr "NSEC შემდეგი დომენის სახელი"
+
+msgid "NSEC record"
+msgstr "NSEC ჩანაწერი"
+
+msgid "NSEC3 record"
+msgstr "NSEC3 ჩანაწერი"
+
 msgid "Name"
 msgstr "სახელი"
+
+msgid "Name of command to export"
+msgstr "გასატანი ბრძანების სახელი"
+
+msgid "Name of host-group"
+msgstr "ჰოსტების ჯგუფის სახელი"
+
+msgid "Name of method to export"
+msgstr "გასატანი მეთოდის სახელი"
+
+msgid "Name of object to export"
+msgstr "გასატანი ობიექტის სახელი"
+
+msgid "Netgroup"
+msgstr "ქსელური ჯგუფი"
+
+msgid "Netgroup Settings"
+msgstr "ქსელური ჯგუფის მორგება"
+
+msgid "Netgroup description"
+msgstr "ქსელური ჯგუფის აღწერა"
+
+msgid "Netgroup name"
+msgstr "ქსელური ჯგუფის სახელი"
+
+msgid "Netgroups"
+msgstr "ქსელური ჯგუფები"
 
 msgid "Network Services"
 msgstr "ქსელური სერვისები"
 
+msgid "New ACI name"
+msgstr "ახალი ACI სახელი"
+
+msgid "New Certificate"
+msgstr "ახალი სერტიფიკატი"
+
 msgid "New Password"
 msgstr "ახალი პაროლი"
+
+msgid "New Principal Password"
+msgstr "ახალი პრინციპალის პაროლი"
+
+msgid "New mount information"
+msgstr "ახალი მიმაგრების ინფორმაცია"
+
+msgid "New password is required"
+msgstr "საჭიროა ახალი პაროლი"
+
+msgid "New vault password"
+msgstr "ახალი საცავის პაროლი"
 
 msgid "Next"
 msgstr "შემდეგი"
 
+msgid "Next Domain Name"
+msgstr "შემდეგი დომენის სახელი"
+
+msgid "No Valid Certificate"
+msgstr "სწორი სერტიფიკატის გარეშე"
+
+msgid "No credentials cache found"
+msgstr "ავტორიზაციის დეტალების ქეში არ არსებობს"
+
+msgid "No entries."
+msgstr "ჩანაწერების გარეშე."
+
+msgid "No file to read"
+msgstr "საწაკითხი ფაილის გარეშე"
+
+#, c-format
+msgid "No keys accepted by KDC\n"
+msgstr "KDC-მა გასაღებები არ მიიღო\n"
+
+msgid "No private group"
+msgstr "ჰოსტების ჯგუფის გარეშე"
+
+msgid "No response"
+msgstr "პასუხის გარეშე"
+
 msgid "Non-Active Directory domain"
 msgstr "არა-Active Directory-ის დომენი"
+
+msgid "Nonce"
+msgstr "სპეციალური"
+
+msgid "Not After"
+msgstr "არა შემდეგ"
+
+msgid "Not Before"
+msgstr "არა თარიღამდე"
 
 msgid "Note"
 msgstr "შენიშვნა"
 
+msgid "Number of entries returned"
+msgstr "დაბრუნებული შედეგების რაოდენობა"
+
+msgid "Number of members added"
+msgstr "დასამატებელი წევრების რაოდენობა"
+
+msgid "Number of members removed"
+msgstr "წაშლილი წევრების რაოდენობა"
+
+msgid "Number of privileges removed"
+msgstr "წაშლილი პრივილეგიებს რაოდენობა"
+
 msgid "OK"
 msgstr "დიახ"
+
+msgid "OTP"
+msgstr "OTP"
 
 msgid "OTP Configuration"
 msgstr "OTP-ის მორგება"
 
+msgid "OTP Token Settings"
+msgstr "OTP კოდის მორგება"
+
+msgid "OTP configuration options"
+msgstr "OTP-ის მორგების პარამეტრები"
+
+msgid "Old vault password"
+msgstr "ძველი საცავის პაროლი"
+
+msgid "Old vault private key"
+msgstr "ძველი საცავის პირადი გასაღები"
+
+msgid "One Time Password"
+msgstr "ერთჯერადი პაროლი"
+
+msgid "One time password commands"
+msgstr "ერთჯერადი პაროლის ბრძანებები"
+
 msgid "One-Time Password"
 msgstr "ერთჯერადი პაროლი"
 
+msgid "One-Time Password Not Present"
+msgstr "ერთჯერადი პაროლი არ არსებობს"
+
+msgid "One-Time Password Present"
+msgstr "ერთჯერადი პაროლი არსებობს"
+
 msgid "Operating system"
 msgstr "ოპერაციული სისტემა"
+
+#, c-format
+msgid "Operation failed: %s\n"
+msgstr "ოპერაცია ჩავარდა: %s\n"
+
+msgid "Operations Error"
+msgstr "ოპერაციის შეცდომა"
+
+msgid "Option added"
+msgstr "პარამეტრი დაემატა"
+
+msgid "Option group"
+msgstr "პარამეტრების ჯგუფი"
 
 msgid "Options"
 msgstr "მორგება"
@@ -578,11 +2922,17 @@ msgstr "მორგება"
 msgid "Order"
 msgstr "დალაგება"
 
+msgid "Org. Unit"
+msgstr "ორგ. ერთეული"
+
 msgid "Organization"
 msgstr "ორგანიზაცია"
 
 msgid "Organizational Unit"
 msgstr "ორგანიზაციული ერთეული"
+
+msgid "Other Record Types"
+msgstr "სხვა ჩანაწერის ტიპები"
 
 #, c-format
 msgid "Out of Memory!\n"
@@ -606,11 +2956,33 @@ msgstr "არასაკმარისი მეხსიერება!\n"
 msgid "Out of memory!?\n"
 msgstr "არასაკმარისი მეხსიერება!\n"
 
+msgid "Output debug info"
+msgstr "გამართვის ინფორმაციის გამოტანა"
+
 msgid "Output filename"
 msgstr "გამოტანის ფაილის სახელი"
 
+msgid "Output only on errors"
+msgstr "მხოლოდ შეცდომების ჩვენება"
+
+msgid "Override existing password"
+msgstr "არსებული პაროლის გადაფარვა"
+
 msgid "Owner"
 msgstr "მფლობელი"
+
+#, python-format
+msgid "Owner %s"
+msgstr "მფლობელი %s"
+
+msgid "Owner groups"
+msgstr "მფლობლის ჯგუფები"
+
+msgid "Owner services"
+msgstr "მფლობლის სერვისები"
+
+msgid "Owner users"
+msgstr "მფლობელის მომხმარებლები"
 
 msgid "Owners"
 msgstr "მფლობელები"
@@ -618,20 +2990,71 @@ msgstr "მფლობელები"
 msgid "PAD"
 msgstr "PAD"
 
+msgid "PKINIT"
+msgstr "PKINIT"
+
+msgid "PTR Hostname"
+msgstr "PTR ჰოსტის სახელი"
+
+msgid "PTR record"
+msgstr "PTR ჩანაწერი"
+
 msgid "Page"
 msgstr "გვერდი"
+
+msgid "Pager Number"
+msgstr "პეიჯერის ნომერი"
 
 msgid "Parameters"
 msgstr "პარამეტრები"
 
+msgid "Parent map"
+msgstr "მშობელი რუკა"
+
 msgid "Parse error"
 msgstr "დამუშავების შეცდომა"
+
+msgid "Passkey Configuration"
+msgstr "საკვანძო სიტყვის პარამეტრები"
+
+msgid "Passkey configuration options"
+msgstr "საკვანძო სიტყვის პარამეტრების მორგება"
 
 msgid "Password"
 msgstr "პაროლი"
 
+msgid "Password Expiration Notification (days)"
+msgstr "პაროლის ვადის ამოწურვის გაფრთხილება (დღე)"
+
+msgid "Password Policies"
+msgstr "პაროლის პოლიტიკები"
+
+msgid "Password Policy"
+msgstr "პაროლის პოლიტიკა"
+
 msgid "Password expiration"
 msgstr "პაროლის ვადა"
+
+msgid "Password grace count"
+msgstr "პაროლის ნების დართვის რაოდენობა"
+
+msgid "Password history size"
+msgstr "პაროლის ისტორიის ზომა"
+
+msgid "Password is too long!\n"
+msgstr "პაროლი ძალიან გრძელია!\n"
+
+msgid "Password migration was not successful"
+msgstr "პაროლის მიგრაცია წარუმატებელია"
+
+msgid "Password migration was successful"
+msgstr "პაროლის მიგრაცია წარმატებით დასრულდა"
+
+msgid "Password or Password+One-Time Password"
+msgstr "პაროლი თუ პაროლი+ერთჯერადი პაროლი"
+
+msgid "Password plugin features"
+msgstr "პაროლის დამატების თვისებები"
 
 msgid "Passwords do not match"
 msgstr "პაროლები არ ემთხვევა"
@@ -646,11 +3069,32 @@ msgstr "პაროლები არ ემთხვევა!\n"
 msgid "Passwords must match"
 msgstr "პაროლები არ ემთხვევა"
 
+msgid "Path to the IPA CA certificate"
+msgstr "ბილიკი IPA CA სერტიფიკატამდე"
+
 msgid "Permission"
 msgstr "წვდომა"
 
+msgid "Permission flags"
+msgstr "წვდომის ალმები"
+
+msgid "Permission name"
+msgstr "წვდომის სახელი"
+
+msgid "Permission settings"
+msgstr "წვდომების მორგება"
+
+msgid "Permission type"
+msgstr "წვდომის ტიპი"
+
+msgid "Permission value"
+msgstr "წვდომის მნიშვნელობა"
+
 msgid "Permissions"
 msgstr "წვდომები"
+
+msgid "Permitted Encryption Types"
+msgstr "დაშვებული დაშიფვრის ტიპები"
 
 msgid "Platform"
 msgstr "პლატფორმა"
@@ -667,11 +3111,35 @@ msgstr "პოზიციური არგუმენტები"
 msgid "Positional arguments"
 msgstr "პოზიციური არგუმენტები"
 
+msgid "Pre-shared password"
+msgstr "წინასწარ გაზიარებული პაროლი"
+
 msgid "Preference"
 msgstr "მორგება"
 
+msgid "Preferred Language"
+msgstr "სასურველი ენა"
+
+msgid "Preserved user"
+msgstr "დაცული მომხმარებელი"
+
+msgid "Preserved users"
+msgstr "დაცული მომხმარებლები"
+
 msgid "Prev"
 msgstr "წინა"
+
+msgid "Primary key only"
+msgstr "მხოლოდ, ძირითადი გასაღები"
+
+msgid "Principal"
+msgstr "პრინციპალი"
+
+msgid "Principal name"
+msgstr "პრინციპალის სახელი"
+
+msgid "Print as little as possible"
+msgstr "რაც შეიძლება ნაკლები ინფორმაციის გამოტანა"
 
 msgid "Print debugging information"
 msgstr "პროგრამის გასამართი ინფორმაციის გამოტანა"
@@ -679,11 +3147,26 @@ msgstr "პროგრამის გასამართი ინფორ�
 msgid "Priority"
 msgstr "პრიორიტეტი"
 
+msgid "Priority (order)"
+msgstr "პრიორიტეტი (მიმდევრობა)"
+
+msgid "Private key specified multiple times"
+msgstr "პირადი გასაღები ერთზე მეტჯერაა მითთებული"
+
 msgid "Privilege"
 msgstr "პრივილეგიები"
 
+msgid "Privilege Settings"
+msgstr "პრივილეგიების მორგება"
+
+msgid "Privilege Withdrawn"
+msgstr "პრივილეგია მოცილებულია"
+
 msgid "Privilege description"
 msgstr "პრივილეგიის აღწერა"
+
+msgid "Privilege name"
+msgstr "პრივილეგიის სახელი"
 
 msgid "Privileges"
 msgstr "პრივილეგიები"
@@ -694,11 +3177,20 @@ msgstr "პროფილი"
 msgid "Profile ID"
 msgstr "პროფილის ID"
 
+msgid "Profile category"
+msgstr "პროფილის კატეგორია"
+
+msgid "Profile configuration"
+msgstr "პროფილის კონფიგურაცია"
+
 msgid "Profile description"
 msgstr "პროფილის აღწერა"
 
 msgid "Profiles"
 msgstr "პროფილები"
+
+msgid "Prompt for LDAP password"
+msgstr "LDAP პაროლის კითხვა"
 
 msgid "Protocol"
 msgstr "პროტოკოლი"
@@ -712,50 +3204,435 @@ msgstr "საჯარო გასაღები"
 msgid "Public key"
 msgstr "საჯარო გასაღები"
 
+msgid "Public key specified multiple times"
+msgstr "საჯარო გასაღები ერთზე მეტჯერაა მითთებული"
+
 msgid "Public key:"
 msgstr "საჯარო გასაღები:"
 
 msgid "Quantity"
 msgstr "რაოდენობა"
 
+msgid "RADIUS"
+msgstr "RADIUS"
+
+msgid "RADIUS Proxy Server Settings"
+msgstr "RADIUS-ის პროქსი სერვერის მორგება"
+
+msgid "RADIUS Server"
+msgstr "RADIUS სერვერი"
+
+msgid "RADIUS Servers"
+msgstr "RADIUS სერვერები"
+
+msgid "RADIUS proxy configuration"
+msgstr "RADIUS-ის პროქსის მორგება"
+
+msgid "RADIUS proxy server"
+msgstr "RADIUS-ის პროქსი სერვერი"
+
+msgid "RADIUS proxy server name"
+msgstr "RADIUS-ის პროქსი სერვერის სახელი"
+
+msgid "RADIUS proxy servers"
+msgstr "RADIUS პროქსი სერვერები"
+
+msgid "RP record"
+msgstr "RP ჩანაწერი"
+
+msgid "RRSIG Algorithm"
+msgstr "RRSIG ალგორითმი"
+
+msgid "RRSIG Labels"
+msgstr "RRSIG ჭდეები"
+
+msgid "RRSIG Signature"
+msgstr "RRSIG ხელმოწერა"
+
+msgid "RRSIG Signature Expiration"
+msgstr "RRSIG ხელმოწერის ვადა"
+
+msgid "RRSIG Signature Inception"
+msgstr "RRSIG ხელმოწერის შემოჭრა"
+
+msgid "RRSIG record"
+msgstr "RRSIG ჩანაწერი"
+
+msgid "RSN Version"
+msgstr "RSN-ის ვერსია"
+
+msgid "Random Serial Number Version"
+msgstr "შემთხვევითი სერიული ნომრის ვერსია"
+
+msgid "Random password"
+msgstr "შემთხვევითი პაროლი"
+
+msgid "Range Settings"
+msgstr "დიაპაზონის მორგება"
+
+msgid "Range name"
+msgstr "დიაპაზონის სახელი"
+
+msgid "Range type"
+msgstr "დიაპაზონის ტიპი"
+
+msgid "Raw A records"
+msgstr "დაუმუშავებელი A ჩანაწერები"
+
+msgid "Raw A6 records"
+msgstr "დაუმუშავებელი A6 ჩანაწერები"
+
+msgid "Raw AAAA records"
+msgstr "დაუმუშავებელი AAAA ჩანაწერები"
+
+msgid "Raw AFSDB records"
+msgstr "დაუმუშავებელი AFSDB ჩანაწერები"
+
+msgid "Raw APL records"
+msgstr "დაუმუშავებელი APL ჩანაწერები"
+
+msgid "Raw CERT records"
+msgstr "დაუმუშავებელი CERT ჩანაწერები"
+
+msgid "Raw CNAME records"
+msgstr "დაუმუშავებელი CNAME ჩანაწერები"
+
+msgid "Raw DHCID records"
+msgstr "დაუმუშავებელი DHCID ჩანაწერები"
+
+msgid "Raw DLV records"
+msgstr "დაუმუშავებელი DLV ჩანაწერები"
+
+msgid "Raw DNAME records"
+msgstr "დაუმუშავებელი DNAME ჩანაწერები"
+
+msgid "Raw DNSKEY records"
+msgstr "დაუმუშავებელი DNSKEY ჩანაწერები"
+
+msgid "Raw DS records"
+msgstr "დაუმუშავებელი DS ჩანაწერები"
+
+msgid "Raw HIP records"
+msgstr "დაუმუშავებელი HIP ჩანაწერები"
+
+msgid "Raw IPSECKEY records"
+msgstr "დაუმუშავებელი IPSECKEY ჩანაწერები"
+
+msgid "Raw KEY records"
+msgstr "დაუმუშავებელი KEY ჩანაწერები"
+
+msgid "Raw KX records"
+msgstr "დაუმუშავებელი KX ჩანაწერები"
+
+msgid "Raw LOC records"
+msgstr "დაუმუშავებელი LOC ჩანაწერები"
+
+msgid "Raw MX records"
+msgstr "დაუმუშავებელი MX ჩანაწერები"
+
+msgid "Raw NAPTR records"
+msgstr "დაუმუშავებელი NAPTR ჩანაწერები"
+
+msgid "Raw NS records"
+msgstr "დაუმუშავებელი NS ჩანაწერები"
+
+msgid "Raw NSEC records"
+msgstr "დაუმუშავებელი NSEC ჩანაწერები"
+
+msgid "Raw NSEC3 records"
+msgstr "დაუმუშავებელი NSEC3 ჩანაწერები"
+
+msgid "Raw PTR records"
+msgstr "დაუმუშავებელი PTR ჩანაწერები"
+
+msgid "Raw RP records"
+msgstr "დაუმუშავებელი RP ჩანაწერები"
+
+msgid "Raw RRSIG records"
+msgstr "დაუმუშავებელი RRSIG ჩანაწერები"
+
+msgid "Raw SIG records"
+msgstr "დაუმუშავებელი SIG ჩანაწერები"
+
+msgid "Raw SPF records"
+msgstr "დაუმუშავებელი SPF ჩანაწერები"
+
+msgid "Raw SRV records"
+msgstr "დაუმუშავებელი SRV ჩანაწერები"
+
+msgid "Raw SSHFP records"
+msgstr "დაუმუშავებელი SSHFP ჩანაწერები"
+
+msgid "Raw TA records"
+msgstr "დაუმუშავებელი TA ჩანაწერები"
+
+msgid "Raw TKEY records"
+msgstr "დაუმუშავებელი TKEY ჩანაწერები"
+
+msgid "Raw TLSA records"
+msgstr "დაუმუშავებელი TLSA ჩანაწერები"
+
+msgid "Raw TSIG records"
+msgstr "დაუმუშავებელი TSIG ჩანაწერები"
+
+msgid "Raw TXT records"
+msgstr "დაუმუშავებელი TXT ჩანაწერები"
+
+msgid "Realm Domains"
+msgstr "რეალმის დომენები"
+
+msgid "Realm domains"
+msgstr "რეალმის დომენები"
+
+msgid "Realm name"
+msgstr "რეალმის სახელი"
+
 msgid "Reason"
 msgstr "მიზეზი"
+
+msgid "Record Settings"
+msgstr "ჩანაწერის პარამეტრები"
 
 msgid "Record Type"
 msgstr "ჩანაწერის ტიპი"
 
+msgid "Record data"
+msgstr "ჩანაწერის მონაცემები"
+
+msgid "Record name"
+msgstr "ჩანაწერის სახელი"
+
+msgid "Record not found."
+msgstr "ჩანაწერი ვერ ვიპოვე."
+
 msgid "Record type"
 msgstr "ჩანაწერის ტიპი"
+
+msgid "Records"
+msgstr "ჩანაწერები"
+
+msgid "Redirection"
+msgstr "გადამისამართება"
 
 msgid "Refresh"
 msgstr "განახლება"
 
+msgid "Registration password"
+msgstr "რეგისტრაციის პაროლი"
+
 msgid "Regular Expression"
 msgstr "რეგულარული ექსპრესია"
+
+msgid "Remote server name"
+msgstr "დაშორებული სერვერის სახელი"
 
 msgid "Remove"
 msgstr "წაშლა"
 
+msgid "Remove CA ACLs"
+msgstr "CA ACL-ების წაშლა"
+
+msgid "Remove DNS zones"
+msgstr "DNS ზონების წაშლა"
+
+msgid "Remove HBAC rules"
+msgstr "HBAC წესების წაშლა"
+
+msgid "Remove HBAC service groups"
+msgstr "HBAC სერვისის ჯგუფების წაშლა"
+
+msgid "Remove HBAC services"
+msgstr "HBAC სერვისების წაშლა"
+
+msgid "Remove ID ranges"
+msgstr "ID-ის დიაპაზონების წაშლა"
+
+msgid "Remove ID views"
+msgstr "ID ხედების წაშლა"
+
+msgid "Remove IPA locations"
+msgstr "IPA მდებარეობების წაშლა"
+
+msgid "Remove Kerberos Alias"
+msgstr "Kerberos_ის მეტსახელის წაშლა"
+
+msgid "Remove OTP tokens"
+msgstr "OTP კოდების წაშლა"
+
+msgid "Remove Passkey"
+msgstr "საკვანძო გასაღების წაშლა"
+
+msgid "Remove Permission"
+msgstr "წვდომის წაშლა"
+
+msgid "Remove RADIUS servers"
+msgstr "RADIUS სერვერების წაშლა"
+
+msgid "Remove all principals in this realm"
+msgstr "ყველა პრინციპალის წაშლა ამ რეალმში"
+
+msgid "Remove automount keys"
+msgstr "ავტომიმაგრების გასაღებების წაშლა"
+
+msgid "Remove automount maps"
+msgstr "ავტომიმაგრების რუკების წაშლა"
+
+msgid "Remove certificate authorities"
+msgstr "სერტიფიკატების გამომცემლის წაშლა"
+
+msgid "Remove certificate hold"
+msgstr "სერტიფიკატის შეჩერების გაუქმება"
+
+msgid "Remove certificate mapping data"
+msgstr "სერტიფიკატის ასახვის მონაცემების წაშლა"
+
+msgid "Remove certificate profiles"
+msgstr "სერტიფიკატის პროფილების წაშლა"
+
+msgid "Remove delegations"
+msgstr "დელეგაციების წაშლა"
+
+msgid "Remove domains"
+msgstr "დომენების წაშლა"
+
+msgid "Remove entries from DNS"
+msgstr "DNS-დან ჩანაწერების წაშლა"
+
+msgid "Remove from CRL"
+msgstr "CRL-დან წაშლა"
+
+msgid "Remove group ID overrides"
+msgstr "ჯგუფის ID-ის გადაფარვების წაშლა"
+
 msgid "Remove hold"
 msgstr "ქმედების შეჩერების გაუქმება"
+
+msgid "Remove host groups"
+msgstr "ჰოსტის ჯგუფების წაშლა"
 
 msgid "Remove hosts"
 msgstr "ჰოსტის წაშლა"
 
+msgid "Remove members from a role."
+msgstr "როლიდან წევრების წაშლა."
+
+msgid "Remove netgroups"
+msgstr "ქსელური ჯგუფების წაშლა"
+
+msgid "Remove password policies"
+msgstr "პაროლის პოლიტიკების წაშლა"
+
+msgid "Remove permissions"
+msgstr "წვდომების წაშლა"
+
+msgid "Remove preserved users"
+msgstr "დაცული მომხმარებლების წაშლა"
+
+msgid "Remove privileges"
+msgstr "პრივილეგიების წაშლა"
+
+msgid "Remove privileges from a role."
+msgstr "როლიდან პრივილეგიების წაშლა."
+
+msgid "Remove profiles from a CA ACL."
+msgstr "პროფილების წაშლა CA ACL-დან."
+
+msgid "Remove roles"
+msgstr "როლების წაშლა"
+
+msgid "Remove self service permissions"
+msgstr "თვითმომსახურების წვდომების წაშლა"
+
+msgid "Remove selinux user maps"
+msgstr "SELinux-ის მომხმარებლის რუკების წაშლა"
+
 msgid "Remove services"
 msgstr "სერვისების წაშლა"
+
+msgid "Remove services from a CA ACL."
+msgstr "CA ACL-დან სერვისების წაშლა."
+
+msgid "Remove stage users"
+msgstr "დროებითი მომხმარებლების წაშლა"
+
+msgid "Remove sudo commands"
+msgstr "Sudo ბრძანებების წაშლა"
+
+msgid "Remove sudo options"
+msgstr "Sudo პარამეტრების წაშლა"
+
+msgid "Remove sudo rules"
+msgstr "Sudo-ის წესების წაშლა"
+
+msgid "Remove topology segments"
+msgstr "ტოპოლოგიის სეგმენტების წაშლა"
+
+msgid "Remove trusts"
+msgstr "ნდობების წაშლა"
+
+msgid "Remove user ID overrides"
+msgstr "მომხმარებლის ID-ის გადაფარვების წაშლა"
+
+msgid "Remove user groups"
+msgstr "მომხმარებლის ჯგუფების წაშლა"
+
+msgid "Remove users"
+msgstr "მომხმარებლების წაშლა"
+
+msgid "Remove vaults"
+msgstr "საცავების წაშლა"
+
+#, c-format
+msgid "Removing principal %s\n"
+msgstr "იშლება პრინციპალი %s\n"
 
 msgid "Rename"
 msgstr "გადარქმევა"
 
+msgid "Rename an ACI."
+msgstr "ACI-ის სახელის გადარქმევა."
+
+msgid "Rename the role object"
+msgstr "როლის ობიექტის სახელის გადრქმევა"
+
 msgid "Replacement"
 msgstr "შემცვლელი"
+
+msgid "Replication configuration"
+msgstr "რეპლიკაციის მორგება"
+
+msgid "Request id"
+msgstr "მოთხოვნის ID"
+
+msgid "Request is missing \"method\""
+msgstr "მოთხოვნას აკლია \"method\""
+
+msgid "Request is missing \"params\""
+msgstr "მოთხოვნას აკლია \"params\""
+
+msgid "Request status"
+msgstr "სტატუსის გამოთხოვა"
 
 msgid "Required"
 msgstr "საჭიროა"
 
+msgid "Required field"
+msgstr "ველი აუცილებელია"
+
+msgid "Requires pre-authentication"
+msgstr "ითხოვს პრე-ავთენტიკაციას"
+
 msgid "Reset"
 msgstr "საწყის მნიშვნელობებზე დაბრუნება"
+
+msgid "Reset OTP"
+msgstr "ITP-ის საწყის მნიშვნელობებზე დაბრუნება"
+
+msgid "Reset One-Time Password"
+msgstr "ერთჯერადი პაროლის თავიდან დაყენება"
+
+msgid "Reset Password"
+msgstr "პაროლის ჩამოყრა"
 
 msgid "Restore"
 msgstr "აღდგენა"
@@ -763,20 +3640,53 @@ msgstr "აღდგენა"
 msgid "Result"
 msgstr "შედეგი"
 
+msgid "Result of simulation"
+msgstr "სიმულაციის შედეგი"
+
 msgid "Retries"
 msgstr "თავიდან ცდები"
+
+msgid "Retrieve a data from a vault."
+msgstr "მონაცემების მიღება საცავიდან."
+
+msgid "Retrieve data from a vault."
+msgstr "მონაცემების მიღება საცავიდან."
 
 msgid "Retry"
 msgstr "თავიდან ცდა"
 
+msgid "Return command defaults"
+msgstr "ბრძანების ნაგულისხმევი არგუმენტების დაბრუნება"
+
+msgid "Reverse zone IP network"
+msgstr "რევერსული ზონის IP ქსელი"
+
 msgid "Revert"
 msgstr "დაბრუნება"
+
+msgid "Revocation reason"
+msgstr "გაუქმების მიზეზი"
 
 msgid "Revoke"
 msgstr "გაუქმება"
 
+msgid "Revoke a certificate."
+msgstr "სერტიფიკატის გაუქმება."
+
+msgid "Revoke certificate"
+msgstr "სერტიფიკატის გაუქმება"
+
 msgid "Revoked"
 msgstr "ამოღებული"
+
+msgid "Revoked on from"
+msgstr "გაუქმებულია ვისგან"
+
+msgid "Revoked on to"
+msgstr "გაუქმებულია ვისთვის"
+
+msgid "Right node"
+msgstr "მარჯვენა კვანძი"
 
 msgid "Rights"
 msgstr "უფლებები"
@@ -784,11 +3694,29 @@ msgstr "უფლებები"
 msgid "Role"
 msgstr "როლი"
 
+msgid "Role Settings"
+msgstr "როლის მორგება"
+
 msgid "Role name"
 msgstr "როლის სახელი"
 
+msgid "Role status"
+msgstr "როლის სტატუსი"
+
 msgid "Roles"
 msgstr "როლები"
+
+msgid "Rule name"
+msgstr "წესის სახელი"
+
+msgid "Rule status"
+msgstr "წესის სტატუსი"
+
+msgid "Rule type"
+msgstr "წესის ტიპი"
+
+msgid "Rule type (allow)"
+msgstr "წესის ტიპი (დაშვება)"
 
 msgid "Rules"
 msgstr "წესები"
@@ -796,20 +3724,143 @@ msgstr "წესები"
 msgid "Run Commands"
 msgstr "ბრძანებების გაშვება"
 
+msgid "RunAs External Group"
+msgstr "გავუშვათ როგორც-ის გარე ჯგუფი"
+
+msgid "RunAs Groups"
+msgstr "გავუშვაროგორც ჯგუფები"
+
+msgid "RunAs Users"
+msgstr "გავუშვაროგორც მომხმარებლები"
+
+msgid "SASL Bind failed\n"
+msgstr "SASL მიმაგრება ჩავარდა\n"
+
+msgid "SELinux Options"
+msgstr "SELinux-ის მორგება"
+
 msgid "SELinux User"
 msgstr "SELinux-ის მომხმარებელი"
+
+msgid "SELinux User Map"
+msgstr "SELinux -ის მომხმარებლის რუკა"
+
+msgid "SELinux User Map rule"
+msgstr "SELinux -ის მომხმარებლის რუკის წესი"
+
+msgid "SELinux User Map rules"
+msgstr "SELinux -ის მომხმარებლის რუკის წესები"
+
+msgid "SELinux User Maps"
+msgstr "SELinux-ის მომხმარებლის ასახვები"
+
+msgid "SELinux user map order"
+msgstr "SELinux-ის მომხმარებლის რუკის მიმდევრობა"
+
+msgid "SHA1 Fingerprint"
+msgstr "SHA1 ანაბეჭდი"
+
+msgid "SHA256 Fingerprint"
+msgstr "SHA256 ანაბეჭდი"
 
 msgid "SID"
 msgstr "SID"
 
+msgid "SIG Algorithm"
+msgstr "SIG ალგორითმი"
+
+msgid "SIG Labels"
+msgstr "SIG ჭდეები"
+
+msgid "SIG Signature"
+msgstr "SIG ხელმოწერა"
+
+msgid "SIG Signature Expiration"
+msgstr "SIG ხელმოწერის ვადა"
+
+msgid "SIG Signature Inception"
+msgstr "SIG ხელმოწერის შემოჭრა"
+
+msgid "SIG record"
+msgstr "SIG ჩანაწერი"
+
+msgid "SMB Home Directory"
+msgstr "SMB-ის საწყისი საქაღალდე"
+
+msgid "SMB Home Directory Drive"
+msgstr "SMB-ის საწყისი საქაღალდის დისკი"
+
+msgid "SOA expire"
+msgstr "SOA ვადა"
+
+msgid "SOA minimum"
+msgstr "SOA მინიმალური"
+
+msgid "SOA record expire time"
+msgstr "SOA ჩანაწერის ვადა"
+
+msgid "SOA record refresh time"
+msgstr "SOA ჩანაწერის განახლების დრო"
+
+msgid "SOA record retry time"
+msgstr "SOA ჩანაწერის გამეორების დრო"
+
+msgid "SOA record serial number"
+msgstr "SOA ჩანაწერის სერიული ნომერი"
+
+msgid "SOA refresh"
+msgstr "SOA განახლება"
+
+msgid "SOA retry"
+msgstr "SOA გამეორება"
+
+msgid "SOA serial"
+msgstr "SOA სერიული"
+
+msgid "SPF record"
+msgstr "SPF ჩანაწერი"
+
+msgid "SRV Port"
+msgstr "SRV პორტი"
+
+msgid "SRV Priority"
+msgstr "SRV პრიორიტეტი"
+
+msgid "SRV Target"
+msgstr "SRV სამიზნე"
+
+msgid "SRV Weight"
+msgstr "SRV სიმძიმე"
+
+msgid "SRV record"
+msgstr "SRV ჩანაწერი"
+
 msgid "SSH public key"
 msgstr "SSH საჯარო გასაღები"
+
+msgid "SSH public key fingerprint"
+msgstr "SSH საჯარო გასაღების ანაბეჭდი"
 
 msgid "SSH public key:"
 msgstr "SSH საჯარო გასაღები:"
 
 msgid "SSH public keys"
 msgstr "SSH საჯარო გასაღები"
+
+msgid "SSHFP Algorithm"
+msgstr "SSHFP ალგორითმი"
+
+msgid "SSHFP Fingerprint"
+msgstr "SSHFP ანაბეჭდი"
+
+msgid "SSHFP Fingerprint Type"
+msgstr "SSHFP ანაბეჭდის ტიპი"
+
+msgid "SSHFP record"
+msgstr "SSHFP ჩანაწერი"
+
+msgid "Salt"
+msgstr "მარილი"
 
 msgid "Save"
 msgstr "შენახვა"
@@ -820,14 +3871,92 @@ msgstr "ფარგლები"
 msgid "Search"
 msgstr "ძებნა"
 
+msgid "Search Options"
+msgstr "ძებნის მორგება"
+
+msgid "Search for DNS resources."
+msgstr "DNS რესურსების ძებნა."
+
+msgid "Search for DNS servers."
+msgstr "DNS სერვერების ძებნა."
+
+msgid "Search for HBAC rules."
+msgstr "HBAC წესების მოძებნა."
+
+msgid "Search for HBAC services."
+msgstr "HBAC სერვისების ძებნა."
+
+msgid "Search for IPA servers."
+msgstr "IPA სერვერების ძებნა."
+
+msgid "Search for IPA services."
+msgstr "IPA სერვისების ძებნა."
+
+msgid "Search for delegations."
+msgstr "დელეგაციების ძებნა."
+
+msgid "Search for groups."
+msgstr "ჯგუფების მოძებნა."
+
+msgid "Search for hostgroups."
+msgstr "ჰოსტის ჯგუფების ძებნა."
+
+msgid "Search for hosts."
+msgstr "ჰოსტების ძებნა."
+
+msgid "Search for permissions."
+msgstr "წვდომების ძებნა."
+
+msgid "Search for privileges."
+msgstr "პრივილეგიების ძებნა."
+
+msgid "Search for roles."
+msgstr "როლების ძებნა."
+
+msgid "Search scope"
+msgstr "ძებნის დიაპაზონი"
+
+msgid "Search size limit"
+msgstr "ძებნის ზომის ლიმიტი"
+
+msgid "Search time limit"
+msgstr "ძებნის დროის ლიმიტი"
+
+msgid "Second Code"
+msgstr "მეორე კოდი"
+
+msgid "Seconds Latitude"
+msgstr "განედი წამებში"
+
 msgid "Secret"
 msgstr "საიდუმლო"
+
+msgid "Segment details"
+msgstr "სეგმენტის დეტალები"
+
+msgid "Segment name"
+msgstr "სეგმენტის სახელი"
 
 msgid "Select All"
 msgstr "ყველას მონიშვნა"
 
+msgid "Selector"
+msgstr "ამრჩევი"
+
 msgid "Self"
 msgstr "Self"
+
+msgid "Self Service Permission"
+msgstr "თვითმომსახურების წვდომა"
+
+msgid "Self Service Permissions"
+msgstr "თვითმომსახურების წვდომები"
+
+msgid "Self-service name"
+msgstr "თვითმომსახურების სახელი"
+
+msgid "Sensitive"
+msgstr "მგრძნობიარე"
 
 msgid "Serial"
 msgstr "სერიული"
@@ -835,11 +3964,20 @@ msgstr "სერიული"
 msgid "Serial Number"
 msgstr "სერიული ნომერი"
 
+msgid "Serial Number (hex)"
+msgstr "სერიული ნომერი (თექვსმ)"
+
 msgid "Serial number"
 msgstr "სერიული ნომერი"
 
+msgid "Serial number (hex)"
+msgstr "სერიული ნომერი (თექვსმეტობითში)"
+
 msgid "Server"
 msgstr "სერვერი"
+
+msgid "Server DNS location"
+msgstr "სერვერის DNS მდებარეობა"
 
 msgid "Server Name"
 msgstr "სერვერის სახელი"
@@ -847,14 +3985,39 @@ msgstr "სერვერის სახელი"
 msgid "Server Options"
 msgstr "სერვერის პარამეტრები"
 
+msgid "Server Role"
+msgstr "სერვერის როლი"
+
+msgid "Server Roles"
+msgstr "სერვერის როლები"
+
 msgid "Server name"
 msgstr "სერვერი სახელი"
+
+#, c-format
+msgid "Server name not provided and unavailable\n"
+msgstr "სერვერის სახელი მიწოდებული არაა და ხელმიუწვდომელია\n"
+
+msgid "Server state"
+msgstr "სერვერის მდგომარეობა"
 
 msgid "Servers"
 msgstr "სერვერები"
 
+msgid "Servers details:"
+msgstr "სერვერების დეტალები:"
+
+msgid "Servers in location"
+msgstr "მდებარეობაზე არსებული სერვერები"
+
 msgid "Service"
 msgstr "სერვისი"
+
+msgid "Service Certificate"
+msgstr "სერვისის სერტიფიკატი"
+
+msgid "Service Groups"
+msgstr "სერვისის ჯგუფები"
 
 msgid "Service Options"
 msgstr "სერვისის მორგება"
@@ -862,8 +4025,50 @@ msgstr "სერვისის მორგება"
 msgid "Service Settings"
 msgstr "სერვერის მორგება"
 
+msgid "Service Vaults"
+msgstr "სერვისის საცავები"
+
+msgid "Service category"
+msgstr "სერვისის კატეგორია"
+
+msgid "Service delegation rule"
+msgstr "სერვისის დელეგაციის წესი"
+
+msgid "Service delegation rules"
+msgstr "სერვისის დელეგაციის წესები"
+
+msgid "Service delegation target"
+msgstr "სერვისის დელეგაციის სამიზნე"
+
+msgid "Service delegation targets"
+msgstr "სერვისის დელეგაციის სამიზნეები"
+
+msgid "Service group name"
+msgstr "სერვისის ჯგუფის სახელი"
+
+msgid "Service name"
+msgstr "სერვისის სახელი"
+
+msgid "Service principal"
+msgstr "სერვისის პრინციპალი"
+
+msgid "Service principal alias"
+msgstr "სერვისის პრინციპალის ფსევდონიმი"
+
+msgid "Service relative weight"
+msgstr "სერვისის შედარებითი წონა"
+
+msgid "Service unprovisioned"
+msgstr "სერვისის სამუშაოდ მომზადება გაუქმდა"
+
+msgid "Service weight"
+msgstr "სერვისის წონა"
+
 msgid "Services"
 msgstr "სერვისები"
+
+msgid "Session error"
+msgstr "სესიის შეცდომა"
 
 msgid "Set"
 msgstr "დაყენება"
@@ -871,29 +4076,86 @@ msgstr "დაყენება"
 msgid "Set One-Time Password"
 msgstr "ერთჯერადი პაროლის დაყენება"
 
+msgid "Set SSH key"
+msgstr "SSH გასაღების დაყენება"
+
+msgid "Set a user's password."
+msgstr "მომხმარებლის პაროლის დაყენება."
+
 msgid "Set public key"
 msgstr "საჯარო გასაღების დაყენება"
 
 msgid "Settings"
 msgstr "მორგება"
 
+msgid "Setup SID configuration"
+msgstr "SID-ის კონფიგურაციის მორგება"
+
 msgid "Shared"
 msgstr "გაზიარებული"
+
+msgid "Shared Vaults"
+msgstr "გაზიარებული საცავები"
+
+msgid "Shared vault"
+msgstr "გაზიარებული საცავი"
 
 msgid "Show"
 msgstr "ჩვენება"
 
+msgid "Show IPA server."
+msgstr "IPA სერვერის ჩვენება."
+
 msgid "Show QR code"
 msgstr "QR კოდის ჩვენება"
+
+msgid "Show Results"
+msgstr "შედეგების ჩვენება"
+
+msgid "Show configuration uri"
+msgstr "კონფიგურაციის URI-ის ჩვენება"
 
 msgid "Show details"
 msgstr "დეტალების ჩვენება"
 
+msgid "Show global trust configuration."
+msgstr "გლობალურ ნდობის კონფიგურაციის ჩვენება."
+
+msgid "Show the current OTP configuration."
+msgstr "OTP-ის მიმდინარე კონფიგურაციის ჩვენება."
+
+msgid "Show the current Passkey configuration."
+msgstr "Passkey-ის მიმდინარე კონფიგურაციის ჩვენება."
+
+msgid "Show the current configuration."
+msgstr "მიმდინარე კონფიგურაციის ჩვენება."
+
+msgid "Show vault configuration."
+msgstr "საცავის კონფიგურაციის ჩვენება."
+
 msgid "Signature"
 msgstr "ხელმოწერა"
 
+msgid "Signature Expiration"
+msgstr "ხელმოწერის ვადა"
+
+msgid "Signature Inception"
+msgstr "ხელმოწერის შემოჭრა"
+
+msgid "Signer's Name"
+msgstr "ხელმომწერის სახელი"
+
+msgid "Simple bind failed\n"
+msgstr "მარტივი მიმაგრება ჩავარდა\n"
+
 msgid "Size"
 msgstr "ზომა"
+
+msgid "Size Limit"
+msgstr "ზომის ლიმიტი"
+
+msgid "Source Host Groups"
+msgstr "საწყისი ჰოსტის ჯგუფები"
 
 msgid "Source Hosts"
 msgstr "საწყისი ჰოსტები"
@@ -901,11 +4163,35 @@ msgstr "საწყისი ჰოსტები"
 msgid "Source host"
 msgstr "საწყისი ჰოსტი"
 
+msgid "Source host category"
+msgstr "საწყისი ჰოსტის კატეგორია"
+
+msgid "Specified CAs"
+msgstr "მითითებული CA-ები"
+
+msgid "Specified Profiles"
+msgstr "მითითებული პროფილები"
+
+msgid "Split DNS record to parts"
+msgstr "DNS ჩანაწერის ნაწილებად დაყოფა"
+
 msgid "Stage"
-msgstr "ნაბიჯი"
+msgstr "დაუდასტურებლად მონიშვნა"
+
+msgid "Stage User"
+msgstr "დროებითი მომხმარებელი"
+
+msgid "Stage Users"
+msgstr "დროებითი მომხმარებლები"
+
+msgid "Stage users"
+msgstr "დროებითი მომხმარებლები"
 
 msgid "Standard"
 msgstr "სტანდარტული"
+
+msgid "Standard Record Types"
+msgstr "სტანდარტული ჩანაწერის ტიპები"
 
 msgid "State"
 msgstr "მდგომარეობა"
@@ -916,11 +4202,59 @@ msgstr "რეგიონი/მხარე"
 msgid "Status"
 msgstr "სტატუსი"
 
+msgid "Status of the certificate"
+msgstr "სერტიფიკატის სტატუსი"
+
+msgid "Store issued certificates"
+msgstr "გამოცემული სერტიფიკატის დამახსოვრება"
+
 msgid "Street address"
 msgstr "ქუჩის მისამართი"
 
+msgid "Structured"
+msgstr "სტრუქტურირებული"
+
 msgid "Subject"
 msgstr "თემა"
+
+msgid "Subject DN"
+msgstr "სუბიექტის DN"
+
+msgid "Subject DNS name"
+msgstr "სუბიექტის DNS სახელი"
+
+msgid "Subject IP Address"
+msgstr "სუბიექტის IP მისამართი"
+
+msgid "Subject OID"
+msgstr "სუბიექტის OID"
+
+msgid "Subject Other Name"
+msgstr "სუბიეტქის სხვა სახელი"
+
+msgid "Subject UPN"
+msgstr "სუბიექტის UPN"
+
+msgid "Subject URI"
+msgstr "სუბიექტის URI"
+
+msgid "Subject X.400 address"
+msgstr "სუბიექტის X.400 მისამართი"
+
+msgid "Subject directory name"
+msgstr "სუბიექტის საქაღალდის სახელი"
+
+msgid "Subject email address"
+msgstr "თემის ელფოსტის მისამართი"
+
+msgid "Subject of the certificate"
+msgstr "სერტიფიკატის სუბიექტი"
+
+msgid "Subordinate id description"
+msgstr "დამხმარე ID-ის აღწერა"
+
+msgid "Subtree"
+msgstr "ქვეხე"
 
 msgid "Subtype"
 msgstr "ქვეტიპი"
@@ -928,32 +4262,224 @@ msgstr "ქვეტიპი"
 msgid "Success"
 msgstr "წარმატება"
 
+msgid "Sudo"
+msgstr "Sudo"
+
+msgid "Sudo Allow Command Groups"
+msgstr "Sudo-ის დაშვებული ბრძანების ჯგუფები"
+
+msgid "Sudo Allow Commands"
+msgstr "Sudo ბრძანებების დაშვება"
+
+msgid "Sudo Command"
+msgstr "ბრძანება Sudo"
+
+msgid "Sudo Command Group"
+msgstr "Sudo ბრძანების ჯგუფი"
+
+msgid "Sudo Command Groups"
+msgstr "Sudo ბრძანების ჯგუფები"
+
+msgid "Sudo Commands"
+msgstr "Sudo ბრძანებები"
+
+msgid "Sudo Deny Command Groups"
+msgstr "Sudo ბრძანებების ჯგუფის აკრძალვა"
+
+msgid "Sudo Deny Commands"
+msgstr "Sudo ბრძანებების აკრძალვა"
+
+msgid "Sudo Option"
+msgstr "Sudo-ის პარამეტრი"
+
+msgid "Sudo Rule"
+msgstr "Sudo-ის წესი"
+
+msgid "Sudo Rules"
+msgstr "Sudo-ის წესები"
+
+msgid "Suffix name"
+msgstr "სუფიქსის სახელი"
+
+msgid "Superseded"
+msgstr "გადაფარულა"
+
+#, c-format
+msgid "Supported encryption types:\n"
+msgstr "მხარდაჭერილი დაშიფვრის ტიპები:\n"
+
+msgid "Symmetric"
+msgstr "სიმეტრიული"
+
 msgid "Synchronizing"
 msgstr "სინქრონიზაცია"
+
+msgid "TA record"
+msgstr "TA ჩანაწერი"
+
+msgid "TKEY record"
+msgstr "TKEY ჩანაწერი"
+
+msgid "TLSA Certificate Association Data"
+msgstr "TLSA სერტიფიკატის ასოცირების მონაცემები"
+
+msgid "TLSA Certificate Usage"
+msgstr "TLSA სერტიფიკატის გამოყენება"
+
+msgid "TLSA Matching Type"
+msgstr "TLSA დამთხვევის ტიპი"
+
+msgid "TLSA Selector"
+msgstr "TLSA ამრჩევი"
+
+msgid "TLSA record"
+msgstr "TLSA ჩანაწერი"
+
+msgid "TOTP Synchronization Window"
+msgstr "TOTP სინქრონიზაციის ფანჯარა"
+
+msgid "TOTP authentication Window"
+msgstr "TOTP ავთენტიკაციის ფანჯარა"
+
+msgid "TSIG record"
+msgstr "TSIG გასაღები"
+
+msgid "TXT Text Data"
+msgstr "TXT ტექსტური მონაცემები"
+
+msgid "TXT record"
+msgstr "TXT ჩანაწერი"
 
 msgid "Target"
 msgstr "სამიზნე"
 
+msgid "Target DN"
+msgstr "სამიზნის DN"
+
+msgid "Target group"
+msgstr "სამიზნე ჯგუფი"
+
+msgid "Target host"
+msgstr "სამიზნე ჰოსტი"
+
 msgid "Telephone Number"
 msgstr "ტელეფონის ნომერი"
+
+msgid "Text Data"
+msgstr "ტექსტური მონაცემები"
+
+#, c-format
+msgid "The hostname must not be: %s\n"
+msgstr "ჰოსტის სახელი არ უნდა იყოს: %s\n"
+
+msgid "The hostname this reverse record points to"
+msgstr "ჰოსტის სახელი, რომელზეც ეს უკუჩანაწერი მიუთითებს"
+
+msgid "The keytab file to remove the principcal(s) from"
+msgstr "გასაღებების ცხრილის ფაილი, საიდანაც პრინციპალი გნებავთ, წაშალოთ"
+
+msgid ""
+"The principal to remove from the keytab (ex: ftp/ftp.example.com@EXAMPLE.COM)"
+msgstr ""
+"გასაღებების ცხრილიდან წასაშლელი პრინციპალი (მაგ: ftp/ftp.example.com@EXAMPLE."
+"COM)"
+
+msgid "Ticket expired"
+msgstr "ბილეთი ვადაგასულია"
+
+msgid "Time Limit"
+msgstr "დროის ლიმიტი"
+
+msgid "Time now"
+msgstr "დრო ახლა"
+
+msgid "Time to live"
+msgstr "სიცოცხლის დრო"
 
 msgid "Timeout"
 msgstr "დროის ამოწურვა"
 
+#, c-format
+msgid "Timeout exceeded."
+msgstr "მოლოდინის ვადა გადაცილებულია."
+
+msgid "Token ID"
+msgstr "კოდის ID"
+
+msgid "Token endpoint"
+msgstr "კოდის ბოლოწერტილი"
+
+msgid "Topic commands:"
+msgstr "თემის ბრძანებები:"
+
+msgid "Topic or Command"
+msgstr "თემა ან ბრძანება"
+
 msgid "Topology"
 msgstr "ტოპოლოგია"
+
+msgid "Topology Segment"
+msgstr "ტოპოლოგიის სეგმენტი"
+
+msgid "Topology Segments"
+msgstr "ტოპოლოგიის სეგმენტები"
+
+msgid "Topology is disconnected"
+msgstr "ტოპოლოგია გათიშულია"
+
+msgid "Topology suffix"
+msgstr "ტოპოლოგიის სუფიქსი"
+
+msgid "Topology suffixes"
+msgstr "ტოპოლოგიის სუფიქსები"
+
+msgid "Transport Certificate"
+msgstr "ტრანსპორტის სერტიფიკატი"
 
 msgid "True"
 msgstr "ჭეშმარიტი"
 
+msgid "True if not all results were returned"
+msgstr "ჭეშმარიტია, თუ არ დაბრუნებულა ყველა შედეგი"
+
 msgid "Trust"
 msgstr "ნდობა"
+
+msgid "Trust Settings"
+msgstr "ნდობის მორგება"
+
+msgid "Trust direction"
+msgstr "ნდობის მიმართულება"
+
+msgid "Trust setup"
+msgstr "ნდობის მორგება"
+
+msgid "Trust status"
+msgstr "ნდობის სტატუსი"
+
+msgid "Trust type"
+msgstr "ნდობის ტიპი"
+
+msgid "Trusted domain"
+msgstr "სანდო დომენი"
+
+msgid "Trusted domains"
+msgstr "სანდო დომენები"
+
+msgid "Trusted forest"
+msgstr "სანდო ტყე"
+
+msgid "Trusting forest"
+msgstr "ვენდობი ტყეს"
 
 msgid "Trusts"
 msgstr "ნდობები"
 
 msgid "Type"
 msgstr "ტიპი"
+
+msgid "Type Map"
+msgstr "ტიპის რუკა"
 
 msgid "UID"
 msgstr "UID"
@@ -967,11 +4493,47 @@ msgstr "URL"
 msgid "UUID"
 msgstr "UUID"
 
+msgid "Un-apply"
+msgstr "გადატარების გაუქმება"
+
+msgid "Un-apply from host groups"
+msgstr "ჰოსტების ჯგუფზე გადატარების გაუქმება"
+
 msgid "Unable to communicate with CMS"
 msgstr "CMS-თან დაკავშირება შეუძლებელია"
 
+#, python-format
+msgid "Unable to communicate with CMS (status %d)"
+msgstr "CMS-თან დაკავშირება შეუძლებელია (სტატუსი %d)"
+
+#, c-format
+msgid "Unable to initialize ldap library!\n"
+msgstr "LDAP ბიბლიოთეკის ინიციალიზაციის შეცდომა!\n"
+
+#, c-format
+msgid "Unable to parse principal\n"
+msgstr "პრინციპალის დამუშავება სეუძლებელია\n"
+
+#, c-format
+msgid "Unable to parse principal name\n"
+msgstr "პრინციპალის სახელის დამუშავება შეუძლებელია\n"
+
+#, c-format
+msgid "Unable to parse principal: %1$s (%2$d)\n"
+msgstr "ვერ დავამუშავე პრინციპალი: %1$s (%2$d)\n"
+
+#, c-format
+msgid "Unable to remove entry\n"
+msgstr "ჩანაწერის წაშლა შეუძლებელია\n"
+
 msgid "Undo"
 msgstr "დაბრუნება"
+
+msgid "Undo All"
+msgstr "ყველას გაუქმება"
+
+msgid "Unique ID"
+msgstr "უნიკალური ID"
 
 msgid "Unknown"
 msgstr "უცნობი"
@@ -982,8 +4544,26 @@ msgstr "უცნობი შეცდომა"
 msgid "Unlock"
 msgstr "განბლოკვა"
 
+msgid "Unmatched"
+msgstr "არ ემთხვევა"
+
+msgid "Unprovision"
+msgstr "მუშაობისთვის მომზადების გაუქმება"
+
+msgid "Unprovisioning host"
+msgstr "ჰოსტის მუშაობისთვის მომზადების გაუქმება"
+
+msgid "Unprovisioning service"
+msgstr "სერვისის მუშაობისთვის მომზადების გაუქმება"
+
+msgid "Unrevoked"
+msgstr "გაუქმებული"
+
 msgid "Unsaved Changes"
 msgstr "შეუნახავი ცვლილებები"
+
+msgid "Unselect All"
+msgstr "მონიშვნის ყველაფერზე მოხსნა"
 
 msgid "Unspecified"
 msgstr "მიუთითებელი"
@@ -994,11 +4574,14 @@ msgstr "მხარდაუჭერელი მნიშვნელობ�
 msgid "Update"
 msgstr "განახლება"
 
+msgid "Update DNS entries"
+msgstr "DNS ჩანაწერების განახლება"
+
 msgid "User"
 msgstr "მომხმარებელი"
 
 msgid "User Group"
-msgstr "მომხმარებლების ჯგუფი"
+msgstr "მომხმარებლის ჯგუფი"
 
 msgid "User Groups"
 msgstr "მომხმარებლის ჯგუფები"
@@ -1006,14 +4589,53 @@ msgstr "მომხმარებლის ჯგუფები"
 msgid "User ID"
 msgstr "მომხმარებლის ID"
 
+msgid "User ID Number"
+msgstr "მომხმარებლის ID ნომერი"
+
+msgid "User ID override"
+msgstr "მომხმარებლის ID-ის გადაფარვა"
+
+msgid "User ID overrides"
+msgstr "მომხმარებლის ID-ის გადაფარავს"
+
 msgid "User Login"
 msgstr "მომხმარებლის შესვლა"
 
 msgid "User Options"
 msgstr "მომხმარებლის პარამეტრები"
 
+msgid "User Vaults"
+msgstr "მომხმარებლის საცავები"
+
+msgid "User attribute"
+msgstr "მომხმარებლის ატრიბუტი"
+
+msgid "User authentication types"
+msgstr "მომხმარებლის ავთენტიკაციის ტიპები"
+
+msgid "User categories"
+msgstr "მომხმარებლის კატეგორიები"
+
+msgid "User category"
+msgstr "მომხმარებლის კატეგორია"
+
+msgid "User check"
+msgstr "მომხმარებლის შემოწმება"
+
+msgid "User container"
+msgstr "მომხმარებლის კონტეინერი"
+
 msgid "User group"
-msgstr "მომხმარებლების ჯგუფი"
+msgstr "მომხმარებლის ჯგუფი"
+
+msgid "User group rule"
+msgstr "მომხმარებლების ჯგუფის წესი"
+
+msgid "User group rules"
+msgstr "მომხმარებლების ჯგუფის წესები"
+
+msgid "User info URI"
+msgstr "მომხმარებლის ინფორმაციის URI"
 
 msgid "User login"
 msgstr "მომხმარებლის შესვლა"
@@ -1024,14 +4646,56 @@ msgstr "მომხმარებლის სახელები"
 msgid "User name"
 msgstr "მომხმარებლის სახელი"
 
+msgid "User password"
+msgstr "მომხმარებლის პაროლი"
+
+msgid "User password expiration"
+msgstr "მომხმარებლის პაროლის ვადის ამოწურვა"
+
+msgid "User search fields"
+msgstr "მომხმარებლის ძებნის ველები"
+
+msgid "User to override"
+msgstr "გადასაფარი მომხმარებელი"
+
 msgid "Username"
 msgstr "მომხმარებელი"
 
 msgid "Users"
 msgstr "მომხმარებლები"
 
+#, c-format
+msgid "Using discovered server %s\n"
+msgstr "ვიყენებ აღმოჩენილ სერვერს %s\n"
+
+#, c-format
+msgid "Using provided server %s\n"
+msgstr "ვიყენებ მოწოდებულ სერვერს %s\n"
+
+#, c-format
+msgid "Using server from config %s\n"
+msgstr "ვიყენებ სერვერს კონფიგურაციიდან %s\n"
+
+msgid "Valid Certificate Present"
+msgstr "სწორი სერტიფიკატი არსებობს"
+
 msgid "Valid from"
 msgstr "Ძალაშია"
+
+msgid "Valid not after from"
+msgstr "არასწორია თარიღიდან დასაწყისი"
+
+msgid "Valid not after to"
+msgstr "არასწორია თარიღიდან დასასრული"
+
+msgid "Valid not before from"
+msgstr "არასწორია თარიღამდე დასაწყისი"
+
+msgid "Valid not before to"
+msgstr "არასწორია თარიღამდე დასასრული"
+
+msgid "Valid to"
+msgstr "მართებულობის ვადა"
 
 msgid "Validation error"
 msgstr "შემოწმების შეცდომა"
@@ -1039,17 +4703,74 @@ msgstr "შემოწმების შეცდომა"
 msgid "Validity"
 msgstr "სისწორე"
 
+msgid "Validity end"
+msgstr "სისწორე სრულდება"
+
+msgid "Validity start"
+msgstr "სისწორე იწყება"
+
+msgid "Vault"
+msgstr "საცავი"
+
+msgid "Vault Container"
+msgstr "საცავის კონტეინერი"
+
+msgid "Vault Containers"
+msgstr "საცავის კონტეინერები"
+
 msgid "Vault configuration"
 msgstr "საცავის მორგება"
+
+msgid "Vault description"
+msgstr "საცავის აღწერა"
+
+msgid "Vault name"
+msgstr "საცავის სახელი"
+
+msgid "Vault password"
+msgstr "საცავის პაროლი"
+
+msgid "Vault private key"
+msgstr "საცავის პირადი გასაღები"
+
+msgid "Vault public key"
+msgstr "საცავის საჯარო გასაღები"
+
+msgid "Vault service"
+msgstr "საცავის სერვისი"
+
+msgid "Vault user"
+msgstr "საცავის მომხმარებელი"
+
+msgid "Vaults"
+msgstr "საცავები"
+
+msgid "Vaults Config"
+msgstr "საცავების მორგება"
 
 msgid "Vendor"
 msgstr "მომწოდებელი"
 
+msgid "Verify Password"
+msgstr "პაროლის გადამოწმება"
+
+msgid "Verify Principal Password"
+msgstr "პრინციპალის პაროლის გადამოწმება"
+
 msgid "Version"
 msgstr "ვერსია"
 
+msgid "Vertical Precision"
+msgstr "ვერტიკალური სიზუსტე"
+
+msgid "Via Service"
+msgstr "გაივლის სერვისს"
+
 msgid "View"
 msgstr "ხედი"
+
+msgid "View Certificate"
+msgstr "სერთიფიკატის ნახვა"
 
 msgid "Warning"
 msgstr "ყურადღება"
@@ -1057,26 +4778,118 @@ msgstr "ყურადღება"
 msgid "Weight"
 msgstr "სიმძიმე"
 
+msgid "Weight for server services"
+msgstr "სერვერის სერვისების წონა"
+
+msgid "Who"
+msgstr "ვინ"
+
 msgid "Working"
 msgstr "მუშაობს"
+
+msgid "X.509 certificate chain"
+msgstr "X.509 სერტიფიკატების ჯაჭვი"
+
+msgid "Your password has expired. Please enter a new password."
+msgstr "თქვენს პაროლს ვადა გაუვიდა. შეიყვანეთ ახალი პაროლი."
 
 msgid "Your session has expired. Please log in again."
 msgstr "სესიის ვადა გასულია. თავიდან შედით."
 
+msgid "YubiKey slot"
+msgstr "YubiKey სლოტი"
+
 msgid "ZIP"
 msgstr "ZIP"
+
+msgid "Zone name"
+msgstr "ზონის სახელი"
+
+msgid "Zone name (FQDN)"
+msgstr "ზონის სახელი (FQDN)"
+
+msgid "Zone refresh interval"
+msgstr "ზონის განახლების ინტერვალი"
+
+msgid "attribute is not configurable"
+msgstr "ატრიბუტი მორგებადი არაა"
+
+msgid "automount location"
+msgstr "ავტომიმაგრების მდებარეობა"
+
+msgid "automount locations"
+msgstr "ავტომიმაგრების მდებარეობები"
 
 msgid "basedn"
 msgstr "basedn"
 
+#, c-format
+msgid "ber_init() failed, Invalid control ?!\n"
+msgstr "ber_init() ჩავარდა. არასწორი კონტროლი ?!\n"
+
+#, c-format
+msgid "ber_scanf() failed, unable to find kvno ?!\n"
+msgstr "ber_scanf() ჩავარდა. ვერ ვიპოვე kvno ?!\n"
+
+msgid "bind password"
+msgstr "მიმაგრების პაროლი"
+
+#, python-format
+msgid "can be at most %(len)d characters"
+msgstr "არ შეიძლება %(len)d სიმბოლოზე გრძელი იყოს"
+
+#, python-format
+msgid "can be at most %(maxlength)d bytes"
+msgstr "შეიძლება, მაქს. %(maxlength)d ბაიტი იყოს"
+
+#, python-format
+msgid "can be at most %(maxlength)d characters"
+msgstr "არ შეიძლება , %(maxlength)d სიმბოლოზე გრძელი იყოს"
+
+msgid "cannot be empty"
+msgstr "ცარიელი ვერ იქნება"
+
 msgid "cannot be longer that {} characters"
 msgstr "არ შეიძლება {} სიმბოლოზე გრძელი იყოს"
+
+#, c-format
+msgid "cannot open configuration file %s\n"
+msgstr "შეცდომა კონფიგურაციის ფაილის %s გახსნისას\n"
+
+#, c-format
+msgid "cannot stat() configuration file %s\n"
+msgstr "კონფიგურაციის ფაილის %s stat() შეუძლებელია\n"
 
 msgid "command"
 msgstr "ბრძანება"
 
 msgid "commands"
 msgstr "ბრძანებები"
+
+msgid "configuration options"
+msgstr "კონფიგურაციის პარამეტრები"
+
+#, c-format
+msgid "curl_easy_init() failed\n"
+msgstr "curl_easy_init() ჩავარდა\n"
+
+#, c-format
+msgid "curl_easy_setopt() failed\n"
+msgstr "curl_easy_setopt() ჩავარდა\n"
+
+#, c-format
+msgid "curl_global_init() failed\n"
+msgstr "curl_global_init() ჩავარდა\n"
+
+#, c-format
+msgid "curl_slist_append() failed for value: '%s'\n"
+msgstr "curl_slist_append() ჩავარდა მნიშვნელობისთვის: '%s'\n"
+
+msgid "delegation"
+msgstr "დელეგაცია"
+
+msgid "delegations"
+msgstr "დელეგაციები"
 
 msgid "delete"
 msgstr "წაშლა"
@@ -1087,11 +4900,20 @@ msgstr "აღწერა"
 msgid "domain"
 msgstr "დომენი"
 
+msgid "domain name cannot be longer than 255 characters"
+msgstr "დომენის სახელი, არ შეიძლება, 255 სიმბოლოზე გრძელი იყოს"
+
+msgid "empty filter"
+msgstr "ცარიელი ფილტრი"
+
 msgid "entries"
 msgstr "ჩანაწერები"
 
 msgid "entry"
 msgstr "ჩანაწერი"
+
+msgid "file to store certificate in"
+msgstr "ფაილი, რომელშიც სერტიფიკატს შევინახავ"
 
 msgid "filename"
 msgstr "ფაილის სახელი"
@@ -1100,11 +4922,23 @@ msgstr "ფაილის სახელი"
 msgid "fork() failed\n"
 msgstr "fork() -ის შეცდომა\n"
 
+msgid "givenname is required"
+msgstr "givenname აუცილებელია"
+
 msgid "group"
 msgstr "ჯგუფი"
 
+msgid "group runAs"
+msgstr "ჯგუფი გავუშვაროგორც"
+
 msgid "groups"
 msgstr "ჯგუფები"
+
+msgid "groups to add"
+msgstr "დასამატებელი ჯგუფები"
+
+msgid "groups to remove"
+msgstr "წასაშლელი ჯგუფები"
 
 msgid "host"
 msgstr "ჰოსტი"
@@ -1114,6 +4948,12 @@ msgstr "ჰოსტების ჯგუფი"
 
 msgid "host groups"
 msgstr "ჰოსტის ჯგუფები"
+
+msgid "host groups to add"
+msgstr "დასამატებელი ჰოსტის ჯგუფები"
+
+msgid "host groups to remove"
+msgstr "წასაშლელი ჰოსტის ჯგუფები"
 
 msgid "hostgroup"
 msgstr "ჰოსტების ჯგუფი"
@@ -1125,13 +4965,56 @@ msgid "hostname"
 msgstr "ჰოსტის სახელი"
 
 msgid "hosts"
-msgstr "ჰოსტი"
+msgstr "ჰოსტები"
+
+msgid "hosts to add"
+msgstr "დასამატებელი ჰოსტები"
+
+msgid "hosts to remove"
+msgstr "წასაშლელი ჰოსტები"
+
+msgid "incorrect type"
+msgstr "არასწორი ტიპი"
+
+msgid "invalid Profile ID"
+msgstr "არასწორი პროფილის ID"
+
+msgid "invalid SSH public key"
+msgstr "არასწორი SSH საჯარო გასაღები"
+
+msgid "invalid attribute name"
+msgstr "არასწორი ატრიბუტის სახელი"
+
+msgid "invalid domain name"
+msgstr "არასწორი დომენის სახელი"
+
+msgid "invalid hostmask"
+msgstr "არასწორი ჰოსტის ნიღაბი"
 
 msgid "invalid port number"
 msgstr "პორტის არასწორი ნომერი"
 
+msgid "invalid serial number 0"
+msgstr "არასწორი სერიული ნომერი 0"
+
+#, c-format
+msgid "ipa-getkeytab not found\n"
+msgstr "ipa-getkeytab ვერ ვიპოვე\n"
+
 msgid "is required"
 msgstr "აუცილებელია"
+
+#, c-format
+msgid "json_dumps() failed\n"
+msgstr "json_dumps() ჩავარდა\n"
+
+#, c-format
+msgid "json_pack_ex() failed: %s\n"
+msgstr "json_pack_ex() ჩავარდა: %s\n"
+
+#, python-format
+msgid "key %(key)s already exists"
+msgstr "გასაღები %(key)s უკვე არსებობს"
 
 #, c-format
 msgid "krb5_kt_close %1$d: %2$s\n"
@@ -1163,15 +5046,115 @@ msgstr "მდებარეობა"
 msgid "locations"
 msgstr "მდებარეობები"
 
+#, python-format
+msgid "map %(map)s already exists"
+msgstr "რუკა %(map)s უკვე არსებობს"
+
+msgid "maximum serial number"
+msgstr "მაქსიმალური სერიული ნომერი"
+
+#, python-format
+msgid "member %s"
+msgstr "წევრი %s"
+
+msgid "member Certificate Profile"
+msgstr "წევრის სერტიფიკატის პროფილი"
+
+msgid "member HBAC service"
+msgstr "წევრი HBAC სერვისი"
+
+msgid "member HBAC service group"
+msgstr "წევრის HBAC სერვისის ჯგუფი"
+
+msgid "member group"
+msgstr "წევრი ჯგუფი"
+
+msgid "member host"
+msgstr "წევრი ჰოსტი"
+
+msgid "member host group"
+msgstr "წევრი ჰოსტების ჯგუფი"
+
+msgid "member netgroup"
+msgstr "მომხმარებლების ქსელური ჯგუფი"
+
+msgid "member privilege"
+msgstr "წევრის პრივილეგია"
+
+msgid "member role"
+msgstr "წევრი როლი"
+
+msgid "member service"
+msgstr "წევრი სერვისი"
+
+msgid "member user"
+msgstr "წევრი მომხმარებელი"
+
+msgid "minimum serial number"
+msgstr "მინიმალური სერიული ნომერი"
+
+msgid "must be a certificate"
+msgstr "სერტიფიკატი უნდა იყოს"
+
+msgid "must be a decimal number"
+msgstr "უნდა წარმოადგენდეს ათობით რიცხვს"
+
+msgid "must be an integer"
+msgstr "უნდა წარმოადგენდეს მთელ რიცხვს"
+
+msgid "must be dictionary"
+msgstr "უნდა იყოს ლექსიკონი"
+
+msgid "netgroup"
+msgstr "ქსელური ჯგუფი"
+
+msgid "netgroups"
+msgstr "ქსელური ჯგუფები"
+
+msgid "netgroups to add"
+msgstr "დასამატებელი ქსელური ჯგუფები"
+
+msgid "netgroups to remove"
+msgstr "წასაშლელი ქსელის ჯგუფები"
+
 msgid "not found"
 msgstr "ვერ მოიძებნა"
+
+msgid "number of passwords"
+msgstr "პაროლების რაოდენობა"
+
+#, python-format
+msgid "objectclass %s not found"
+msgstr "ობიექტის კლასი %s ვერ ვიპოვე"
 
 #, c-format
 msgid "out of memory\n"
 msgstr "არასაკმარისი მეხსიერება\n"
 
+#, python-format
+msgid "owner %s"
+msgstr "მფლობელი %s"
+
+msgid "owner group"
+msgstr "მფლობელის ჯგუფი"
+
+msgid "owner service"
+msgstr "მფლობელი სერვისი"
+
+msgid "owner user"
+msgstr "მფლობელის მომხმარებელი"
+
 msgid "password"
 msgstr "პაროლი"
+
+msgid "password policies"
+msgstr "პაროლის პოლიტიკები"
+
+msgid "password policy"
+msgstr "პაროლის პოლიტიკა"
+
+msgid "password to use if not using kerberos"
+msgstr "პაროლი, რომელსაც გამოვიყენებთ, როცა Kerberos-ს არ ვიყენებ"
 
 msgid "permission"
 msgstr "წვდომა"
@@ -1179,14 +5162,39 @@ msgstr "წვდომა"
 msgid "permissions"
 msgstr "წვდომები"
 
+msgid "pkinit"
+msgstr "pkinit"
+
 msgid "preserve"
 msgstr "შენარჩუნება"
+
+#, c-format
+msgid "principal not found\n"
+msgstr "პრინციპალი ვერ ვიპოვე\n"
+
+msgid "principal to add"
+msgstr "დასამატებელი პრინციპალი"
 
 msgid "privilege"
 msgstr "პრივილეგიები"
 
+msgid "privileged group"
+msgstr "პრივილეგიის მქონე ჯგუფი"
+
+msgid "privileged hostgroup"
+msgstr "პრივილეგიის მქონე ჰოსტების ჯგუფი"
+
+msgid "privileged user"
+msgstr "პრივილეგიის მქონე მომხმარებელი"
+
 msgid "privileges"
 msgstr "პრივილეგიები"
+
+msgid "privileges to add"
+msgstr "დასამატებელი პრივილეგიები"
+
+msgid "privileges to remove"
+msgstr "წასაშლელი პრივილეგიები"
 
 #, c-format
 msgid "read error\n"
@@ -1202,11 +5210,44 @@ msgstr "როლები"
 msgid "roles"
 msgstr "როლები"
 
+msgid "roles to add"
+msgstr "დასამატებელი როლები"
+
+msgid "roles to remove"
+msgstr "წასაშლელი როლები"
+
+msgid "runAs groups"
+msgstr "გავუშვაროგორც ჯგუფები"
+
+msgid "runAs user"
+msgstr "გაშვება სხვა მომხმარებლით"
+
+msgid "runAs users"
+msgstr "გავუშვაროგორც მომხმარებლები"
+
 msgid "seconds"
 msgstr "წამი"
 
+msgid "segment"
+msgstr "სეგმენტი"
+
+msgid "segments"
+msgstr "სეგმენტები"
+
+msgid "self service permission"
+msgstr "თვითმომსახურების წვდომა"
+
+msgid "self service permissions"
+msgstr "თვითმომსახურების წვდომები"
+
 msgid "server"
 msgstr "სერვერი"
+
+msgid "server role"
+msgstr "სერვერის როლი"
+
+msgid "server roles"
+msgstr "სერვერის როლები"
 
 msgid "servers"
 msgstr "სერვერები"
@@ -1214,8 +5255,62 @@ msgstr "სერვერები"
 msgid "service"
 msgstr "სერვისი"
 
+msgid "service delegation rule"
+msgstr "სერვისის დელეგაციის წესი"
+
+msgid "service delegation rules"
+msgstr "სერვისის დელეგაციის წესები"
+
+msgid "service delegation target"
+msgstr "სერვისის დელეგაციის სამიზნე"
+
+msgid "service delegation targets"
+msgstr "სერვისის დელეგაციის სამიზნეები"
+
 msgid "services"
 msgstr "სერვისები"
+
+msgid "services to add"
+msgstr "დასამატებელი სერვისები"
+
+msgid "services to remove"
+msgstr "წასაშლელი სერვისები"
+
+msgid "sidgen_was_run"
+msgstr "sidgen_was_run"
+
+msgid "sn is required"
+msgstr "sn აუცილებელია"
+
+msgid "stage user"
+msgstr "დროებითი მომხმარებელი"
+
+msgid "stage users"
+msgstr "დროებითი მომხმარებლები"
+
+msgid "sudo command"
+msgstr "ბრძანება sudo"
+
+msgid "sudo command group"
+msgstr "'sudo' ბრძანების ჯგუფი"
+
+msgid "sudo command groups"
+msgstr "'sudo' ბრძანების ჯგუფები"
+
+msgid "sudo commands"
+msgstr "sudo ბრძანებები"
+
+msgid "sudo rule"
+msgstr "sudo წესი"
+
+msgid "sudo rules"
+msgstr "sudo-ის წესები"
+
+msgid "suffix"
+msgstr "სუფიქსი"
+
+msgid "suffixes"
+msgstr "სუფიქსები"
 
 msgid "trust"
 msgstr "ნდობა"
@@ -1223,8 +5318,26 @@ msgstr "ნდობა"
 msgid "trust configuration"
 msgstr "ნდობის მორგება"
 
+msgid "trust domain"
+msgstr "ნდობის დომენი"
+
+msgid "trust domains"
+msgstr "ნდობის დომენები"
+
+msgid "trust type"
+msgstr "ნდობის ტიპი"
+
+msgid "trusts"
+msgstr "ნდობები"
+
 msgid "unknown provider"
 msgstr "უცნობი მომწოდებელი"
+
+msgid "unsupported functional level"
+msgstr "მხარდაუჭერელი ფუნქციონალის დონე"
+
+msgid "unsupported trust type"
+msgstr "მხარდაუჭერელი ნდობის ტიპი"
 
 msgid "url"
 msgstr "url"
@@ -1235,8 +5348,30 @@ msgstr "მომხმარებელი"
 msgid "users"
 msgstr "მომხმარებლები"
 
+msgid "users to add"
+msgstr "დასამატებელი მომხმარებლები"
+
+msgid "users to remove"
+msgstr "წასაშლელი მომხმარებელი"
+
 msgid "value"
 msgstr "მნიშვნელობა"
 
 msgid "value is missing"
 msgstr "აკლია მნიშვნელობა"
+
+msgid "vault"
+msgstr "საცავი"
+
+msgid "vaultcontainer"
+msgstr "vaultcontainer"
+
+msgid "vaultcontainers"
+msgstr "საცავისკონტეინერები"
+
+msgid "vaults"
+msgstr "საცავები"
+
+#, python-brace-format
+msgid "{role}: role not found"
+msgstr "{role}: როლი ვერ ვიპოვე"

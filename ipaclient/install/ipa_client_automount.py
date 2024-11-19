@@ -36,14 +36,14 @@ from six.moves.urllib.parse import urlsplit
 
 from optparse import OptionParser  # pylint: disable=deprecated-module
 from ipapython import ipachangeconf
-from ipaclient.install import ipadiscovery
+from ipaclient import discovery
 from ipaclient.install.client import (
     CLIENT_NOT_CONFIGURED,
     CLIENT_ALREADY_CONFIGURED,
 )
 from ipalib import api, errors
 from ipalib.install import sysrestore
-from ipalib.install.kinit import kinit_keytab
+from ipalib.kinit import kinit_keytab
 from ipalib.util import check_client_configuration
 from ipapython import ipautil
 from ipapython.ipa_log_manager import standard_logging_setup
@@ -217,7 +217,7 @@ def uninstall(fstore, statestore):
         paths.SYSCONFIG_NFS,
         paths.IDMAPD_CONF,
     ]
-    STATES = ['autofs', 'rpcidmapd', 'rpcgssd', 'nfsclient']
+    STATES = ['autofs', 'rpcidmapd', 'rpcgssd']
 
     if not statestore.get_state('autofs', 'sssd'):
         tasks.disable_ldap_automount(statestore)
@@ -230,7 +230,6 @@ def uninstall(fstore, statestore):
 
     print("Restoring configuration")
 
-    tasks.disable_nsswitch_automount(statestore)
     for filepath in RESTORE_FILES:
         if fstore.has_file(filepath):
             fstore.restore_file(filepath)
@@ -278,16 +277,6 @@ def uninstall(fstore, statestore):
     if statestore.has_state('rpcgssd'):
         statestore.delete_state('rpcgssd', 'enabled')
         statestore.delete_state('rpcgssd', 'running')
-
-    # restore nfs-client.target
-    if statestore.has_state('nfsclient'):
-        enabled = statestore.restore_state('nfsclient', 'enabled')
-        running = statestore.restore_state('nfsclient', 'running')
-        nfsclient = services.knownservices.nfs_client
-        if not enabled:
-            nfsclient.disable()
-        if not running:
-            nfsclient.stop()
 
     nfsutils = services.knownservices['nfs-utils']
     try:
@@ -338,19 +327,6 @@ def configure_nfs(fstore, statestore, options):
         tasks.restore_context(paths.IDMAPD_CONF)
         print("Configured %s" % paths.IDMAPD_CONF)
 
-    # by default nfs-client.target is disabled in ALT
-    nfsclient = services.knownservices.nfs_client
-    statestore.backup_state('nfsclient', 'enabled', nfsclient.is_enabled())
-    statestore.backup_state('nfsclient', 'running', nfsclient.is_running())
-    try:
-        nfsclient.enable()
-    except Exception as e:
-        logger.error("Failed to enable nfs-client.target (%s)", str(e))
-    try:
-        nfsclient.restart()
-    except Exception as e:
-        logger.error("Failed to restart nfs-client.target (%s)", str(e))
-
     rpcgssd = services.knownservices.rpcgssd
     try:
         rpcgssd.restart()
@@ -364,14 +340,16 @@ def configure_nfs(fstore, statestore, options):
 
 
 def configure_automount():
-    try:
-        check_client_configuration()
-    except ScriptError as e:
-        print(e.msg)
-        sys.exit(e.rval)
+    statestore = sysrestore.StateFile(paths.IPA_CLIENT_SYSRESTORE)
+    if not statestore.get_state('installation', 'automount'):
+        # not called from ipa-client-install
+        try:
+            check_client_configuration()
+        except ScriptError as e:
+            print(e.msg)
+            sys.exit(e.rval)
 
     fstore = sysrestore.FileStore(paths.IPA_CLIENT_SYSRESTORE)
-    statestore = sysrestore.StateFile(paths.IPA_CLIENT_SYSRESTORE)
 
     options, _args = parse_options()
 
@@ -406,12 +384,12 @@ def configure_automount():
         sys.exit(CLIENT_ALREADY_CONFIGURED)
 
     autodiscover = False
-    ds = ipadiscovery.IPADiscovery()
+    ds = discovery.IPADiscovery()
     if not options.server:
         print("Searching for IPA server...")
         ret = ds.search(ca_cert_path=ca_cert_path)
         logger.debug('Executing DNS discovery')
-        if ret == ipadiscovery.NO_LDAP_SERVER:
+        if ret == discovery.NO_LDAP_SERVER:
             logger.debug('Autodiscovery did not find LDAP server')
             s = urlsplit(api.env.xmlrpc_uri)
             server = [s.netloc]
@@ -431,14 +409,14 @@ def configure_automount():
         server = options.server
         logger.debug("Verifying that %s is an IPA server", server)
         ldapret = ds.ipacheckldap(server, api.env.realm, ca_cert_path)
-        if ldapret[0] == ipadiscovery.NO_ACCESS_TO_LDAP:
+        if ldapret[0] == discovery.NO_ACCESS_TO_LDAP:
             print("Anonymous access to the LDAP server is disabled.")
             print("Proceeding without strict verification.")
             print(
                 "Note: This is not an error if anonymous access has been "
                 "explicitly restricted."
             )
-        elif ldapret[0] == ipadiscovery.NO_TLS_LDAP:
+        elif ldapret[0] == discovery.NO_TLS_LDAP:
             logger.warning("Unencrypted access to LDAP is not supported.")
         elif ldapret[0] != 0:
             sys.exit('Unable to confirm that %s is an IPA server' % server)
@@ -498,7 +476,6 @@ def configure_automount():
         sys.exit("Installation aborted")
 
     try:
-        tasks.enable_nsswitch_automount(statestore)
         configure_nfs(fstore, statestore, options)
         configure_autofs_sssd(fstore, statestore, autodiscover, options)
         configure_autofs_common(fstore, statestore, options)

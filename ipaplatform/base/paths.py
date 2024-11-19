@@ -36,7 +36,6 @@ class BasePathNamespace:
     SYSTEMD_DETECT_VIRT = "/usr/bin/systemd-detect-virt"
     SYSTEMD_TMPFILES = "/bin/systemd-tmpfiles"
     TAR = "/bin/tar"
-    PACKAGE_MANAGER = "/usr/bin/rpm"
     ETC_FEDORA_RELEASE = "/etc/fedora-release"
     GROUP = "/etc/group"
     ETC_HOSTNAME = "/etc/hostname"
@@ -57,7 +56,6 @@ class BasePathNamespace:
     HTTPD_CERT_FILE = "/var/lib/ipa/certs/httpd.crt"
     HTTPD_KEY_FILE = "/var/lib/ipa/private/httpd.key"
     HTTPD_PASSWD_FILE_FMT = "/var/lib/ipa/passwds/{host}-443-RSA"
-    HTTPD_DEFAULT_STARTED_SITE_CONF = None
     # only used on Fedora
     HTTPD_IPA_WSGI_MODULES_CONF = None
     OLD_IPA_KEYTAB = "/etc/httpd/conf/ipa.keytab"
@@ -104,13 +102,10 @@ class BasePathNamespace:
     NAMED_ROOT_KEY = "/etc/named.root.key"
     NAMED_MANAGED_KEYS_DIR = "/var/named/dynamic"
     NAMED_CRYPTO_POLICY_FILE = None
-    NAMED_RNDC_CONF = ""
     NSLCD_CONF = "/etc/nslcd.conf"
     NSS_LDAP_CONF = "/etc/nss_ldap.conf"
     NSSWITCH_CONF = "/etc/nsswitch.conf"
     CHRONY_CONF = "/etc/chrony.conf"
-    NTPD_CONF = "/etc/ntp.conf"
-    ONTPD_CONF = "/etc/ntpd.conf"
     NTP_CONF = "/etc/ntp.conf"
     NTP_STEP_TICKERS = "/etc/ntp/step-tickers"
     ETC_OPENDNSSEC_DIR = "/etc/opendnssec"
@@ -234,6 +229,7 @@ class BasePathNamespace:
     SOFTHSM2_UTIL = "/usr/bin/softhsm2-util"
     SSLGET = "/usr/bin/sslget"
     SSS_SSH_AUTHORIZEDKEYS = "/usr/bin/sss_ssh_authorizedkeys"
+    SSS_SSH_KNOWNHOSTS = "/usr/bin/sss_ssh_knownhosts"
     SSS_SSH_KNOWNHOSTSPROXY = "/usr/bin/sss_ssh_knownhostsproxy"
     BIN_TIMEOUT = "/usr/bin/timeout"
     UPDATE_CA_TRUST = "/usr/bin/update-ca-trust"
@@ -255,6 +251,7 @@ class BasePathNamespace:
     CERTMONGER_DOGTAG_SUBMIT = "/usr/libexec/certmonger/dogtag-submit"
     IPA_SERVER_GUARD = "/usr/libexec/certmonger/ipa-server-guard"
     GENERATE_RNDC_KEY = "/usr/libexec/generate-rndc-key.sh"
+    RNDC_KEY = "/etc/rndc.key"
     LIBEXEC_IPA_DIR = "/usr/libexec/ipa"
     IPA_DNSKEYSYNCD_REPLICA = "/usr/libexec/ipa/ipa-dnskeysync-replica"
     IPA_DNSKEYSYNCD = "/usr/libexec/ipa/ipa-dnskeysyncd"
@@ -287,6 +284,7 @@ class BasePathNamespace:
     SEMODULE = "/usr/sbin/semodule"
     SMBD = "/usr/sbin/smbd"
     USERADD = "/usr/sbin/useradd"
+    FONTS_DIR = "/usr/share/fonts"
     FONTS_OPENSANS_DIR = "/usr/share/fonts/open-sans"
     FONTS_FONTAWESOME_DIR = "/usr/share/fonts/fontawesome"
     USR_SHARE_IPA_DIR = "/usr/share/ipa/"
@@ -328,6 +326,7 @@ class BasePathNamespace:
     IPA_KASP_DB_BACKUP = "/var/lib/ipa/ipa-kasp.db.backup"
     DNSSEC_TOKENS_DIR = "/var/lib/ipa/dnssec/tokens"
     DNSSEC_SOFTHSM_PIN = "/var/lib/ipa/dnssec/softhsm_pin"
+    DNSSEC_ENGINE_SOCK = "/run/opendnssec/engine.sock"
     IPA_CA_CSR = "/var/lib/ipa/ca.csr"
     IPA_CACERT_MANAGE = "/usr/sbin/ipa-cacert-manage"
     IPA_CERTUPDATE = "/usr/sbin/ipa-certupdate"
@@ -352,6 +351,11 @@ class BasePathNamespace:
     SSSD_MC_GROUP = "/var/lib/sss/mc/group"
     SSSD_MC_PASSWD = "/var/lib/sss/mc/passwd"
     SSSD_MC_INITGROUPS = "/var/lib/sss/mc/initgroups"
+    SSSD_MC_SID = "/var/lib/sss/mc/sid"
+    SSSD_PIPES = "/var/lib/sss/pipes"
+    SSSD_LDB = "/var/lib/sss/db/sssd.ldb"
+    SSSD_CONFIG_LDB = "/var/lib/sss/db/config.ldb"
+    SSSD_SECRETS = "/var/lib/sss/secrets/secrets.ldb"
     SSSD_PUBCONF_DIR = "/var/lib/sss/pubconf"
     SSSD_PUBCONF_KNOWN_HOSTS = "/var/lib/sss/pubconf/known_hosts"
     SSSD_PUBCONF_KRB5_INCLUDE_D_DIR = "/var/lib/sss/pubconf/krb5.include.d/"
@@ -421,6 +425,7 @@ class BasePathNamespace:
     IPA_CUSTODIA_HANDLER = "/usr/libexec/ipa/custodia"
     IPA_CUSTODIA_CHECK = "/usr/libexec/ipa/ipa-custodia-check"
     IPA_GETKEYTAB = '/usr/sbin/ipa-getkeytab'
+    IPA_MIGRATE_LOG = '/var/log/ipa-migrate.log'
     EXTERNAL_SCHEMA_DIR = '/usr/share/ipa/schema.d'
     GSSPROXY_CONF = '/etc/gssproxy/10-ipa.conf'
     KRB5CC_HTTPD = '/tmp/krb5cc-httpd'

@@ -54,16 +54,15 @@ wellknownservices = [
     'nfs-utils', 'sssd', 'NetworkManager', 'ipa-custodia',
     'ipa-dnskeysyncd', 'ipa-otpd', 'ipa-ods-exporter',
     'systemd-resolved',
-    'nfs_client',
 ]
 
 # The common ports for these services. This is used to wait for the
 # service to become available.
 wellknownports = {
     'dirsrv': [389],  # only used if the incoming instance name is blank
-    'pki-tomcatd@pki-tomcat.service': [8090, 8443],
-    'pki-tomcat': [8090, 8443],
-    'pki-tomcatd': [8090, 8443],  # used if the incoming instance name is blank
+    'pki-tomcatd@pki-tomcat.service': [8080, 8443],
+    'pki-tomcat': [8080, 8443],
+    'pki-tomcatd': [8080, 8443],  # used if the incoming instance name is blank
 }
 
 SERVICE_POLL_INTERVAL = 0.1 # seconds
@@ -291,6 +290,10 @@ class SystemdService(PlatformService):
         # https://bugzilla.redhat.com/show_bug.cgi?id=973331#c11
         if instance == "ipa-otpd.socket":
             args.append("--ignore-dependencies")
+        # ipa-ods-exporter is socket-activated, both the service and the
+        # socket have to be stopped
+        if instance == "ipa-ods-exporter.service":
+            args.append("ipa-ods-exporter.socket")
 
         ipautil.run(args, skip_output=not capture_output)
 

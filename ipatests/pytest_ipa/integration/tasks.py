@@ -432,6 +432,19 @@ def master_authoritative_for_client_domain(master, client):
     return result.returncode == 0
 
 
+def copy_nfast_data(src_host, dest_host):
+    src_host.run_command(
+        ['tar', '-cf', '/root/token_files.tar', '.'],
+        cwd='/opt/nfast/kmdata/local/'
+    )
+    tarball = src_host.get_file_contents('/root/token_files.tar')
+    dest_host.put_file_contents('/root/token_files.tar', tarball)
+    dest_host.run_command(
+        ['tar', '-xf', '/root/token_files.tar',
+         '-C', '/opt/nfast/kmdata/local']
+    )
+
+
 def install_replica(master, replica, setup_ca=True, setup_dns=False,
                     setup_kra=False, setup_adtrust=False, extra_args=(),
                     domain_level=None, unattended=True, stdin_text=None,
@@ -1424,7 +1437,7 @@ def double_circle_topo(master, replicas, site_size=6):
 def install_topo(topo, master, replicas, clients, domain_level=None,
                  skip_master=False, setup_replica_cas=True,
                  setup_replica_kras=False, clients_extra_args=(),
-                 random_serial=False):
+                 random_serial=False, extra_args=()):
     """Install IPA servers and clients in the given topology"""
     if setup_replica_kras and not setup_replica_cas:
         raise ValueError("Option 'setup_replica_kras' requires "
@@ -1452,6 +1465,7 @@ def install_topo(topo, master, replicas, clients, domain_level=None,
                 setup_ca=setup_replica_cas,
                 setup_kra=setup_replica_kras,
                 nameservers=master.ip,
+                extra_args=extra_args,
             )
         installed.add(child)
     install_clients([master] + replicas, clients, clients_extra_args)
@@ -1520,7 +1534,7 @@ def wait_for_replication(ldap, timeout=30,
         statuses = [entry.single_value[status_attr] for entry in entries]
         wrong_statuses = [s for s in statuses
                           if not re.match(target_status_re, s)]
-        if any(e.single_value[progress_attr] == 'TRUE' for e in entries):
+        if any(e.single_value[progress_attr] for e in entries):
             msg = 'Replication not finished'
             logger.debug(msg)
         elif wrong_statuses:
@@ -1614,14 +1628,18 @@ def resolve_record(nameserver, query, rtype="SOA", retry=True, timeout=100):
             if not retry:
                 raise
         time.sleep(1)
+    raise errors.DNSResolverError(exception=ValueError("Record not found"))
 
 
-def ipa_backup(host, disable_role_check=False, raiseonerr=True):
+def ipa_backup(host, disable_role_check=False, data_only=False,
+               raiseonerr=True):
     """Run backup on host and return the run_command result.
     """
     cmd = ['ipa-backup', '-v']
     if disable_role_check:
         cmd.append('--disable-role-check')
+    if data_only:
+        cmd.append('--data')
     result = host.run_command(cmd, raiseonerr=raiseonerr)
 
     # Test for ticket 7632: check that services are restarted
@@ -1651,10 +1669,10 @@ def ipa_epn(
     return host.run_command(cmd, raiseonerr=raiseonerr)
 
 
-def get_backup_dir(host, raiseonerr=True):
+def get_backup_dir(host, data_only=False, raiseonerr=True):
     """Wrapper around ipa_backup: returns the backup directory.
     """
-    result = ipa_backup(host, raiseonerr)
+    result = ipa_backup(host, data_only=data_only, raiseonerr=raiseonerr)
 
     # Get the backup location from the command's output
     for line in result.stderr_text.splitlines():
@@ -1670,18 +1688,25 @@ def get_backup_dir(host, raiseonerr=True):
             return None
 
 
-def ipa_restore(master, backup_path):
-    master.run_command(["ipa-restore", "-U",
-                        "-p", master.config.dirman_password,
-                        backup_path])
+def ipa_restore(master, backup_path, backend=None):
+    cmd = ["ipa-restore", "-U",
+           "-p", master.config.dirman_password,
+           backup_path]
+    if backend:
+        cmd.extend(["--data", "--backend", backend])
+    master.run_command(cmd)
 
 
 def install_kra(host, domain_level=None,
-                first_instance=False, raiseonerr=True):
+                first_instance=False, raiseonerr=True,
+                extra_args=(),):
     if domain_level is None:
         domain_level = domainlevel(host)
     check_domain_level(domain_level)
     command = ["ipa-kra-install", "-U", "-p", host.config.dirman_password]
+    if not isinstance(extra_args, (tuple, list)):
+        raise TypeError("extra_args must be tuple or list")
+    command.extend(extra_args)
     result = host.run_command(command, raiseonerr=raiseonerr)
     return result
 
@@ -2525,6 +2550,21 @@ def install_packages(host, pkgs):
     host.run_command(install_cmd + pkgs)
 
 
+def reinstall_packages(host, pkgs):
+    """Install packages on a remote host.
+    :param host: the host where the installation takes place
+    :param pkgs: packages to install, provided as a list of strings
+    """
+    platform = get_platform(host)
+    if platform in {'rhel', 'fedora'}:
+        install_cmd = ['/usr/bin/dnf', 'reinstall', '-y']
+    elif platform in {'debian', 'ubuntu'}:
+        install_cmd = ['apt-get', '--reinstall', 'install', '-y']
+    else:
+        raise ValueError('install_packages: unknown platform %s' % platform)
+    host.run_command(install_cmd + pkgs)
+
+
 def download_packages(host, pkgs):
     """Download packages on a remote host.
     :param host: the host where the download takes place
@@ -2913,3 +2953,15 @@ def move_date(host, chrony_cmd, date_str):
     """
     host.run_command(['systemctl', chrony_cmd, 'chronyd'])
     host.run_command(['date', '-s', date_str])
+
+
+def copy_files(source_host, dest_host, filelist):
+    """Helper to copy a file from one host to another
+    :param source_host: source host of the file to copy
+    :param dest_host: destination host
+    :param filelist: list of full path of files to copy
+    """
+    for file in filelist:
+        dest_host.transport.mkdir_recursive(os.path.dirname(file))
+        data = source_host.get_file_contents(file)
+        dest_host.transport.put_file_contents(file, data)

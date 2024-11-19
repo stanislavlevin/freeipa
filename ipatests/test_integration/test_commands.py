@@ -639,6 +639,11 @@ class TestIPACommand(IntegrationTest):
         # change private key permission to comply with SS rules
         os.chmod(first_priv_key_path, 0o600)
 
+        # Make sure that / has rwxr-xr-x permissions on the master
+        # otherwise sshd will deny login using private key
+        # https://access.redhat.com/solutions/6798261
+        self.master.run_command(['chmod', '755', '/'])
+
         # start to look at logs a bit before "now"
         # https://pagure.io/freeipa/issue/8432
         since = time.strftime(
@@ -747,6 +752,27 @@ class TestIPACommand(IntegrationTest):
             x509.load_pem_x509_certificate(data, backend=default_backend())
 
             self.master.run_command(['rm', '-f', filename])
+
+        # Ensure that ca/cert-show doesn't leave an empty file when
+        # the requested ca/cert does not exist.
+        commands = [
+            ['ipa', 'cert-show', '0xdeadbeef', '--certificate-out'],
+            ['ipa', 'ca-show', 'notfound', '--certificate-out'],
+        ]
+
+        for command in commands:
+            cmd = self.master.run_command(['mktemp', '--dry-run'])
+            filename = cmd.stdout_text.strip()
+
+            result = self.master.run_command(command + [filename],
+                                             raiseonerr=False)
+            assert result.returncode == 2
+
+            result = self.master.run_command(
+                ['stat', filename],
+                raiseonerr=False
+            )
+            assert result.returncode == 1
 
     def test_sssd_ifp_access_ipaapi(self):
         # check that ipaapi is allowed to access sssd-ifp for smartcard auth
@@ -1241,7 +1267,7 @@ class TestIPACommand(IntegrationTest):
 
     def get_dirsrv_id(self):
         serverid = realm_to_serverid(self.master.domain.realm)
-        return("dirsrv@%s.service" % serverid)
+        return ("dirsrv@%s.service" % serverid)
 
     def test_ipa_nis_manage_enable(self):
         """
@@ -1477,29 +1503,6 @@ class TestIPACommand(IntegrationTest):
             assert 'This account is currently not available' in \
                 result.stdout_text
 
-    def test_ipa_cacert_manage_prune(self):
-        """Test for ipa-cacert-manage prune"""
-
-        certfile = os.path.join(self.master.config.test_dir, 'cert.pem')
-        self.master.put_file_contents(certfile, isrgrootx1)
-        result = self.master.run_command(
-            [paths.IPA_CACERT_MANAGE, 'install', certfile])
-
-        certs_before_prune = self.master.run_command(
-            [paths.IPA_CACERT_MANAGE, 'list'], raiseonerr=False
-        ).stdout_text
-
-        assert isrgrootx1_nick in certs_before_prune
-
-        # Jump in time to make sure the cert is expired
-        self.master.run_command(['date', '-s', '+15Years'])
-        result = self.master.run_command(
-            [paths.IPA_CACERT_MANAGE, 'prune'], raiseonerr=False
-        ).stdout_text
-        self.master.run_command(['date', '-s', '-15Years'])
-
-        assert isrgrootx1_nick in result
-
     def test_ipa_getkeytab_server(self):
         """
         Exercise the ipa-getkeytab server options
@@ -1575,6 +1578,17 @@ class TestIPACommand(IntegrationTest):
         # upload script and run with Python executable
         script = "/tmp/example_cli.py"
         host.put_file_contents(script, contents)
+        # Important: this test is date-sensitive and may fail if executed
+        # around Feb 28 or Feb 29 on a leap year.
+        # The previous tests are playing with the date by jumping in the
+        # future and back to the (expected) current date but calling
+        # date -s +15Years and then date -s -15Years doesn't
+        # bring the date back to the original value if called around Feb 29.
+        # As a consequence, client and server are not synchronized any more
+        # and client API authentication may fail with the following error:
+        # ipalib.errors.KerberosError:
+        # No valid Negotiate header in server response
+        # If you see this failure, just ignore and relaunch on March 1.
         result = host.run_command([sys.executable, script])
 
         # script prints admin account
@@ -1585,6 +1599,54 @@ class TestIPACommand(IntegrationTest):
         host_princ = f"host/{host.hostname}@{host.domain.realm}"
         result = host.run_command([paths.KLIST])
         assert host_princ in result.stdout_text
+
+    def test_delete_last_enabled_admin(self):
+        """
+        The admin user may be disabled. Don't allow all other
+        members of admins to be removed if the admin user is
+        disabled which would leave the install with no
+        usable admins users
+        """
+        user = 'adminuser2'
+        passwd = 'Secret123'
+        tasks.create_active_user(self.master, user, passwd)
+        tasks.kinit_admin(self.master)
+        self.master.run_command(['ipa', 'group-add-member', 'admins',
+                                '--users', user])
+        tasks.kinit_user(self.master, user, passwd)
+        self.master.run_command(['ipa', 'user-disable', 'admin'])
+        result = self.master.run_command(
+            ['ipa', 'user-del', user],
+            raiseonerr=False
+        )
+        self.master.run_command(['ipa', 'user-enable', 'admin'])
+        tasks.kdestroy_all(self.master)
+
+        assert result.returncode == 1
+        assert 'cannot be deleted or disabled' in result.stderr_text
+
+    def test_ipa_cacert_manage_prune(self):
+        """Test for ipa-cacert-manage prune"""
+
+        certfile = os.path.join(self.master.config.test_dir, 'cert.pem')
+        self.master.put_file_contents(certfile, isrgrootx1)
+        result = self.master.run_command(
+            [paths.IPA_CACERT_MANAGE, 'install', certfile])
+
+        certs_before_prune = self.master.run_command(
+            [paths.IPA_CACERT_MANAGE, 'list'], raiseonerr=False
+        ).stdout_text
+
+        assert isrgrootx1_nick in certs_before_prune
+
+        # Jump in time to make sure the cert is expired
+        self.master.run_command(['date', '-s', '+15Years'])
+        result = self.master.run_command(
+            [paths.IPA_CACERT_MANAGE, 'prune'], raiseonerr=False
+        ).stdout_text
+        self.master.run_command(['date', '-s', '-15Years'])
+
+        assert isrgrootx1_nick in result
 
 
 class TestIPACommandWithoutReplica(IntegrationTest):
@@ -1707,7 +1769,7 @@ class TestIPACommandWithoutReplica(IntegrationTest):
             api.bootstrap_with_global_options(context='server')
             api.finalize()
             api.Backend.ldap2.connect()
-            
+
             api.Command["group_add"]("testgroup1", external=True)
             api.Command["group_add"]("testgroup2", external=False)
             result1 = api.Command["group_show"]("testgroup1", all=True)["result"] # noqa: E501
@@ -1751,6 +1813,75 @@ class TestIPACommandWithoutReplica(IntegrationTest):
         result = self.master.run_command(['python3',
                                           '/tmp/reproducer2_code.py'])
         assert "missing attribute" not in result.stdout_text
+
+    def test_sidgen_task_continue_on_error(self):
+        """Verify that SIDgen task continue even if it fails to assign sid
+        scenario:
+            - add a user with no uid (it will be auto-assigned inside
+              the range)
+            - add a user with uid 2000
+            - add a user with no uid (it will be auto-assigned inside
+              the range)
+            - edit the first and 3rd users, remove the objectclass
+              ipaNTUserAttrs and the attribute ipaNTSecurityIdentifier
+            - run the sidgen task
+            - verify that user1 and user3 have a ipaNTSecurityIdentifier
+            - verify that old error message is not seen in dirsrv error log
+            - verify that new error message is seen in dirsrv error log
+
+        related: https://pagure.io/freeipa/issue/9618
+        """
+        test_user1 = 'test_user1'
+        test_user2 = 'test_user2'
+        test_user2000 = 'test_user2000'
+        base_dn = str(self.master.domain.basedn)
+        old_err_msg = 'Cannot add SID to existing entry'
+        new_err_msg = r'Finished with [0-9]+ failures, please check the log'
+
+        tasks.kinit_admin(self.master)
+        tasks.user_add(self.master, test_user1)
+        self.master.run_command(
+            ['ipa', 'user-add', test_user2000,
+             '--first', 'test', '--last', 'user',
+             '--uid', '2000']
+        )
+        tasks.user_add(self.master, test_user2)
+
+        for user in (test_user1, test_user2):
+            entry_ldif = textwrap.dedent("""
+                dn: uid={user},cn=users,cn=accounts,{base_dn}
+                changetype: modify
+                delete: ipaNTSecurityIdentifier
+                -
+                delete: objectclass
+                objectclass: ipaNTUserAttrs
+            """).format(
+                user=user,
+                base_dn=base_dn)
+            tasks.ldapmodify_dm(self.master, entry_ldif)
+
+        # run sidgen task
+        self.master.run_command(
+            ['ipa', 'config-mod', '--add-sids', '--enable-sid']
+        )
+
+        # ensure that sidgen have added the attr removed above
+        for user in (test_user1, test_user2):
+            result = tasks.ldapsearch_dm(
+                self.master,
+                'uid={user},cn=users,cn=accounts,{base_dn}'.format(
+                    user=user, base_dn=base_dn),
+                ['ipaNTSecurityIdentifier']
+            )
+            assert 'ipaNTSecurityIdentifier' in result.stdout_text
+
+        dashed_domain = self.master.domain.realm.replace(".", '-')
+        dirsrv_error_log = self.master.get_file_contents(
+            paths.SLAPD_INSTANCE_ERROR_LOG_TEMPLATE % (dashed_domain),
+            encoding='utf-8'
+        )
+        assert old_err_msg not in dirsrv_error_log
+        assert re.search(new_err_msg, dirsrv_error_log)
 
 
 class TestIPAautomount(IntegrationTest):

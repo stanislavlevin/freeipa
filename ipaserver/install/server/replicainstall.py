@@ -9,6 +9,7 @@ import logging
 
 import dns.exception as dnsexception
 import dns.name as dnsname
+import itertools
 import os
 import shutil
 import socket
@@ -21,10 +22,10 @@ from pkg_resources import parse_version
 import six
 
 from ipaclient.install.client import check_ldap_conf, sssd_enable_ifp
-from ipalib.install import certstore, sysrestore
-from ipalib.install.kinit import kinit_keytab
-from ipapython import ipaldap, ipautil, ntpmethods
-from ipapython.ntpmethods import TIME_SERVER
+import ipaclient.install.timeconf
+from ipalib.install import sysrestore
+from ipalib.kinit import kinit_keytab
+from ipapython import ipaldap, ipautil
 from ipapython.dn import DN
 from ipapython.dnsutil import DNSResolver
 from ipapython.admintool import ScriptError
@@ -32,14 +33,17 @@ from ipapython.ipachangeconf import IPAChangeConf
 from ipaplatform import services
 from ipaplatform.tasks import tasks
 from ipaplatform.paths import paths
-from ipalib import api, constants, create_api, errors, rpc, x509
+from ipalib import api, constants, create_api, errors, rpc
 from ipalib.config import Env
 from ipalib.facts import is_ipa_configured, is_ipa_client_configured
 from ipalib.util import no_matching_interface_for_ip_address_warning
 from ipaclient.install.client import configure_krb5_conf, purge_host_keytab
+from ipaserver.install.dogtaginstance import INTERNAL_TOKEN
 from ipaserver.install import (
-    adtrust, bindinstance, ca, dns, dsinstance, httpinstance,
-    installutils, kra, krbinstance, otpdinstance, custodiainstance, service)
+    adtrust, bindinstance, ca, cainstance, dns, dsinstance, httpinstance,
+    installutils, kra, krainstance, krbinstance, otpdinstance,
+    custodiainstance, service,)
+from ipaserver.install import certs
 from ipaserver.install.installutils import (
     ReplicaConfig, load_pkcs12, validate_mask)
 from ipaserver.install.replication import (
@@ -130,24 +134,6 @@ def install_krb(config, setup_pkinit=False, pkcs12_info=None, fstore=None):
                        subject_base=config.subject_base)
 
     return krb
-
-
-def install_ca_cert(ldap, base_dn, realm, cafile, destfile=paths.IPA_CA_CRT):
-    try:
-        try:
-            certs = certstore.get_ca_certs(ldap, base_dn, realm, False)
-        except errors.NotFound:
-            try:
-                shutil.copy(cafile, destfile)
-            except shutil.Error:
-                # cafile == IPA_CA_CRT
-                pass
-        else:
-            certs = [c[0] for c in certs if c[2] is not False]
-            x509.write_certificate_list(certs, destfile, mode=0o644)
-    except Exception as e:
-        raise ScriptError("error copying files: " + str(e))
-    return destfile
 
 
 def install_http(config, auto_redirect, ca_is_configured, ca_file,
@@ -591,12 +577,12 @@ def common_check(no_ntp, skip_mem_check, setup_ca):
 
     if not no_ntp:
         try:
-            ntpmethods.check_timedate_services()
-        except ntpmethods.NTPConflictingService as e:
+            ipaclient.install.timeconf.check_timedate_services()
+        except ipaclient.install.timeconf.NTPConflictingService as e:
             print("WARNING: conflicting time&date synchronization service "
-                  "'{svc}' will\nbe disabled in favor of {ts}\n"
-                  .format(svc=e.conflicting_service, ts=TIME_SERVER))
-        except ntpmethods.NTPConfigurationError:
+                  "'{svc}' will\nbe disabled in favor of chronyd\n"
+                  .format(svc=e.conflicting_service))
+        except ipaclient.install.timeconf.NTPConfigurationError:
             pass
 
 
@@ -781,7 +767,79 @@ def promotion_check_host_principal_auth_ind(conn, hostdn):
         )
 
 
+def clean_up_hsm_nicknames(api):
+    """Ensure that all of the nicknames on the token are visible on
+       the NSS softoken.
+    """
+    # Hardcode the token names. NSS tooling does not provide a
+    # public way to determine it other than scraping modutil
+    # output.
+    if tasks.is_fips_enabled():
+        dbname = 'NSS FIPS 140-2 Certificate DB'
+    else:
+        dbname = 'NSS Certificate DB'
+
+    api.Backend.ldap2.connect()
+    (token_name, _unused) = ca.lookup_hsm_configuration(api)
+    api.Backend.ldap2.disconnect()
+    if not token_name:
+        return
+
+    cai = cainstance.CAInstance(api.env.realm, host_name=api.env.host)
+    dogtag_reqs = cai.tracking_reqs.items()
+    kra = krainstance.KRAInstance(api.env.realm)
+    if kra.is_installed():
+        dogtag_reqs = itertools.chain(dogtag_reqs,
+                                      kra.tracking_reqs.items())
+
+    try:
+        tmpdir = tempfile.mkdtemp(prefix="tmp-")
+        pwd_file = os.path.join(tmpdir, "pwd_file")
+        with open(pwd_file, "w") as pwd:
+            with open(paths.PKI_TOMCAT_PASSWORD_CONF, 'r') as fd:
+                for line in fd:
+                    (token, pin) = line.split('=', 1)
+                    if token.startswith('hardware-'):
+                        token = token.replace('hardware-', '')
+                        pwd.write(f'{token}:{pin}')
+                    elif token == INTERNAL_TOKEN:
+                        pwd.write(f'{dbname}:{pin}')
+            pwd.flush()
+            db = certs.CertDB(api.env.realm,
+                              nssdir=paths.PKI_TOMCAT_ALIAS_DIR,
+                              pwd_file=pwd_file)
+            for (nickname, _unused) in dogtag_reqs:
+                try:
+                    if nickname in (
+                        'caSigningCert cert-pki-ca',
+                        'Server-Cert cert-pki-ca'
+                    ):
+                        continue
+                    if nickname in (
+                        'auditSigningCert cert-pki-ca',
+                        'auditSigningCert cert-pki-kra',
+                    ):
+                        trust = ',,P'
+                    else:
+                        trust = ',,'
+                    db.run_certutil(['-M',
+                                     '-n', f"{token_name}:{nickname}",
+                                     '-t', trust])
+                except CalledProcessError as e:
+                    logger.debug("Modifying trust on %s failed: %s",
+                                 nickname, e)
+
+            if db.has_nickname('Directory Server CA certificate'):
+                db.run_certutil(['--rename',
+                                 '-n', 'Directory Server CA certificate',
+                                 '--new-n', 'caSigningCert cert-pki-ca'],
+                                raiseonerr=False)
+    finally:
+        shutil.rmtree(tmpdir)
+
+
 def remote_connection(config):
+    logger.debug("Creating LDAP connection to %s", config.master_host_name)
     ldapuri = 'ldaps://%s' % ipautil.format_netloc(config.master_host_name)
     xmlrpc_uri = 'https://{}/ipa/xml'.format(
         ipautil.format_netloc(config.master_host_name))
@@ -811,7 +869,8 @@ def promote_check(installer):
         raise ScriptError("--setup-ca and --*-cert-file options are "
                           "mutually exclusive")
 
-    if not is_ipa_client_configured(on_master=True):
+    ipa_client_installed = is_ipa_client_configured(on_master=True)
+    if not ipa_client_installed:
         # One-step replica installation
         if options.password and options.admin_password:
             raise ScriptError("--password and --admin-password options are "
@@ -952,10 +1011,13 @@ def promote_check(installer):
                  paths.KRB5_KEYTAB,
                  ccache)
 
-    cafile = paths.IPA_CA_CRT
-    if not os.path.isfile(cafile):
-        raise RuntimeError("CA cert file is not available! Please reinstall"
-                           "the client and try again.")
+    if ipa_client_installed:
+        # host was already an IPA client, refresh client cert stores to
+        # ensure we have up to date CA certs.
+        try:
+            ipautil.run([paths.IPA_CERTUPDATE])
+        except ipautil.CalledProcessError:
+            raise RuntimeError("ipa-certupdate failed to refresh certs.")
 
     remote_api = remote_connection(config)
     installer._remote_api = remote_api
@@ -1087,7 +1149,7 @@ def promote_check(installer):
             'CA', conn, preferred_cas
         )
         if ca_host is not None:
-            if config.master_host_name != ca_host:
+            if options.setup_ca and config.master_host_name != ca_host:
                 conn.disconnect()
                 del remote_api
                 config.master_host_name = ca_host
@@ -1096,8 +1158,7 @@ def promote_check(installer):
                 conn = remote_api.Backend.ldap2
                 conn.connect(ccache=installer._ccache)
             config.ca_host_name = ca_host
-            config.master_host_name = ca_host
-            ca_enabled = True
+            ca_enabled = True  # There is a CA somewhere in the topology
             if options.dirsrv_cert_files:
                 logger.error("Certificates could not be provided when "
                              "CA is present on some master.")
@@ -1135,7 +1196,7 @@ def promote_check(installer):
             'KRA', conn, preferred_kras
         )
         if kra_host is not None:
-            if config.master_host_name != kra_host:
+            if options.setup_kra and config.master_host_name != kra_host:
                 conn.disconnect()
                 del remote_api
                 config.master_host_name = kra_host
@@ -1144,9 +1205,9 @@ def promote_check(installer):
                 conn = remote_api.Backend.ldap2
                 conn.connect(ccache=installer._ccache)
             config.kra_host_name = kra_host
-            config.ca_host_name = kra_host
-            config.master_host_name = kra_host
-            kra_enabled = True
+            if options.setup_kra:  # only reset ca_host if KRA is requested
+                config.ca_host_name = kra_host
+            kra_enabled = True  # There is a KRA somewhere in the topology
             if options.setup_kra and options.server and \
                kra_host != options.server:
                 # Installer was provided with a specific master
@@ -1220,14 +1281,14 @@ def promote_check(installer):
                 config.master_host_name, config.host_name, config.realm_name,
                 options.setup_ca, 389,
                 options.admin_password, principal=options.principal,
-                ca_cert_file=cafile)
+                ca_cert_file=paths.IPA_CA_CRT)
         finally:
             if add_to_ipaservers:
                 os.environ['KRB5CCNAME'] = ccache
 
     installer._ca_enabled = ca_enabled
     installer._kra_enabled = kra_enabled
-    installer._ca_file = cafile
+    installer._ca_file = paths.IPA_CA_CRT
     installer._fstore = fstore
     installer._sstore = sstore
     installer._config = config
@@ -1248,7 +1309,6 @@ def install(installer):
     fstore = installer._fstore
     sstore = installer._sstore
     config = installer._config
-    cafile = installer._ca_file
     dirsrv_pkcs12_info = installer._dirsrv_pkcs12_info
     http_pkcs12_info = installer._http_pkcs12_info
     pkinit_pkcs12_info = installer._pkinit_pkcs12_info
@@ -1300,18 +1360,10 @@ def install(installer):
 
     try:
         conn.connect(ccache=ccache)
-
-        # Update and istall updated CA file
-        cafile = install_ca_cert(conn, api.env.basedn, api.env.realm, cafile)
-        install_ca_cert(conn, api.env.basedn, api.env.realm, cafile,
-                        destfile=paths.KDC_CA_BUNDLE_PEM)
-        install_ca_cert(conn, api.env.basedn, api.env.realm, cafile,
-                        destfile=paths.CA_BUNDLE_PEM)
-
         # Configure dirsrv
         ds = install_replica_ds(config, options, ca_enabled,
                                 remote_api,
-                                ca_file=cafile,
+                                ca_file=paths.IPA_CA_CRT,
                                 pkcs12_info=dirsrv_pkcs12_info,
                                 fstore=fstore)
 
@@ -1362,7 +1414,7 @@ def install(installer):
         auto_redirect=not options.no_ui_redirect,
         pkcs12_info=http_pkcs12_info,
         ca_is_configured=ca_enabled,
-        ca_file=cafile,
+        ca_file=paths.IPA_CA_CRT,
         fstore=fstore)
 
     # Need to point back to ourself after the cert for HTTP is obtained
@@ -1372,10 +1424,10 @@ def install(installer):
     otpd.create_instance('OTPD', config.host_name,
                          ipautil.realm_to_suffix(config.realm_name))
 
-    if kra_enabled:
+    if options.setup_kra and kra_enabled:
         # A KRA peer always provides a CA, too.
         mode = custodiainstance.CustodiaModes.KRA_PEER
-    elif ca_enabled:
+    elif options.setup_ca and ca_enabled:
         mode = custodiainstance.CustodiaModes.CA_PEER
     else:
         mode = custodiainstance.CustodiaModes.MASTER_PEER
@@ -1387,6 +1439,8 @@ def install(installer):
         options.domain_name = config.domain_name
         options.host_name = config.host_name
         options.dm_password = config.dirman_password
+        # Always call ca.install() if there is a CA in the topology
+        # to ensure the RA agent is present.
         ca.install(False, config, options, custodia=custodia)
 
     # configure PKINIT now that all required services are in place
@@ -1399,6 +1453,7 @@ def install(installer):
     ds.finalize_replica_config()
 
     if kra_enabled:
+        # The KRA installer checks for itself the status of setup_kra
         kra.install(api, config, options, custodia=custodia)
 
     service.print_msg("Restarting the KDC")
@@ -1447,6 +1502,9 @@ def install(installer):
             Run ipa-ca-install(1) on another master to accomplish this.
         '''.format(ca_servers[0]))
         print(msg, file=sys.stderr)
+
+    if options.setup_ca:
+        clean_up_hsm_nicknames(api)
 
 
 def init(installer):

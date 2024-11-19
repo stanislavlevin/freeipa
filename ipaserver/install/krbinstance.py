@@ -22,7 +22,6 @@ from __future__ import print_function
 
 import logging
 import os
-import grp
 import socket
 import dbus
 
@@ -432,8 +431,8 @@ class KrbInstance(service.Service):
         installutils.create_keytab(paths.KRB5_KEYTAB, host_principal)
 
         # Make sure access is strictly reserved to root only for now
-        os.chown(paths.KRB5_KEYTAB, 0, grp.getgrnam('_keytab').gr_gid)
-        os.chmod(paths.KRB5_KEYTAB, 0o640)
+        os.chown(paths.KRB5_KEYTAB, 0, 0)
+        os.chmod(paths.KRB5_KEYTAB, 0o600)
 
         self.move_service_to_host(host_principal)
 
@@ -664,3 +663,7 @@ class KrbInstance(service.Service):
 
         self.kpasswd = KpasswdInstance()
         self.kpasswd.uninstall()
+
+        ipautil.remove_file(paths.KRB5_KEYTAB)
+        ipautil.remove_file(paths.KRB5_FREEIPA)
+        ipautil.remove_file(paths.KRB5_FREEIPA_SERVER)

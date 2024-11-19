@@ -10,6 +10,7 @@ from __future__ import absolute_import
 from configparser import RawConfigParser, NoOptionError
 from datetime import datetime, timedelta, timezone
 UTC = timezone.utc
+import io
 import json
 import os
 import re
@@ -157,7 +158,6 @@ TOMCAT_CONFIG_FILES = (
     paths.CA_CS_CFG_PATH,
 )
 
-
 def run_healthcheck(host, source=None, check=None, output_type="json",
                     failures_only=False, config=None):
     """
@@ -207,6 +207,28 @@ def run_healthcheck(host, source=None, check=None, output_type="json",
             data = result.stdout_text.strip()
 
     return result.returncode, data
+
+
+def set_excludes(host, option, value,
+                 config_file='/etc/ipahealthcheck/ipahealthcheck.conf'):
+    """Mark checks that should be excluded from the results
+
+       This will set in the [excludes] section on host:
+           option=value
+    """
+    EXCLUDES = "excludes"
+
+    conf = host.get_file_contents(config_file, encoding='utf-8')
+    cfg = RawConfigParser()
+    cfg.read_string(conf)
+    if not cfg.has_section(EXCLUDES):
+        cfg.add_section(EXCLUDES)
+    if not cfg.has_option(EXCLUDES, option):
+        cfg.set(EXCLUDES, option, value)
+    out = io.StringIO()
+    cfg.write(out)
+    out.seek(0)
+    host.put_file_contents(config_file, out.read())
 
 
 @pytest.fixture
@@ -266,6 +288,7 @@ class TestIpaHealthCheck(IntegrationTest):
             setup_dns=True,
             extra_args=['--no-dnssec-validation']
         )
+        set_excludes(cls.master, "key", "DSCLE0004")
 
     def test_ipa_healthcheck_install_on_master(self):
         """
@@ -454,6 +477,11 @@ class TestIpaHealthCheck(IntegrationTest):
             assert data[0]["result"] == "SUCCESS"
             assert data[0]["kw"]["status"] is True
 
+        version = tasks.get_healthcheck_version(self.master)
+        # With healthcheck newer versions, the error msg for PKI tomcat
+        # contains the string pki-tomcatd instead of pki_tomcatd
+        always_replace = parse_version(version) >= parse_version("0.13")
+
         for service in svc_list:
             restart_service(self.master, service)
             returncode, data = run_healthcheck(
@@ -466,7 +494,7 @@ class TestIpaHealthCheck(IntegrationTest):
             for check in data:
                 if check["check"] != service:
                     continue
-                if service != 'pki_tomcatd':
+                if service != 'pki_tomcatd' or always_replace:
                     service = service.replace('_', '-')
                 assert check["result"] == "ERROR"
                 assert check["kw"]["msg"] == "%s: not running" % service
@@ -479,6 +507,11 @@ class TestIpaHealthCheck(IntegrationTest):
         Testcase checks behaviour of check DogtagCertsConfigCheck in
         ipahealthcheck.dogtag.ca when tomcat config file is removed
         """
+        version = tasks.get_pki_version(self.master)
+        if version >= parse_version("11.5"):
+            pytest.skip("Skipping test for 11.5 pki version, since the "
+                        "check CADogtagCertsConfigCheck itself is skipped "
+                        "See ipa-healthcheck ticket 317")
         returncode, data = run_healthcheck(
             self.master,
             "ipahealthcheck.dogtag.ca",
@@ -553,6 +586,7 @@ class TestIpaHealthCheck(IntegrationTest):
                               setup_dns=True,
                               extra_args=['--no-dnssec-validation']
                               )
+        set_excludes(self.replicas[0], "key", "DSCLE0004")
 
         # Init a user on replica to assign a DNA range
         tasks.kinit_admin(self.replicas[0])
@@ -605,9 +639,15 @@ class TestIpaHealthCheck(IntegrationTest):
         ipahealthcheck.ipa.host when GSSAPI credentials cannot be obtained
         from host's keytab.
         """
-        msg = (
-            "Minor (2529639107): No credentials cache found"
-        )
+        version = tasks.get_healthcheck_version(self.master)
+        if parse_version(version) >= parse_version("0.15"):
+            msg = (
+                "Service {service} keytab {path} does not exist."
+            )
+        else:
+            msg = (
+                "Minor (2529639107): No credentials cache found"
+            )
 
         with tasks.FileBackup(self.master, paths.KRB5_KEYTAB):
             self.master.run_command(["rm", "-f", paths.KRB5_KEYTAB])
@@ -693,6 +733,7 @@ class TestIpaHealthCheck(IntegrationTest):
                 'output_type=human'
             ])
         )
+        set_excludes(self.master, "key", "DSCLE0004", config_file)
         returncode, output = run_healthcheck(
             self.master, failures_only=True, config=config_file
         )
@@ -708,6 +749,7 @@ class TestIpaHealthCheck(IntegrationTest):
                 'output_file=%s' % HC_LOG,
             ])
         )
+        set_excludes(self.master, "key", "DSCLE0004")
         returncode, _unused = run_healthcheck(
             self.master, config=config_file
         )
@@ -1224,6 +1266,10 @@ class TestIpaHealthCheck(IntegrationTest):
         )
         self.master.run_command(cmd)
 
+    @pytest.mark.skipif((osinfo.id == 'rhel'
+                         and osinfo.version_number >= (9,0)),
+                        reason=" TLS versions below 1.2 are not "
+                        "supported anymore in RHEL9.0 and above.")
     def test_ipahealthcheck_ds_encryption(self, modify_tls):
         """
         This testcase modifies the default TLS version of
@@ -1412,13 +1458,21 @@ class TestIpaHealthCheck(IntegrationTest):
         This testcase checks that CADogtagCertsConfigCheck can handle
         cert renewal, when there can be two certs with the same nickname
         """
-        if (tasks.get_pki_version(self.master) < tasks.parse_version('11.4.0')):
+        if (tasks.get_pki_version(
+                self.master) < tasks.parse_version('11.4.0')):
             raise pytest.skip("PKI known issue #2022561")
-        self.master.run_command(['ipa-cacert-manage', 'renew', '--self-signed'])
+        elif (tasks.get_pki_version(
+                self.master) >= tasks.parse_version('11.5.0')):
+            raise pytest.skip("Skipping test for 11.5 pki version, since "
+                              "check CADogtagCertsConfigCheck is "
+                              "not present in source "
+                              "pki.server.healthcheck.meta.csconfig")
+        self.master.run_command(
+            ['ipa-cacert-manage', 'renew', '--self-signed']
+        )
         returncode, data = run_healthcheck(
-            self.master,
-            "pki.server.healthcheck.meta.csconfig",
-            "CADogtagCertsConfigCheck",
+            self.master, "pki.server.healthcheck.meta.csconfig",
+            "CADogtagCertsConfigCheck"
         )
         assert returncode == 0
         for check in data:
@@ -1640,12 +1694,18 @@ class TestIpaHealthCheckWithoutDNS(IntegrationTest):
                 "Got {count} ipa-ca AAAA records, expected {expected}",
                 "Expected URI record missing",
             }
-        else:
+        elif (parse_version(version) < parse_version('0.13')):
             expected_msgs = {
                 "Expected SRV record missing",
                 "Unexpected ipa-ca address {ipaddr}",
                 "expected ipa-ca to contain {ipaddr} for {server}",
                 "Expected URI record missing",
+            }
+        else:
+            expected_msgs = {
+                "Expected SRV record missing",
+                "Expected URI record missing",
+                "missing IP address for ipa-ca server {server}",
             }
 
         tasks.install_packages(self.master, HEALTHCHECK_PKG)
@@ -2397,6 +2457,7 @@ class TestIpaHealthCLI(IntegrationTest):
             cls.master, setup_dns=True, extra_args=['--no-dnssec-validation']
         )
         tasks.install_packages(cls.master, HEALTHCHECK_PKG)
+        set_excludes(cls.master, "key", "DSCLE0004")
 
     def test_indent(self):
         """
@@ -2406,12 +2467,19 @@ class TestIpaHealthCLI(IntegrationTest):
             cmd = self.base_cmd + ["--indent", option]
             result = self.master.run_command(cmd, raiseonerr=False)
             assert result.returncode == 2
-            assert 'invalid int value' in result.stderr_text
+            assert ('invalid int value' in result.stderr_text
+                    or 'is not an integer' in result.stderr_text)
 
-        # unusual success, arguably odd but not invalid :-)
+        version = tasks.get_healthcheck_version(self.master)
         for option in ('-1', '5000'):
             cmd = self.base_cmd + ["--indent", option]
-            result = self.master.run_command(cmd)
+            result = self.master.run_command(cmd, raiseonerr=False)
+            if parse_version(version) >= parse_version('0.13'):
+                assert result.returncode == 2
+                assert 'is not in the range 0-32' in result.stderr_text
+            else:
+                # Older versions did not check for a given allowed range
+                assert result.returncode == 0
 
     def test_severity(self):
         """
@@ -2682,12 +2750,14 @@ class TestIpaHealthCheckWithExternalCA(IntegrationTest):
         for check in data:
             assert check["result"] == "ERROR"
             if parse_version(version) >= parse_version("0.6"):
-                if check["kw"]["key"] == paths.HTTPD_CERT_FILE:
+                if check["kw"]["key"] in (
+                    paths.HTTPD_CERT_FILE,
+                    paths.RA_AGENT_PEM,
+                ):
                     assert error_msg in check["kw"]["msg"]
-                    assert error_reason in check["kw"]["reason"]
-                elif check["kw"]["key"] == paths.RA_AGENT_PEM:
-                    assert error_msg in check["kw"]["msg"]
-                    assert error_reason in check["kw"]["reason"]
+                    assert error_reason.replace(" ", "") in check["kw"][
+                        "reason"
+                    ].replace(" ", "")
             else:
                 assert error_reason in check["kw"]["reason"]
                 assert error_reason in check["kw"]["msg"]
@@ -2698,17 +2768,18 @@ class TestIpaHealthCheckWithExternalCA(IntegrationTest):
         Fixture to remove Server cert and revert the change.
         """
         instance = realm_to_serverid(self.master.domain.realm)
+        instance_dir = paths.ETC_DIRSRV_SLAPD_INSTANCE_TEMPLATE % instance
         self.master.run_command(
             [
                 "certutil",
                 "-L",
                 "-d",
-                paths.ETC_DIRSRV_SLAPD_INSTANCE_TEMPLATE % instance,
+                instance_dir,
                 "-n",
                 "Server-Cert",
                 "-a",
                 "-o",
-                paths.ETC_DIRSRV_SLAPD_INSTANCE_TEMPLATE % instance
+                instance_dir
                 + "/Server-Cert.pem",
             ]
         )
@@ -2727,15 +2798,15 @@ class TestIpaHealthCheckWithExternalCA(IntegrationTest):
             [
                 "certutil",
                 "-d",
-                paths.ETC_DIRSRV_SLAPD_INSTANCE_TEMPLATE % instance,
+                instance_dir,
                 "-A",
                 "-i",
-                paths.ETC_DIRSRV_SLAPD_INSTANCE_TEMPLATE % instance
+                instance_dir
                 + "/Server-Cert.pem",
                 "-t",
                 "u,u,u",
                 "-f",
-                paths.IPA_NSSDB_PWDFILE_TXT,
+                "%s/pwdfile.txt" % instance_dir,
                 "-n",
                 "Server-Cert",
             ]

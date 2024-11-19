@@ -1,12 +1,12 @@
 # Marco Aurélio Krause <ouesten@me.com>, 2015. #zanata
-# Rafael Fontenelle <rafaelff@gnome.org>, 2020, 2021.
+# Rafael Fontenelle <rafaelff@gnome.org>, 2020, 2021, 2024.
 # Daniel Lara Souza <daniellarasouza@yahoo.com.br>, 2020, 2021.
 msgid ""
 msgstr ""
 "Project-Id-Version: freeipa 4.9.0.dev201908140712+gitc9938e3d8\n"
 "Report-Msgid-Bugs-To: https://pagure.io/freeipa/new_issue\n"
-"POT-Creation-Date: 2022-06-29 16:26+0200\n"
-"PO-Revision-Date: 2021-03-08 03:01+0000\n"
+"POT-Creation-Date: 2024-05-28 15:09+0200\n"
+"PO-Revision-Date: 2024-02-09 19:36+0000\n"
 "Last-Translator: Rafael Fontenelle <rafaelff@gnome.org>\n"
 "Language-Team: Portuguese (Brazil) <https://translate.fedoraproject.org/"
 "projects/freeipa/master/pt_BR/>\n"
@@ -15,7 +15,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Weblate 4.5.1\n"
+"X-Generator: Weblate 5.3.1\n"
 
 msgid ""
 "\n"
@@ -594,7 +594,7 @@ msgstr "Incapaz de analisar o principal\n"
 
 #, c-format
 msgid "Unable to parse principal name\n"
-msgstr "Incapaz de analisar o nome principal\n"
+msgstr "Não foi possível analisar o nome principal\n"
 
 #, c-format
 msgid "Unable to remove entry\n"
@@ -641,6 +641,14 @@ msgstr "pode ser no máximo %(maxvalue)s"
 #, python-format
 msgid "cannot connect to '%(uri)s': %(error)s"
 msgstr "não foi possível se conectar a \"%(uri)s\": %(error)s"
+
+#, c-format
+msgid "cannot open configuration file %s\n"
+msgstr "não é possível abrir o arquivo de configuração %s\n"
+
+#, c-format
+msgid "cannot stat() configuration file %s\n"
+msgstr "não é possível fazer stat() no arquivo de configuração %s\n"
 
 msgid "change collided with another change"
 msgstr "a alteração colidiu com outra alteração"
@@ -821,6 +829,10 @@ msgstr ""
 "classe de número \"%(cls)s\" não está incluído em uma lista de classes de "
 "número: %(allowed)s"
 
+#, c-format
+msgid "out of memory\n"
+msgstr "memória insuficiente\n"
+
 #, python-format
 msgid "overlapping arguments and options: %(names)s"
 msgstr "sobreposição de argumentos e opções: %(names)s"
@@ -836,6 +848,10 @@ msgstr "Principal não encontrado\n"
 #, python-format
 msgid "query '%(owner)s %(rtype)s': %(error)s"
 msgstr "consulta \"%(owner)s %(rtype)s\": %(error)s"
+
+#, c-format
+msgid "read error\n"
+msgstr "erro de leitura\n"
 
 #, c-format
 msgid "realm not found\n"

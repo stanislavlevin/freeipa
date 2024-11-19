@@ -33,7 +33,7 @@
  * Authors:
  * Simo Sorce <ssorce@redhat.com>
  *
- * Copyright (C) 2007-2010 Red Hat, Inc.
+ * Copyright (C) 2007-2023 Red Hat, Inc.
  * All rights reserved.
  * END COPYRIGHT BLOCK **/
 
@@ -81,7 +81,9 @@ static struct ipapwd_krbcfg *ipapwd_getConfig(void)
     char **encsalts;
     char **tmparray;
     char *tmpstr;
-    int i, ret;
+    int ret;
+    size_t i;
+    bool fips_enabled = false;
 
     config = calloc(1, sizeof(struct ipapwd_krbcfg));
     if (!config) {
@@ -240,27 +242,34 @@ static struct ipapwd_krbcfg *ipapwd_getConfig(void)
     config->allow_nt_hash = false;
     if (ipapwd_fips_enabled()) {
         LOG("FIPS mode is enabled, NT hashes are not allowed.\n");
+        fips_enabled = true;
+    }
+
+    sdn = slapi_sdn_new_dn_byval(ipa_etc_config_dn);
+    ret = ipapwd_getEntry(sdn, &config_entry, NULL);
+    slapi_sdn_free(&sdn);
+    if (ret != LDAP_SUCCESS) {
+        LOG_FATAL("No config Entry?\n");
+        goto free_and_error;
     } else {
-        sdn = slapi_sdn_new_dn_byval(ipa_etc_config_dn);
-        ret = ipapwd_getEntry(sdn, &config_entry, NULL);
-        slapi_sdn_free(&sdn);
-        if (ret != LDAP_SUCCESS) {
-            LOG_FATAL("No config Entry?\n");
-            goto free_and_error;
-        } else {
-            tmparray = slapi_entry_attr_get_charray(config_entry,
-                                                    "ipaConfigString");
-            for (i = 0; tmparray && tmparray[i]; i++) {
+        tmparray = slapi_entry_attr_get_charray(config_entry,
+                                                "ipaConfigString");
+        for (i = 0; tmparray && tmparray[i]; i++) {
+            if (strcasecmp(tmparray[i], "EnforceLDAPOTP") == 0) {
+                config->enforce_ldap_otp = true;
+                continue;
+            }
+            if (!fips_enabled) {
                 if (strcasecmp(tmparray[i], "AllowNThash") == 0) {
                     config->allow_nt_hash = true;
                     continue;
                 }
             }
-            if (tmparray) slapi_ch_array_free(tmparray);
         }
-
-        slapi_entry_free(config_entry);
+        if (tmparray) slapi_ch_array_free(tmparray);
     }
+
+    slapi_entry_free(config_entry);
 
     return config;
 
@@ -327,7 +336,8 @@ int ipapwd_getPolicy(const char *dn,
                       "ipaPwdUserCheck", NULL};
     Slapi_Entry **es = NULL;
     Slapi_Entry *pe = NULL;
-    int ret, res, scope, i;
+    int ret, res, scope;
+    size_t i;
     int buffer_flags=0;
     Slapi_ValueSet* results = NULL;
     char *actual_type_name = NULL;
@@ -545,7 +555,7 @@ int ipapwd_gen_checks(Slapi_PBlock *pb, char **errMesg,
         }
         sdn = slapi_sdn_new_dn_byref(dn);
         if (!sdn) {
-            LOG_FATAL("Unable to convert dn to sdn %s", dn ? dn : "<NULL>");
+            LOG_FATAL("Unable to convert dn to sdn %s\n", dn ? dn : "<NULL>");
             *errMesg = "Internal Error";
             rc = LDAP_OPERATIONS_ERROR;
             goto done;
@@ -564,9 +574,16 @@ int ipapwd_gen_checks(Slapi_PBlock *pb, char **errMesg,
     /* get the kerberos context and master key */
     *config = ipapwd_getConfig();
     if (NULL == *config) {
-        LOG_FATAL("Error Retrieving Master Key");
+        LOG_FATAL("Error Retrieving Master Key\n");
         *errMesg = "Fatal Internal Error";
         rc = LDAP_OPERATIONS_ERROR;
+    }
+
+    /* do not return the master key if asked */
+    if (check_flags & IPAPWD_CHECK_ONLY_CONFIG) {
+        free((*config)->kmkey->contents);
+        free((*config)->kmkey);
+	(*config)->kmkey = NULL;
     }
 
 done:
@@ -594,7 +611,7 @@ int ipapwd_CheckPolicy(struct ipapwd_data *data)
             /* Find the entry with the password policy */
             ret = ipapwd_getPolicy(data->dn, data->target, &pol);
             if (ret) {
-                LOG_TRACE("No password policy, use defaults");
+                LOG_TRACE("No password policy, use defaults\n");
             }
             break;
         case IPA_CHANGETYPE_ADMIN:
@@ -620,14 +637,14 @@ int ipapwd_CheckPolicy(struct ipapwd_data *data)
              */
             ret = ipapwd_getPolicy(data->dn, data->target, &tmppol);
             if (ret) {
-                LOG_TRACE("No password policy, use defaults");
+                LOG_TRACE("No password policy, use defaults\n");
             } else {
                 pol.max_pwd_life = tmppol.max_pwd_life;
                 pol.history_length = tmppol.history_length;
             }
             break;
         default:
-            LOG_TRACE("Unknown password change type, use defaults");
+            LOG_TRACE("Unknown password change type, use defaults\n");
             break;
     }
 
@@ -860,7 +877,7 @@ int ipapwd_SetPassword(struct ipapwd_krbcfg *krbcfg,
                 case IPA_CHANGETYPE_DSMGR:
                 case IPA_CHANGETYPE_ADMIN:
                     /* Mark as administratively reset which will unlock acct */
-                    ret = ipapwd_setdate(data->target, smods, 
+                    ret = ipapwd_setdate(data->target, smods,
                                          "krbLastAdminUnlock",
                                          data->timeNow, false);
                     if (ret != LDAP_SUCCESS)
@@ -951,7 +968,7 @@ Slapi_Value **ipapwd_setPasswordHistory(Slapi_Mods *smods,
     char **new_pwd_history = NULL;
     int n = 0;
     int ret;
-    int i;
+    size_t i;
 
     pwd_history = slapi_entry_attr_get_charray(data->target,
                                                "passwordHistory");
@@ -1083,10 +1100,9 @@ int ipapwd_set_extradata(const char *dn,
 void ipapwd_free_slapi_value_array(Slapi_Value ***svals)
 {
     Slapi_Value **sv = *svals;
-    int i;
 
     if (sv) {
-        for (i = 0; sv[i]; i++) {
+        for (size_t i = 0; sv[i]; i++) {
             slapi_value_free(&sv[i]);
         }
     }
@@ -1102,8 +1118,10 @@ void free_ipapwd_krbcfg(struct ipapwd_krbcfg **cfg)
 
     krb5_free_default_realm(c->krbctx, c->realm);
     krb5_free_context(c->krbctx);
-    free(c->kmkey->contents);
-    free(c->kmkey);
+    if (c->kmkey) {
+        free(c->kmkey->contents);
+        free(c->kmkey);
+    }
     free(c->supp_encsalts);
     free(c->pref_encsalts);
     slapi_ch_array_free(c->passsync_mgrs);

@@ -387,11 +387,11 @@ class DsInstance(service.Service):
         # This helps with initial replication or force-sync because
         # the receiving side has no valuable changes itself yet.
         self.step("ignore time skew for initial replication",
-                  self.__replica_ignore_initial_time_skew)
+                  self.replica_ignore_initial_time_skew)
 
         self.step("setting up initial replication", self.__setup_replica)
         self.step("prevent time skew after initial replication",
-                  self.replica_manage_time_skew)
+                  self.replica_revert_time_skew)
         self.step("adding sasl mappings to the directory", self.__configure_sasl_mappings)
         self.step("updating schema", self.__update_schema)
         # See LDIFs for automember configuration during replica install
@@ -997,16 +997,6 @@ class DsInstance(service.Service):
     def __add_replication_acis(self):
         self._ldap_mod("replica-acis.ldif", self.sub_dict)
 
-    def __replica_ignore_initial_time_skew(self):
-        self.replica_manage_time_skew(prevent=False)
-
-    def replica_manage_time_skew(self, prevent=True):
-        if prevent:
-            self.sub_dict['SKEWVALUE'] = 'off'
-        else:
-            self.sub_dict['SKEWVALUE'] = 'on'
-        self._ldap_mod("replica-prevent-time-skew.ldif", self.sub_dict)
-
     def __setup_s4u2proxy(self):
 
         def __add_principal(last_cn, principal, self):
@@ -1103,6 +1093,11 @@ class DsInstance(service.Service):
             except ipautil.CalledProcessError:
                 logger.error("Failed to remove DS instance. You may "
                              "need to remove instance data manually")
+            destfile = paths.SLAPD_INSTANCE_SYSTEMD_IPA_ENV_TEMPLATE % (
+                serverid
+            )
+            ipautil.remove_file(destfile)
+            ipautil.remove_directory(os.path.dirname(destfile))
 
         else:
             logger.error("Failed to remove DS instance. No serverid present "

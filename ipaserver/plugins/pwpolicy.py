@@ -34,7 +34,6 @@ from ipalib import _
 from ipalib.plugable import Registry
 from ipalib.request import context
 from ipapython.dn import DN
-from ipaplatform.constants import constants as platformconstants
 
 import six
 
@@ -370,19 +369,6 @@ class pwpolicy(LDAPObject):
             minvalue=0,
         ),
         Int(
-            'passwordgracelimit?',
-            cli_name='gracelimit',
-            label=_('Grace login limit'),
-            doc=_('Number of LDAP authentications allowed after expiration'),
-            minvalue=-1,
-            maxvalue=Int.MAXINT,
-            default=-1,
-            autofill=True,
-        ),
-    )
-
-    pwquality_lib_params = (
-        Int(
             'ipapwdmaxrepeat?',
             cli_name='maxrepeat',
             label=_('Max repeat'),
@@ -414,10 +400,17 @@ class pwpolicy(LDAPObject):
             doc=_('Check if the password contains the username'),
             default=False,
         ),
+        Int(
+            'passwordgracelimit?',
+            cli_name='gracelimit',
+            label=_('Grace login limit'),
+            doc=_('Number of LDAP authentications allowed after expiration'),
+            minvalue=-1,
+            maxvalue=Int.MAXINT,
+            default=-1,
+            autofill=True,
+        ),
     )
-
-    if platformconstants.PASSWORD_QUALITY_LIB is not None:
-        takes_params += pwquality_lib_params
 
     def get_dn(self, *keys, **options):
         if keys[-1] is not None:
@@ -469,6 +462,7 @@ class pwpolicy(LDAPObject):
             return False
 
         has_pwquality_value = False
+        min_length = 0
         if not add:
             if len(keys) > 0:
                 existing_entry = self.api.Command.pwpolicy_show(
@@ -477,14 +471,15 @@ class pwpolicy(LDAPObject):
                 existing_entry = self.api.Command.pwpolicy_show(
                     all=True,)['result']
             existing_entry.update(entry_attrs)
-            min_length = int(get_val(existing_entry, 'krbpwdminlength'))
-
+            if existing_entry.get('krbpwdminlength'):
+                min_length = int(get_val(existing_entry, 'krbpwdminlength'))
             has_pwquality_value = has_pwquality_set(existing_entry)
         else:
-            min_length = int(get_val(entry_attrs, 'krbpwdminlength'))
+            if entry_attrs.get('krbpwdminlength'):
+                min_length = int(get_val(entry_attrs, 'krbpwdminlength'))
             has_pwquality_value = has_pwquality_set(entry_attrs)
 
-        if min_length and min_length < 6 and has_pwquality_value:
+        if min_length < 6 and has_pwquality_value:
             raise errors.ValidationError(
                 name='minlength',
                 error=_('Minimum length must be >= 6 if maxrepeat, '

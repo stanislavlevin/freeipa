@@ -1067,8 +1067,13 @@ class TestTrust(BaseTestTrust):
                 raiseonerr=False,
                 stdin_text=self.master.config.ad_admin_password)
             assert result.returncode == 1
+            assert 'Unable to read domain information' in result.stderr_text
+            httpd_error_log = self.master.get_file_contents(
+                paths.VAR_LOG_HTTPD_ERROR,
+                encoding='utf-8'
+            )
             assert 'CIFS server communication error: code "3221225653", ' \
-                   'message "{Device Timeout}' in result.stderr_text
+                   'message "{Device Timeout}' in httpd_error_log
 
             # Check that trust is successfully established with --server option
             tasks.establish_trust_with_ad(
@@ -1155,7 +1160,8 @@ class TestNonPosixAutoPrivateGroup(BaseTestTrust):
                                      ):
             self.mod_idrange_auto_private_group(type)
             sssd_version = tasks.get_sssd_version(self.clients[0])
-            bad_version = sssd_version >= tasks.parse_version("2.8.2")
+            bad_version = (tasks.parse_version("2.8.2") <= sssd_version
+                           < tasks.parse_version("2.9.4"))
             cond = (type == 'hybrid') and bad_version
             with xfail_context(condition=cond,
                                reason="https://pagure.io/freeipa/issue/9295"):
@@ -1163,8 +1169,12 @@ class TestNonPosixAutoPrivateGroup(BaseTestTrust):
                 assert (uid == self.uid_override and gid == self.gid_override)
             test_group = self.clients[0].run_command(
                 ["id", nonposixuser]).stdout_text
-            with xfail_context(type == "hybrid",
-                               'https://github.com/SSSD/sssd/issues/5989'):
+            cond2 = ((type == 'false'
+                      and sssd_version >= tasks.parse_version("2.9.4"))
+                     or type == 'hybrid')
+            with xfail_context(cond2,
+                               'https://github.com/SSSD/sssd/issues/5989 '
+                               'and 7169'):
                 assert "domain users@{0}".format(self.ad_domain) in test_group
 
     @pytest.mark.parametrize('type', ['hybrid', 'true', "false"])
@@ -1237,7 +1247,9 @@ class TestPosixAutoPrivateGroup(BaseTestTrust):
         self.mod_idrange_auto_private_group(type)
         if type == "true":
             sssd_version = tasks.get_sssd_version(self.clients[0])
-            with xfail_context(sssd_version >= tasks.parse_version("2.8.2"),
+            bad_version = (tasks.parse_version("2.8.2") <= sssd_version
+                           < tasks.parse_version("2.9.4"))
+            with xfail_context(bad_version,
                  "https://pagure.io/freeipa/issue/9295"):
                 (uid, gid) = self.get_user_id(self.clients[0], posixuser)
                 assert uid == gid
@@ -1284,5 +1296,9 @@ class TestPosixAutoPrivateGroup(BaseTestTrust):
             assert(uid == self.uid_override
                    and gid == self.gid_override)
             result = self.clients[0].run_command(['id', posixuser])
-            assert "10047(testgroup@{0})".format(
-                self.ad_domain) in result.stdout_text
+            sssd_version = tasks.get_sssd_version(self.clients[0])
+            bad_version = sssd_version >= tasks.parse_version("2.9.4")
+            with xfail_context(bad_version and type in ('false', 'hybrid'),
+                 "https://github.com/SSSD/sssd/issues/7169"):
+                assert "10047(testgroup@{0})".format(
+                    self.ad_domain) in result.stdout_text
