@@ -1,5 +1,6 @@
 # build defines
 %define _unpackaged_files_terminate_build 1
+%define bash_completions_dir %_datadir/bash-completion/completions
 
 %ifarch %ix86 armh
 %def_with only_client
@@ -89,6 +90,7 @@ BuildRequires: 389-ds-base-devel >= %ds_version
 BuildRequires: samba-devel >= %samba_version
 BuildRequires: nodejs
 BuildRequires: python3(rjsmin)
+BuildRequires: python3-module-argcomplete
 %endif # only_client
 
 # python
@@ -650,6 +652,13 @@ install -D -p -m 0755 %SOURCE1 %buildroot%_rpmlibdir/freeipa-server.filetrigger
 mkdir -p %buildroot%_altdir
 printf '%_libdir/krb5/plugins/libkrb5/winbind_krb5_locator.so\t/dev/null\t90\n' > %buildroot%_altdir/winbind_krb5_locator.so
 
+# generate bash completions
+for clitool in ipa-migrate
+do
+    register-python-argcomplete "$clitool" > "$clitool"
+    install -p -m 0644 -D -t '%buildroot%bash_completions_dir' "$clitool"
+done
+
 %endif # only_client
 
 /bin/touch %buildroot%_sysconfdir/ipa/{default.conf,ca.crt}
@@ -848,6 +857,7 @@ fi
 %_sbindir/ipa-crlgen-manage
 %_sbindir/ipa-cert-fix
 %_sbindir/ipa-acme-manage
+%_sbindir/ipa-migrate
 %_libexecdir/certmonger/dogtag-ipa-ca-renew-agent-submit
 %_libexecdir/certmonger/ipa-server-guard
 %_libexecdir/ipa/ipa-ccache-sweeper
@@ -923,12 +933,15 @@ fi
 %_man1dir/ipa-crlgen-manage.1*
 %_man1dir/ipa-cert-fix.1*
 %_man1dir/ipa-acme-manage.1*
+%_man1dir/ipa-migrate.1*
 %_man8dir/ipactl.8*
 # WSGI applications
 %_datadir/ipa/wsgi.py
 %_datadir/ipa/migration/migration.py
 %_datadir/ipa/kdcproxy.wsgi
 %_datadir/ipa/wsgi/plugins.py
+
+%bash_completions_dir/ipa-migrate
 
 %_rpmlibdir/freeipa-server.filetrigger
 
@@ -1035,7 +1048,7 @@ fi
 %_bindir/ipa
 %dir %_libexecdir/ipa/acme
 %_libexecdir/ipa/acme/certbot-dns-ipa
-%_datadir/bash-completion/completions/ipa
+%bash_completions_dir/ipa
 %config %_sysconfdir/sysconfig/certmonger
 %_mandir/man1/ipa.1*
 %_mandir/man1/ipa-getkeytab.1*
