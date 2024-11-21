@@ -780,7 +780,12 @@ if [ $1 -gt 1 ] ; then
         %__python3 -c 'from ipaclient.install.client import configure_krb5_snippet; configure_krb5_snippet()' >>"$IPA_UPGRADE_LOG" 2>&1
         %__python3 -c 'from ipaclient.install.client import update_ipa_nssdb; update_ipa_nssdb()' >>"$IPA_UPGRADE_LOG" 2>&1
         chmod 0600 "$IPA_UPGRADE_LOG"
-        sed -E --in-place=.orig 's/^(HostKeyAlgorithms ssh-rsa,ssh-dss)$/# disabled by ipa-client update\n# \1/' /etc/openssh/ssh_config ||:
+        SSH_CLIENT_SYSTEM_CONF='/etc/openssh/ssh_config'
+        if [ -f "$SSH_CLIENT_SYSTEM_CONF" ]; then
+            if grep -E -q '^HostKeyAlgorithms ssh-rsa,ssh-dss$' "$SSH_CLIENT_SYSTEM_CONF" 2>/dev/null; then
+                sed -E --in-place=.orig 's/^(HostKeyAlgorithms ssh-rsa,ssh-dss)$/# disabled by ipa-client update\n# \1/' "$SSH_CLIENT_SYSTEM_CONF"
+            fi
+        fi
     fi
 fi
 
