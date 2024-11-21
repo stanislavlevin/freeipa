@@ -784,6 +784,22 @@ if [ $1 -gt 1 ] ; then
     fi
 fi
 
+%triggerin client -- sssd >= 2.10
+# Has the client been configured?
+restore=0
+test -f '/var/lib/ipa-client/sysrestore/sysrestore.index' && restore=$(wc -l '/var/lib/ipa-client/sysrestore/sysrestore.index' | awk '{print $1}') ||:
+SSH_CLIENT_SYSTEM_CONF='/etc/openssh/ssh_config'
+if [ -f "$SSH_CLIENT_SYSTEM_CONF" -a $restore -ge 2 ]; then
+    # https://pagure.io/freeipa/issue/9536
+    # upgrade sss_ssh_knownhostsproxy with sss_ssh_knownhosts
+    if grep -E -q '^GlobalKnownHostsFile /var/lib/sss/pubconf/known_hosts$' "$SSH_CLIENT_SYSTEM_CONF" 2>/dev/null; then
+        sed -E --in-place=.orig 's/^(GlobalKnownHostsFile \/var\/lib\/sss\/pubconf\/known_hosts)$/# disabled by ipa-client update\n# \1/' "$SSH_CLIENT_SYSTEM_CONF"
+    fi
+    if grep -E -q '^ProxyCommand /usr/bin/sss_ssh_knownhostsproxy -p %%p %%h$' "$SSH_CLIENT_SYSTEM_CONF" 2>/dev/null; then
+        sed -E --in-place=.orig 's/^(ProxyCommand \/usr\/bin\/sss_ssh_knownhostsproxy -p %%p %%h)$/# replaced by ipa-client update\n# \1\nKnownHostsCommand \/usr\/bin\/sss_ssh_knownhosts %%H/' "$SSH_CLIENT_SYSTEM_CONF"
+    fi
+fi
+
 %triggerin client -- openssh-server
 # Has the client been configured?
 restore=0
