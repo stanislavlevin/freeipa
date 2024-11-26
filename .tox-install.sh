@@ -80,6 +80,7 @@ pypi_packages)
 
     # Install packages from dist/pypi
     $ENVPYTHON -m pip install \
+        --no-index \
         --disable-pip-version-check \
         --constraint "${TOXINIDIR}/.wheelconstraints" \
         --find-links "${DISTPYPI}" \
