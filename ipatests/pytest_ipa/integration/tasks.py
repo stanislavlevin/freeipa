@@ -2515,24 +2515,13 @@ def get_logsize(host, logfile):
 
 
 def get_platform(host):
-    result = host.run_command([
-        'python3', '-c',
-        'from ipaplatform.osinfo import OSInfo; print(OSInfo().platform)'
-    ], raiseonerr=False)
-    assert result.returncode == 0
-    return result.stdout_text.strip()
+    """compat only. TODO: remove later"""
+    return host.osinfo.platform
 
 
 def get_platform_version(host):
-    result = host.run_command([
-        'python3', '-c',
-        'from ipaplatform.osinfo import OSInfo; print(OSInfo().version_number)'
-    ], raiseonerr=False)
-    assert result.returncode == 0
-    # stdout_text is a str in format "(X, Y)" and needs to be
-    # converted back to a functional tuple. This approach works with
-    # any number of version numbers filled, e.g. (34, ) or (8, 6) etc.
-    return tuple(map(int, re.findall(r'[0-9]+', result.stdout_text.strip())))
+    """compat only. TODO: remove later"""
+    return host.osinfo.version_number
 
 
 def install_packages(host, pkgs):
