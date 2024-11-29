@@ -179,6 +179,7 @@ BuildRequires: python3(pylint)
 BuildRequires: python3(pycodestyle)
 BuildRequires: python3(docker)
 BuildRequires: python3(sphinx)
+BuildRequires: python3-module-paramiko
 %endif
 
 %description
@@ -512,6 +513,7 @@ Requires: openssh-clients
 Requires: sshpass
 Requires: iptables
 Requires: drill
+Requires: python3-module-paramiko
 # Tests have a huge amount useless Provides
 %filter_from_provides /python3(ipatests\(\..*\)\?)/d
 
