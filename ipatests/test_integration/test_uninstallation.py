@@ -20,6 +20,8 @@ from ipatests.pytest_ipa.integration import tasks
 from ipaplatform.paths import paths
 from ipapython.ipaldap import realm_to_serverid
 
+import pytest
+
 # from ipaserver.install.dsinstance
 DS_INSTANCE_PREFIX = 'slapd-'
 
@@ -140,6 +142,11 @@ class TestUninstallWithoutDNS(IntegrationTest):
         tasks.uninstall_master(self.master)
 
 
+@pytest.mark.skip_if_hostplatform(
+    "master",
+    platform="altlinux",
+    reason="Need to investigate ssh problem",
+)
 class TestUninstallCleanup(IntegrationTest):
     """Test installer hostname validator."""
 
