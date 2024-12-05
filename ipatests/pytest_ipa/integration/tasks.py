@@ -2911,6 +2911,8 @@ def run_ssh_cmd(
             "-v",
             "-o", "PubkeyAuthentication=no",
             "-o", "GSSAPIAuthentication=no",
+            # alt specific default: https://bugzilla.altlinux.org/50629
+            "-o", "ChallengeResponseAuthentication=yes",
             "-o", "ConnectTimeout={connect_timeout}".format(
                 connect_timeout=connect_timeout
             ),
