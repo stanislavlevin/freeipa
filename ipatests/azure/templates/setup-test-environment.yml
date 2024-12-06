@@ -14,7 +14,8 @@ steps:
 
 - script: |
     set -e
-    sudo modprobe {nfs,nfsd}
+    sudo modprobe nfs
+    sudo modprobe nfsd
   displayName: Configure NFS to allow NFS server/client within containers
 
 - task: DownloadPipelineArtifact@0
