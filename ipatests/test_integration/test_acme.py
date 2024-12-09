@@ -299,6 +299,10 @@ class TestACME(CALessBase):
         assert 'revocation_reason:' in result.stdout_text
 
     @pytest.mark.skipif(skip_certbot_tests, reason='certbot not available')
+    @pytest.mark.xfail(
+        reason="Fails with certbot 3.0: https://pagure.io/freeipa/issue/9714",
+        strict=True,
+    )
     def test_certbot_dns(self):
         # Assume previous revoke operation succeeded and cert was deleted.
         # We can now request a new certificate.
