@@ -55,7 +55,7 @@ jobs:
         cp -pr dist container/
         cp $(IPA_TESTS_DOCKERFILES)/$(DOCKER_DOCKERFILE) container/Dockerfile
         cd container
-        docker build -t freeipa-azure-builder .
+        docker build --build-context='docker_tests_image=docker-image://$(DOCKER_TESTS_IMAGE)' -t freeipa-azure-builder .
         docker save freeipa-azure-builder | gzip > '$(builddir)/freeipa-azure-builder-container.tar.gz'
       displayName: Create container image for test
     - template: templates/publish-build.yml
