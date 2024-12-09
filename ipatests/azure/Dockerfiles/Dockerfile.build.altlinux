@@ -15,10 +15,11 @@ RUN \
     && find /var/lib/apt/lists/ -type f -exec rm "{}" \; \
     && rm -rf /var/cache/apt/*.bin \
     && mkdir -p /rpms/x86_64/RPMS.local_rpms \
+    && mkdir -p /rpms/x86_64/RPMS.local_debug_rpms \
     && mv /root/rpms/*.rpm /rpms/x86_64/RPMS.local_rpms/ \
-    && ln -s -t /rpms/x86_64/RPMS.local_rpms/ /root/rpms_debuginfo/*.rpm \
+    && mv /root/rpms_debuginfo/*.rpm /rpms/x86_64/RPMS.local_debug_rpms/ \
     && apt-repo add 'rpm-dir file:/rpms x86_64 local_rpms' \
-    && rm -rf /root/rpms /root/srpms \
+    && rm -rf /root/rpms /root/srpms /root/rpms_debuginfo \
     && sed -i 's/.*PermitRootLogin .*/#&/g' /etc/openssh/sshd_config \
     && echo 'PermitRootLogin yes' >> /etc/openssh/sshd_config \
     && systemctl enable sshd

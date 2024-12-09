@@ -1,6 +1,10 @@
 #!/bin/bash -eu
 
 function install_debuginfo() {
+    # add debuginfo component
+    sed -i 's/^\(rpm .*\)\(\/x86_64 classic\)$/\1\2 debuginfo/' /etc/apt/sources.list && \
+    apt-repo add 'rpm-dir file:/rpms x86_64 local_debug_rpms' && \
+    apt-repo && \
     apt-get update && \
     apt-get install -y \
         gdb \
