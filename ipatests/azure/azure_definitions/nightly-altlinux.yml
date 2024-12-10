@@ -627,3 +627,30 @@ vms:
       replicas: 1
     tests:
     - test_integration/test_ipa_ipa_migration.py
+
+- vm_jobs:
+  - container_job: random_serial_numbers_TestInstallWithCA_DNS1_RSN
+    containers:
+      replicas: 3
+    tests:
+    - test_integration/test_random_serial_numbers.py::TestInstallWithCA_DNS1_RSN
+
+- vm_jobs:
+  - container_job: random_serial_numbers_TestIPACommand_RSN_test_certificate_out_write_to_file
+    containers:
+      clients: 1
+      replicas: 1
+    tests:
+    - test_integration/test_random_serial_numbers.py::TestIPACommand_RSN::test_certificate_out_write_to_file
+
+- vm_jobs:
+  - container_job: random_serial_numbers_TestServerCALessToExternalCA_RSN
+    tests:
+    - test_integration/test_random_serial_numbers.py::TestServerCALessToExternalCA_RSN
+
+- vm_jobs:
+  - container_job: random_serial_numbers_TestRSNVault
+    containers:
+      replicas: 1
+    tests:
+    - test_integration/test_random_serial_numbers.py::TestRSNVault
