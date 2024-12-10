@@ -179,11 +179,21 @@ vms:
       replicas: 1
 
   - container_job: acme
-    tests:
-    - test_integration/test_acme.py
     containers:
       replicas: 1
       clients: 1
+    tests:
+    - test_integration/test_acme.py::TestACME
+    - test_integration/test_acme.py::TestACMECALess
+    - test_integration/test_acme.py::TestACMEwithExternalCA
+    - test_integration/test_acme.py::TestACMERenew
+
+- vm_jobs:
+  - container_job: acme_prune
+    containers:
+      clients: 1
+    tests:
+    - test_integration/test_acme.py::TestACMEPrune
 
 - vm_jobs:
   - container_job: caless_TestServerInstall
