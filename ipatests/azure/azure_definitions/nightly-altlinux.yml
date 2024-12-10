@@ -149,14 +149,16 @@ vms:
   - container_job: ipahealthcheck_TestIpaHealthCheckWithoutDNS
     tests:
     - test_integration/test_ipahealthcheck.py::TestIpaHealthCheckWithoutDNS
+    - test_integration/test_ipahealthcheck.py::TestIpaHealthCheckWithExternalCA
+    - test_integration/test_ipahealthcheck.py::TestIpaHealthCheckFileCheck
     containers:
       replicas: 1
 
-  - container_job: ipahealthcheck_TestIpaHealthCheckWithExternalCA
+- vm_jobs:
+  - container_job: ipahealthcheck_TestIpaHealthCLI
     tests:
-    - test_integration/test_ipahealthcheck.py::TestIpaHealthCheckWithExternalCA
-    containers:
-      replicas: 1
+    - test_integration/test_ipahealthcheck.py::TestIpaHealthCLI
+    - test_integration/test_ipahealthcheck.py::TestIpaHealthCheckFilesystemSpace
 
 - vm_jobs:
   # test_ipa_healthcheck_no_errors requires at least 20% of free space
@@ -166,10 +168,6 @@ vms:
     containers:
       replicas: 1
       clients: 1
-      # resources:
-      #   server:
-      #     mem_limit: "2400m"
-      #     memswap_limit: "3200m"
 
 - vm_jobs:
   - container_job: TestReplicaInstallWithExistingEnty
