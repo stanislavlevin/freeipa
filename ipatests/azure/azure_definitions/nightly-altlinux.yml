@@ -147,6 +147,67 @@ vms:
     - test_integration/test_backup_and_restore.py::TestBackupAndRestore
 
 - vm_jobs:
+  - container_job: backup_and_restore_TestUserRootFilesOwnershipPermission
+    tests:
+    - test_integration/test_backup_and_restore.py::TestUserRootFilesOwnershipPermission
+
+  - container_job: backup_and_restore_TestBackupAndRestoreWithDNSSEC
+    tests:
+    - test_integration/test_backup_and_restore.py::TestBackupAndRestoreWithDNSSEC
+
+  - container_job: backup_and_restore_TestBackupReinstallRestoreWithDNSSEC
+    tests:
+    - test_integration/test_backup_and_restore.py::TestBackupReinstallRestoreWithDNSSEC
+
+- vm_jobs:
+  - container_job: backup_and_restore_TestBackupAndRestoreWithDNS
+    tests:
+    - test_integration/test_backup_and_restore.py::TestBackupAndRestoreWithDNS
+
+  - container_job: backup_and_restore_TestBackupReinstallRestoreWithDNS
+    tests:
+    - test_integration/test_backup_and_restore.py::TestBackupReinstallRestoreWithDNS
+
+- vm_jobs:
+  - container_job: backup_and_restore_TestBackupAndRestoreWithKRA
+    tests:
+    - test_integration/test_backup_and_restore.py::TestBackupAndRestoreWithKRA
+
+  - container_job: backup_and_restore_TestBackupReinstallRestoreWithKRA
+    tests:
+    - test_integration/test_backup_and_restore.py::TestBackupReinstallRestoreWithKRA
+
+- vm_jobs:
+  - container_job: backup_and_restore_TestBackupAndRestoreWithReplica
+    containers:
+      replicas: 2
+    tests:
+    - test_integration/test_backup_and_restore.py::TestBackupAndRestoreWithReplica
+
+- vm_jobs:
+  - container_job: backup_and_restore_TestBackupAndRestoreDMPassword
+    tests:
+    - test_integration/test_backup_and_restore.py::TestBackupAndRestoreDMPassword
+
+- vm_jobs:
+  - container_job: backup_and_restore_TestReplicaInstallAfterRestore
+    containers:
+      replicas: 2
+    tests:
+    - test_integration/test_backup_and_restore.py::TestReplicaInstallAfterRestore
+
+- vm_jobs:
+  - container_job: backup_and_restore_TestBackupRoles
+    containers:
+      replicas: 1
+    tests:
+    - test_integration/test_backup_and_restore.py::TestBackupRoles
+
+  - container_job: backup_and_restore_TestBackupAndRestoreTrust
+    tests:
+    - test_integration/test_backup_and_restore.py::TestBackupAndRestoreTrust
+
+- vm_jobs:
   - container_job: epn
     tests:
     - test_integration/test_epn.py
