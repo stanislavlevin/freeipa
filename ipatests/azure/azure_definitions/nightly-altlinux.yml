@@ -736,6 +736,12 @@ vms:
     tests:
     - test_integration/test_custom_plugins.py
 
+  - container_job: pkinit_install
+    containers:
+      clients: 1
+    tests:
+    - test_integration/test_pkinit_install.py
+
 - vm_jobs:
   - container_job: installation_TestHostnameValidator
     tests:
