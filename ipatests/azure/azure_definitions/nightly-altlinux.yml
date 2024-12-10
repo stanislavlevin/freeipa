@@ -14,12 +14,19 @@ default_resources:
 
 vms:
 - vm_jobs:
-  - container_job: nfs
+  - container_job: nfs_TestNFS
     containers:
       clients: 3
     tests:
-    - test_integration/test_nfs.py
+    - test_integration/test_nfs.py::TestNFS
 
+  - container_job: nfs_TestIpaClientAutomountFileRestore
+    containers:
+      clients: 1
+    tests:
+    - test_integration/test_nfs.py::TestIpaClientAutomountFileRestore
+
+- vm_jobs:
   - container_job: ntp_options_common
     tests:
     - test_integration/test_ntp_options.py::TestNTPoptionsCommon
