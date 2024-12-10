@@ -730,3 +730,8 @@ vms:
       replicas: 1
     tests:
     - test_integration/test_random_serial_numbers.py::TestRSNVault
+
+- vm_jobs:
+  - container_job: custom_plugins
+    tests:
+    - test_integration/test_custom_plugins.py
