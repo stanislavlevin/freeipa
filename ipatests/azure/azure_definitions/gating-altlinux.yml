@@ -25,6 +25,10 @@ vms:
     tests:
     - test_integration/test_kerberos_flags.py
 
+  - container_job: idm_api
+    tests:
+    - test_integration/test_idm_api.py
+
 - vm_jobs:
   - container_job: forced_client_reenrollment
     containers:
