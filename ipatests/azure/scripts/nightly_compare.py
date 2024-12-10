@@ -26,6 +26,8 @@ SKIP_IN_AZURE_LIST = [
 EXTRA_AZURE_LIST = [
     "test_integration/test_idviews.py::TestRulesWithServicePrincipals",
     "test_integration/test_idviews.py::TestIDViews",
+    # patched in ALT
+    "test_integration/test_nfs.py::TestNFS",
     # ALT specific tests
     "test_integration/test_ntp_options.py::TestNTPMissingOptionsAndNTPs",
     "test_integration/test_ntp_options.py::TestNTPoptionsCommon",
