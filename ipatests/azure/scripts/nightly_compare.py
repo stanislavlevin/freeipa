@@ -19,6 +19,8 @@ SKIP_IN_AZURE_LIST = [
     # requires external DNS
     "test_integration/test_installation.py::TestADTrustInstall",
     "test_integration/test_installation.py::TestInstallWithoutNamed",
+    "test_integration/test_random_serial_numbers.py::TestRSNPKIConfig",
+    "test_integration/test_random_serial_numbers.py::TestInstallWithCA_KRA1_RSN",
 ]
 
 EXTRA_AZURE_LIST = [
