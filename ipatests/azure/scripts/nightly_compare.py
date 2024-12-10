@@ -13,7 +13,9 @@ SKIP_IN_AZURE_LIST = [
     "test_integration/test_authselect.py",  # ALT doesn't have authselect
     "test_integration/test_idviews",  # RunADTests class(2 IPA + 1 AD classes)
     "test_integration/test_fips.py",  # requires fake FIPS mode
-    "test_integration/test_http_kdc_proxy.py",  # requires AD(should be fixed)
+    # requires AD
+    "test_integration/test_http_kdc_proxy.py",
+    "test_integration/test_replica_promotion.py::TestReplicaConn",
     # requires external DNS
     "test_integration/test_installation.py::TestADTrustInstall",
     "test_integration/test_installation.py::TestInstallWithoutNamed",
