@@ -127,6 +127,7 @@ vms:
     tests:
     - test_integration/test_topologies.py
     - test_integration/test_testconfig.py
+    - test_ipalib_install/test_kinit.py
 
 - vm_jobs:
   - container_job: ServerReplicaCALessToCAFull
