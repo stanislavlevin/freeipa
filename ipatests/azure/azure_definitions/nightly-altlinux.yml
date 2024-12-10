@@ -619,3 +619,11 @@ vms:
       clients: 1
     tests:
     - test_integration/test_hsm.py::TestHSMVault
+
+- vm_jobs:
+  - container_job: ipa_ipa_migration
+    containers:
+      clients: 1
+      replicas: 1
+    tests:
+    - test_integration/test_ipa_ipa_migration.py
