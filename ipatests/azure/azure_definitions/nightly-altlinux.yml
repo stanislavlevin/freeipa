@@ -735,3 +735,29 @@ vms:
   - container_job: custom_plugins
     tests:
     - test_integration/test_custom_plugins.py
+
+- vm_jobs:
+  - container_job: installation_TestHostnameValidator
+    tests:
+    - test_integration/test_installation.py::TestHostnameValidator
+
+  - container_job: installation_TestInstallwithSHA384withRSA
+    tests:
+    - test_integration/test_installation.py::TestInstallwithSHA384withRSA
+
+- vm_jobs:
+  - container_job: installation_TestKRAinstallAfterCertRenew
+    tests:
+    - test_integration/test_installation.py::TestKRAinstallAfterCertRenew
+
+  - container_job: installation_TestMaskInstall
+    tests:
+    - test_integration/test_installation.py::TestMaskInstall
+
+- vm_jobs:
+  - container_job: installation_TestInstallWithoutSudo
+    containers:
+      clients: 1
+      replicas: 1
+    tests:
+    - test_integration/test_installation.py::TestInstallWithoutSudo
