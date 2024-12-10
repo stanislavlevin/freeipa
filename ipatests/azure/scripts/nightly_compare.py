@@ -21,6 +21,10 @@ SKIP_IN_AZURE_LIST = [
     "test_integration/test_installation.py::TestInstallWithoutNamed",
     "test_integration/test_random_serial_numbers.py::TestRSNPKIConfig",
     "test_integration/test_random_serial_numbers.py::TestInstallWithCA_KRA1_RSN",
+    "test_integration/test_installation.py::TestInstallWithCA1",
+    "test_integration/test_installation.py::TestInstallWithCA2",
+    "test_integration/test_installation.py::TestInstallWithCA_KRA1",
+    "test_integration/test_installation.py::TestInstallWithCA_KRA2",
 ]
 
 EXTRA_AZURE_LIST = [
