@@ -536,3 +536,86 @@ vms:
     - test_integration/test_installation.py::TestInstallWithCA_KRA_DNS2
     containers:
       replicas: 3
+
+- vm_jobs:
+  - container_job: hsm_TestHSMInstall
+    tests:
+    - test_integration/test_hsm.py::TestHSMInstall
+    containers:
+      replicas: 3
+      clients: 1
+
+- vm_jobs:
+  - container_job: hsm_TestHSMInstallADTrustBase
+    tests:
+    - test_integration/test_hsm.py::TestHSMInstallADTrustBase
+    containers:
+      replicas: 1
+
+  - container_job: hsm_TestADTrustInstallWithDNS_KRA_ADTrust
+    tests:
+    - test_integration/test_hsm.py::TestADTrustInstallWithDNS_KRA_ADTrust
+    containers:
+      replicas: 1
+
+- vm_jobs:
+  - container_job: hsm_TestHSMcertRenewal
+    tests:
+    - test_integration/test_hsm.py::TestHSMcertRenewal
+
+  - container_job: hsm_TestHSMCALessToExternalToSelfSignedCA
+    containers:
+      replicas: 1
+    tests:
+    - test_integration/test_hsm.py::TestHSMCALessToExternalToSelfSignedCA
+
+- vm_jobs:
+  - container_job: hsm_TestHSMExternalToSelfSignedCA
+    containers:
+      replicas: 1
+    tests:
+    - test_integration/test_hsm.py::TestHSMExternalToSelfSignedCA
+
+  - container_job: hsm_TestHSMcertFix
+    tests:
+    - test_integration/test_hsm.py::TestHSMcertFix
+
+- vm_jobs:
+  - container_job: hsm_TestHSMcertFixKRA
+    tests:
+    - test_integration/test_hsm.py::TestHSMcertFixKRA
+
+  - container_job: hsm_TestHSMcertFixReplica
+    containers:
+      replicas: 1
+    tests:
+    - test_integration/test_hsm.py::TestHSMcertFixReplica
+
+- vm_jobs:
+  - container_job: hsm_TestHSMNegative
+    tests:
+    - test_integration/test_hsm.py::TestHSMNegative
+
+  - container_job: hsm_TestHSMACME
+    containers:
+      clients: 1
+    tests:
+    - test_integration/test_hsm.py::TestHSMACME
+
+- vm_jobs:
+  - container_job: hsm_TestHSMBackupRestore
+    tests:
+    - test_integration/test_hsm.py::TestHSMBackupRestore
+
+  - container_job: hsm_TestHSMACMEPrune
+    containers:
+      clients: 1
+    tests:
+    - test_integration/test_hsm.py::TestHSMACMEPrune
+
+- vm_jobs:
+  - container_job: hsm_TestHSMVault
+    containers:
+      clients: 1
+    tests:
+    - test_integration/test_hsm.py::TestHSMVault
