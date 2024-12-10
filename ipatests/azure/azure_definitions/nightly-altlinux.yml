@@ -767,3 +767,10 @@ vms:
       replicas: 1
     tests:
     - test_integration/test_installation.py::TestInstallWithoutSudo
+
+- vm_jobs:
+  - container_job: idp
+    containers:
+      replicas: 2
+    tests:
+    - test_integration/test_idp.py
