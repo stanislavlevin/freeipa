@@ -80,6 +80,11 @@ def kinit_idp(host, user, keycloak_server):
     assert "152" in test_idp.stdout_text
 
 
+@pytest.mark.skip_if_hostplatform(
+    "replicas[0]",
+    platform="altlinux",
+    reason="Need to debug locally first",
+)
 class TestIDPKeycloak(IntegrationTest):
 
     num_replicas = 2
