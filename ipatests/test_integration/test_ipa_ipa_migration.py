@@ -89,7 +89,7 @@ def prepare_ipa_server(master):
     )
 
     # Run ipa-adtrust-install
-    master.run_command(["dnf", "install", "-y", "ipa-server-trust-ad"])
+    tasks.install_packages(master, ['*ipa-server-trust-ad'])
     master.run_command(
         [
             "ipa-adtrust-install",
