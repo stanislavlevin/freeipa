@@ -7,7 +7,6 @@ from __future__ import absolute_import
 
 import logging
 import os
-import site
 
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.pytest_ipa.integration import tasks
@@ -61,12 +60,19 @@ class TestCustomPlugin(IntegrationTest):
         self.master.run_command(['ipa-ldap-updater', '-S', '/tmp/schema.ldif'])
         self.master.put_file_contents('/tmp/schema.ldif', schema)
 
-        site_packages = site.getsitepackages()[-1]
-        site_file = os.path.join(
-            site_packages, "ipaserver", "plugins", "test.py"
-        )
+        plugins_dir = self.master.run_command(
+            [
+                "python3",
+                "-c",
+                (
+                    "import ipaserver.plugins as pl; from pathlib import Path;"
+                    "print(Path(pl.__file__).parent)"
+                ),
+            ]
+        ).stdout_text.strip()
+        plugin_path = os.path.join(plugins_dir, "test.py")
 
-        self.master.put_file_contents(site_file, plugin)
+        self.master.put_file_contents(plugin_path, plugin)
 
         self.master.run_command(['ipactl', 'restart'])
 
@@ -85,4 +91,4 @@ class TestCustomPlugin(IntegrationTest):
             '--userobjectclasses', 'customuser',
         ])
 
-        self.master.run_command(['rm', '-f', site_file])
+        self.master.run_command(['rm', '-f', plugin_path])
