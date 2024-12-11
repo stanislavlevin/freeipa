@@ -612,8 +612,15 @@ class TestBackupAndRestoreWithReplica(IntegrationTest):
             request_path
         ], raiseonerr=not expect_connection_error)
         if expect_connection_error:
-            assert (1 == res.returncode and
-                    '[Errno 111] Connection refused' in res.stderr_text)
+            assert res.returncode == 1
+            # actual error depends on tests environment
+            # PR-CI provides external DNS
+            expected_errs = ["[Errno 111] Connection refused"]
+            # Azure Pipeline doesn't provide external DNS
+            expected_errs.append(
+                "[Errno -3] Temporary failure in name resolution"
+            )
+            assert any(True for err in expected_errs if err in res.stderr_text)
 
     def test_full_backup_and_restore_with_replica(self, cert_sign_request):
         # check prerequisites
