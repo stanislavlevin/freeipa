@@ -15,9 +15,9 @@ from ipatests.pytest_ipa.integration import tasks
 class TestPkinitClientInstall(IntegrationTest):
     num_clients = 1
 
-    certfile = "/etc/pki/tls/certs/client.pem"
-    keyfile = "/etc/pki/tls/private/client.key"
-    tmpbundle = "/tmp/kdc-ca-bundle.pme"
+    certfile = "client.pem"
+    keyfile = "client.key"
+    tmpbundle = "/tmp/kdc-ca-bundle.pem"
 
     @classmethod
     def install(cls, mh):
@@ -78,8 +78,8 @@ class TestPkinitClientInstall(IntegrationTest):
             [
                 "mkdir",
                 "-p",
-                os.path.dirname(self.certfile),
-                os.path.dirname(self.keyfile),
+                self.master.paths.OPENSSL_CERTS_DIR,
+                self.master.paths.OPENSSL_PRIVATE_DIR,
             ]
         )
         self.master.run_command(
@@ -88,8 +88,14 @@ class TestPkinitClientInstall(IntegrationTest):
                 "request",
                 "-w",
                 # fmt: off
-                "-f", self.certfile,
-                "-k", self.keyfile,
+                "-f",
+                os.path.join(
+                    self.master.paths.OPENSSL_CERTS_DIR, self.certfile
+                ),
+                "-k",
+                os.path.join(
+                    self.master.paths.OPENSSL_PRIVATE_DIR, self.keyfile
+                ),
                 "-N", client.hostname,
                 "-D", client.hostname,
                 "-K", f"host/{client.hostname}",
@@ -97,9 +103,21 @@ class TestPkinitClientInstall(IntegrationTest):
             ]
         )
         # copy cert, key, and bundle to client
-        for filename in (self.certfile, self.keyfile):
-            data = self.master.get_file_contents(filename)
-            client.put_file_contents(filename, data)
+        certdata = self.master.get_file_contents(
+            os.path.join(self.master.paths.OPENSSL_CERTS_DIR, self.certfile)
+        )
+        client.put_file_contents(
+            os.path.join(client.paths.OPENSSL_CERTS_DIR, self.certfile),
+            certdata,
+        )
+
+        keydata = self.master.get_file_contents(
+            os.path.join(self.master.paths.OPENSSL_PRIVATE_DIR, self.keyfile)
+        )
+        client.put_file_contents(
+            os.path.join(client.paths.OPENSSL_PRIVATE_DIR, self.keyfile),
+            keydata,
+        )
 
         cabundle = self.master.get_file_contents(paths.KDC_CA_BUNDLE_PEM)
         client.put_file_contents(self.tmpbundle, cabundle)
@@ -118,9 +136,15 @@ class TestPkinitClientInstall(IntegrationTest):
         self.add_host()
         self.create_cert()
 
+        certfile = os.path.join(
+            self.clients[0].paths.OPENSSL_CERTS_DIR, self.certfile
+        )
+        keyfile = os.path.join(
+            self.clients[0].paths.OPENSSL_PRIVATE_DIR, self.keyfile
+        )
         tasks.install_client(
             self.master,
             self.clients[0],
-            pkinit_identity=f"FILE:{self.certfile},{self.keyfile}",
+            pkinit_identity=f"FILE:{certfile},{keyfile}",
             extra_args=[f"--pkinit-anchor=FILE:{self.tmpbundle}"],
         )
