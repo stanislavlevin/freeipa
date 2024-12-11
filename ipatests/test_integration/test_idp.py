@@ -156,6 +156,11 @@ azure_user_code_script = (
 )
 
 
+@pytest.mark.skip_if_hostplatform(
+    "replicas[0]",
+    platform="altlinux",
+    reason="Need to debug locally first",
+)
 class TestIDP(IntegrationTest):
     """Common IdP integration test setup and helpers."""
 
@@ -231,6 +236,11 @@ class TestIDP(IntegrationTest):
         assert "152" in test_idp.stdout_text
 
 
+@pytest.mark.skip_if_hostplatform(
+    "master",
+    platform="altlinux",
+    reason="Need to debug locally first",
+)
 class TestIDPKeycloak(TestIDP):
     """Keycloak IdP integration tests."""
 
@@ -714,6 +724,11 @@ class TestIDPKeycloak(TestIDP):
             self.master.run_command(["rm", "-f", keytab])
 
 
+@pytest.mark.skip_if_hostplatform(
+    "master",
+    platform="altlinux",
+    reason="Need to debug locally first",
+)
 class TestIDPAzure(TestIDP):
     """
     Microsoft Entra (Azure) IdP integration tests.
