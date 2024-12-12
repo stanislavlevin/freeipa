@@ -1968,6 +1968,11 @@ class TestInstallWithoutSudo(IntegrationTest):
         for pkg in ('sudo', 'libsss_sudo'):
             assert tasks.is_package_installed(self.clients[0], pkg) is False
         tasks.uninstall_client(self.clients[0])
+        if self.clients[0].osinfo.platform in {"altlinux"}:
+            # libsss_sudo and sudo were removed in previous test
+            # alt: libsss_sudo is required by freeipa-client and apt complains
+            # so fix the it first
+            tasks.install_packages(self.clients[0], ["libsss_sudo"])
         tasks.install_packages(self.clients[0], ['sudo'])
         for pkg in ('sudo', 'libsss_sudo'):
             assert tasks.is_package_installed(self.clients[0], pkg)
