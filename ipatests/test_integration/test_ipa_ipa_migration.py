@@ -247,12 +247,13 @@ def prepare_ipa_server(master):
     )
 
     # Add Selinuxusermap
+    selinux_user = master.constants.SELINUX_USERMAP_ORDER.split("$")[:2][-1]
     master.run_command(
         [
             "ipa",
             "selinuxusermap-add",
             "--usercat=all",
-            "--selinuxuser=xguest_u:s0",
+            f"--selinuxuser={selinux_user}",
             "test1",
         ]
     )
