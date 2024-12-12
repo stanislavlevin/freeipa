@@ -233,6 +233,11 @@ class TestCASpecificRUVs(IntegrationTest):
         finally:
             tasks.service_control_dirsrv(replica, function='start')
 
+    @pytest.mark.skip_if_hostplatform(
+        "master",
+        platform="altlinux",
+        reason="https://pagure.io/freeipa/issue/8023",
+    )
     def test_replica_uninstall_deletes_ruvs(self):
         """
         http://www.freeipa.org/page/V4/Manage_replication_topology_4_4/Test_Plan
