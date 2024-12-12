@@ -2441,10 +2441,11 @@ class TestIpaHealthCheckFilesystemSpace(IntegrationTest):
         """Calculate the free space and create a humongous file to fill it
         within the threshold without using all available space."""
 
-        path = os.path.join('/tmp', str(uuid.uuid4()))
+        directory = self.master.paths.IPA_BACKUP_DIR
+        path = os.path.join(directory, str(uuid.uuid4()))
         # CI has a single big disk so we may end up allocating most of it.
         result = self.master.run_command(
-            ['df', '--block-size=1024', '--output=avail', '/tmp']
+            ['df', '--block-size=1024', '--output=avail', directory]
         )
         free = (int(result.stdout_text.split('\n')[1]) // 1024) - 50
         self.master.run_command(['fallocate', '-l', '%dMiB' % free, path])
@@ -2455,7 +2456,7 @@ class TestIpaHealthCheckFilesystemSpace(IntegrationTest):
 
     def test_ipa_filesystemspace_check(self, create_jumbo_file):
         """
-        Create a large file in /tmp and verify that it reports low space
+        Create a large file and verify that it reports low space
 
         This should raise 2 errors. One that the available space is
         below a size threshold and another that it is below a
@@ -2472,21 +2473,26 @@ class TestIpaHealthCheckFilesystemSpace(IntegrationTest):
 
         errors_found = 0
         # Because PR-CI has a single filesystem more filesystems will
-        # report as full. Let's only consider /tmp since this will work
-        # with discrete /tmp as well.
+        # report as full
+
+        # os.path.join: the result will only end in a separator if the last part
+        # is either empty or ends in a separator
+        directory = os.path.join(self.master.paths.IPA_BACKUP_DIR, "")
         for check in data:
-            if check["kw"]["store"] != "/tmp":
+            if check["kw"]["store"] != directory:
                 continue
 
             assert check["result"] == "ERROR"
-            assert check["kw"]["store"] == "/tmp"
+            assert check["kw"]["store"] == directory
             if "percent_free" in check["kw"]:
-                assert "/tmp: free space percentage under threshold" in \
-                    check["kw"]["msg"]
+                assert (
+                    f"{directory}: free space percentage under threshold"
+                ) in check["kw"]["msg"]
                 assert check["kw"]["threshold"] == 20
             else:
-                assert "/tmp: free space under threshold" in \
-                    check["kw"]["msg"]
+                assert (
+                    f"{directory}: free space under threshold"
+                ) in check["kw"]["msg"]
                 assert check["kw"]["threshold"] == 512
             errors_found += 1
 
