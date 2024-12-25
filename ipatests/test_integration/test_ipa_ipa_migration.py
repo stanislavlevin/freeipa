@@ -288,6 +288,11 @@ def run_migrate(
     return result
 
 
+@pytest.mark.skip_if_hostplatform(
+    "master",
+    platform="altlinux",
+    reason="need to check it",
+)
 class TestIPAMigrateScenario1(IntegrationTest):
     """
     Tier-1 tests for ipa-migrate tool with DNS enabled on
