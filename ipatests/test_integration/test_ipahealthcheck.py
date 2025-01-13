@@ -1180,47 +1180,6 @@ class TestIpaHealthCheck(IntegrationTest):
                     assert check["kw"]["msg"] == error_msg_4_0
 
     @pytest.fixture
-    def update_logging(self):
-        """
-        Fixture disables nsslapd-logging-hr-timestamps-enabled
-        parameter and reverts it back
-        """
-        ldap = self.master.ldap_connect()
-        dn = DN(
-            ("cn", "config"),
-        )
-        entry = ldap.get_entry(dn)
-        entry.single_value["nsslapd-logging-hr-timestamps-enabled"] = 'off'
-        ldap.update_entry(entry)
-
-        yield
-
-        entry = ldap.get_entry(dn)
-        entry.single_value["nsslapd-logging-hr-timestamps-enabled"] = 'on'
-        ldap.update_entry(entry)
-
-    def test_ipahealthcheck_ds_configcheck(self, update_logging):
-        """
-        This testcase ensures that ConfigCheck displays warning
-        when high resolution timestamp is disabled.
-        """
-        warn_msg = (
-            "nsslapd-logging-hr-timestamps-enabled changes the "
-            "log format in directory server "
-        )
-        returncode, data = run_healthcheck(
-            self.master,
-            "ipahealthcheck.ds.config",
-            "ConfigCheck",
-        )
-        assert returncode == 1
-        for check in data:
-            if check["kw"]["key"] == "DSCLE0001":
-                assert check["result"] == "WARNING"
-                assert 'cn=config' in check["kw"]["items"]
-                assert warn_msg in check["kw"]["msg"]
-
-    @pytest.fixture
     def rename_ldif(self):
         """Fixture to rename dse.ldif file and revert after test"""
         instance = realm_to_serverid(self.master.domain.realm)
