@@ -24,7 +24,6 @@ import logging
 import os
 import re
 import sys
-from optparse import OptionParser  # pylint: disable=deprecated-module
 
 from ipaplatform.paths import paths
 from ipapython import config
@@ -32,6 +31,7 @@ from ipaserver.install import installutils
 from ipalib import api, errors
 from ipapython.ipa_log_manager import standard_logging_setup
 from ipapython.dn import DN
+from ipapython.admintool import admin_cleanup_global_argv
 
 logger = logging.getLogger(os.path.basename(__file__))
 
@@ -39,7 +39,8 @@ logger = logging.getLogger(os.path.basename(__file__))
 def parse_options():
     usage = "%prog [options] <status|enable|disable>\n"
     usage += "%prog [options]\n"
-    parser = OptionParser(usage=usage, formatter=config.IPAFormatter())
+    parser = config.IPAOptionParser(usage=usage,
+                                    formatter=config.IPAFormatter())
 
     parser.add_option("-d", "--debug", action="store_true", dest="debug",
                       help="Display debugging information about the update(s)")
@@ -50,9 +51,10 @@ def parse_options():
                       action="store_true",
                       help="List available Managed Entries")
     parser.add_option("-p", "--password", dest="dirman_password",
-                      help="Directory Manager password")
+                      sensitive=True, help="Directory Manager password")
 
     options, args = parser.parse_args()
+    admin_cleanup_global_argv(parser, options, sys.argv)
 
     return options, args
 

@@ -20,7 +20,6 @@
 from __future__ import absolute_import, print_function
 
 import logging
-import optparse  # pylint: disable=deprecated-module
 import os
 import shutil
 import sys
@@ -34,7 +33,7 @@ import six
 from ipaclient.install.client import update_ipa_nssdb
 from ipalib import api, errors
 from ipalib.constants import FQDN
-from ipapython import version, ipautil
+from ipapython import version, ipautil, config
 from ipapython.ipautil import run, user_input
 from ipapython import admintool, certdb
 from ipapython.dn import DN
@@ -186,11 +185,11 @@ class Restore(admintool.AdminTool):
         super(Restore, cls).add_options(parser, debug_option=True)
 
         parser.add_option(
-            "-p", "--password", dest="password",
+            "-p", "--password", dest="password", sensitive=True,
             help="Directory Manager password")
         parser.add_option(
             "--gpg-keyring", dest="gpg_keyring",
-            help=optparse.SUPPRESS_HELP)
+            help=config.SUPPRESS_HELP)
         parser.add_option(
             "--data", dest="data_only", action="store_true",
             default=False, help="Restore only the data")
