@@ -39,7 +39,7 @@ from ipatests.create_external_ca import ExternalCA
 from ipatests.test_ipalib.test_x509 import good_pkcs7, badcert
 from ipapython.ipautil import realm_to_suffix, ipa_generate_password
 from ipaserver.install.installutils import realm_to_serverid
-from pkg_resources import parse_version
+from packaging.version import parse as parse_version
 
 logger = logging.getLogger(__name__)
 
