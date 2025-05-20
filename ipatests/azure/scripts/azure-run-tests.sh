@@ -241,12 +241,12 @@ echo "Report disk usage"
 compose_execute df -h
 
 echo "Report memory statistics"
-files='/sys/fs/cgroup/memory/memory.memsw.failcnt \
-/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes \
-/sys/fs/cgroup/memory/memory.memsw.max_usage_in_bytes \
-/sys/fs/cgroup/memory/memory.failcnt \
-/sys/fs/cgroup/memory/memory.max_usage_in_bytes \
-/sys/fs/cgroup/memory/memory.limit_in_bytes \
+files='/sys/fs/cgroup/memory.swap.events \
+/sys/fs/cgroup/memory.swap.max \
+/sys/fs/cgroup/memory.swap.peak \
+/sys/fs/cgroup/memory.events \
+/sys/fs/cgroup/memory.max \
+/sys/fs/cgroup/memory.peak \
 /proc/sys/vm/swappiness \
 '
 
