@@ -262,18 +262,30 @@ def collect_memory_stats(name, hosts, logfile_dir=None):
         if not os.path.exists(topdirname):
             os.makedirs(topdirname)
 
-        cgroupv1_mem_interfaces = [
-            "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes",
-            "/sys/fs/cgroup/memory/memory.limit_in_bytes",
-            "/sys/fs/cgroup/memory/memory.memsw.max_usage_in_bytes",
-            "/sys/fs/cgroup/memory/memory.max_usage_in_bytes",
-            "/sys/fs/cgroup/memory/memory.memsw.usage_in_bytes",
-            "/sys/fs/cgroup/memory/memory.usage_in_bytes",
-            "/sys/fs/cgroup/memory/memory.stat",
-        ]
+        if os.path.isdir("/sys/fs/cgroup/memory"):
+            # cgroup v1
+            cgroup_mem_interfaces = [
+                "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes",
+                "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+                "/sys/fs/cgroup/memory/memory.memsw.max_usage_in_bytes",
+                "/sys/fs/cgroup/memory/memory.max_usage_in_bytes",
+                "/sys/fs/cgroup/memory/memory.memsw.usage_in_bytes",
+                "/sys/fs/cgroup/memory/memory.usage_in_bytes",
+                "/sys/fs/cgroup/memory/memory.stat",
+            ]
+        else:
+            # cgroup v2
+            cgroup_mem_interfaces = [
+                "/sys/fs/cgroup/memory.swap.events",
+                "/sys/fs/cgroup/memory.swap.max",
+                "/sys/fs/cgroup/memory.swap.peak",
+                "/sys/fs/cgroup/memory.events",
+                "/sys/fs/cgroup/memory.max",
+                "/sys/fs/cgroup/memory.peak",
+            ]
 
         cmd = host.run_command(
-            ["head", "-n-0"] + cgroupv1_mem_interfaces,
+            ["head", "-n-0", *cgroup_mem_interfaces],
             log_stdout=False,
             raiseonerr=False,
         )
