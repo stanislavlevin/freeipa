@@ -85,15 +85,6 @@ steps:
 - template: run-test.yml
 
 - script: |
-    set -eux
-    free -m
-    cat /sys/fs/cgroup/memory/memory.memsw.max_usage_in_bytes
-    cat /sys/fs/cgroup/memory/memory.max_usage_in_bytes
-    cat /proc/sys/vm/swappiness
-  condition: succeededOrFailed()
-  displayName: Host's memory statistics
-
-- script: |
     set -eu
     function emit_warning() {
         printf "##vso[task.logissue type=warning]%s\n" "$1"
