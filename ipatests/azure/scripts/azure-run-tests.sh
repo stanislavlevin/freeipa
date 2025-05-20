@@ -251,18 +251,7 @@ files='/sys/fs/cgroup/memory.swap.events \
 '
 
 MEMORY_STATS_PATH="$project_dir/memory.stats"
-compose_execute $BASH_CMD -eu -c \
-    "for file in $files; do printf '%s=%s\n' \"\$file\" \"\$(head -n 1 \$file)\" ; done" > "$MEMORY_STATS_PATH"
-
-sed -E -n \
-    's/(.*): .*(memory\.(memsw\.)?failcnt)=([0-9]+)/\1 \2 \4/p' \
-    "$MEMORY_STATS_PATH" | \
-tr -d '\r' | \
-while read -r container memtype failcnt; do
-   if [ "$failcnt" -gt 0 ]; then
-      grep "^$container.*memory\..*" "$MEMORY_STATS_PATH" >> "$project_dir/memory.warnings"
-   fi
-done
+compose_execute $BASH_CMD -eu -c "head -n-0 $files" > "$MEMORY_STATS_PATH"
 
 pushd "$project_dir"
 BUILD_REPOSITORY_LOCALPATH="$BUILD_REPOSITORY_LOCALPATH" \
