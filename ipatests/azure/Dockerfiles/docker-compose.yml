@@ -1,4 +1,3 @@
-version: '2.1'
 services:
   master:
     image: ${IPA_DOCKER_IMAGE}
