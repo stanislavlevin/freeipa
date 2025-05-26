@@ -2197,6 +2197,36 @@ class TestIPACommandWithoutReplica(IntegrationTest):
         assert result.returncode == 1
         assert "PAC_ENFORCEMENT_TGT_WITHOUT_PAC" in result.stderr_text
 
+    @pytest.fixture
+    def update_ipaconfigstring(self):
+        """
+        This fixture stores the value of ipaconfigstring parameter
+        and reverts to the initial value
+        """
+        ldap = self.master.ldap_connect()
+        dn = DN(
+            ("cn", "ipaconfig"), ('cn', 'etc'),
+            self.master.domain.basedn
+        )
+        entry = ldap.get_entry(dn)
+        val = entry.get("ipaconfigstring")
+        yield
+
+        # re-read the entry as the value may have been changed by the test
+        entry = ldap.get_entry(dn)
+        entry["ipaconfigstring"] = val
+        ldap.update_entry(entry)
+
+    def test_empty_ipaconfigstring(self, update_ipaconfigstring):
+        """
+        Test for https://pagure.io/freeipa/issue/9794
+
+        Test that setting an empty ipaconfigstring does not fail.
+        Subsequent calls to ipa subid-stats should also succeed.
+        """
+        self.master.run_command(['ipa', 'config-mod', "--ipaconfigstring="])
+        self.master.run_command(['ipa', 'subid-stats'])
+
     def test_ipa_cacert_manage_prune(self):
         """Test for ipa-cacert-manage prune
 
