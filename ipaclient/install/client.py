@@ -1548,7 +1548,7 @@ def update_dns(server, hostname, options):
 
     update_txt = "debug\n"
     if options.dns_over_tls:
-        update_txt += "server %s 853" % server
+        update_txt += "server %s 853\n" % server
     update_txt += ipautil.template_str(DELETE_TEMPLATE_A,
                                        dict(HOSTNAME=hostname))
     update_txt += ipautil.template_str(DELETE_TEMPLATE_AAAA,
@@ -1796,7 +1796,7 @@ def update_ssh_keys(hostname, ssh_dir, options, server):
 
         update_txt = 'debug\n'
         if options.dns_over_tls:
-            update_txt += "server %s 853" % server
+            update_txt += "server %s 853\n" % server
         update_txt += 'update delete %s. IN SSHFP\nshow\nsend\n' % hostname
         for pubkey in pubkeys:
             sshfp = pubkey.fingerprint_dns_sha1()
