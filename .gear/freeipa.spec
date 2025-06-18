@@ -262,6 +262,7 @@ Requires: python3-module-samba
 Requires: python3-module-psutil
 # urllib3.util.ssl_match_hostname
 Requires: python3-module-urllib3 >= 1.26.8
+Requires: python3-module-packaging
 Requires: librpm
 Obsoletes: python3-module-ipaserver-ntp < %EVR
 Provides: python3-module-ipaserver-ntp = %EVR
@@ -469,6 +470,7 @@ Requires: python3-module-urllib3 >= 1.26.8
 Requires: python3-module-sss-murmur
 Requires: python3-module-yubico
 Requires: python3-module-systemd
+Requires: python3-module-packaging
 %py3_provides ipaplatform
 %py3_provides ipaplatform.constants
 %py3_provides ipaplatform.osinfo
@@ -514,6 +516,7 @@ Requires: sshpass
 Requires: iptables
 Requires: drill
 Requires: python3-module-paramiko
+Requires: python3-module-packaging
 # Tests have a huge amount useless Provides
 %filter_from_provides /python3(ipatests\(\..*\)\?)/d
 
