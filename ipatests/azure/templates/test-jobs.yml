@@ -41,7 +41,21 @@ steps:
     printf "AppArmor status\n"
     sudo aa-status
     printf "Disable AppArmor conflicting profiles\n"
-    sudo aa-disable /etc/apparmor.d/usr.sbin.chronyd ||:
+    # apparmor profiles work with in-container executables and can block them,
+    # chronyd can't start in containers with current apparmor profile
+    # docker's chronyd:
+    # chronyd[10190]: Fatal error : Could not send notification to $NOTIFY_SOCKET
+    # host's apparmor:
+    # kernel: audit: type=1400 audit(1750258475.789:131): apparmor="DENIED" operation="sendmsg" class="file" profile="/usr/sbin/chronyd" name="/run/systemd/notify" pid=23031 comm="chronyd" requested_mask="w" denied_mask="w" fsuid=997 ouid=0
+    # https://bugs.launchpad.net/ubuntu/+source/apparmor/+bug/2079019
+    # fixed in apparmor 4.0.2
+    # apparmor in ubuntu 24.04 is 4.0.1
+    # remove workaround when updated
+    sudo aa-disable /etc/apparmor.d/usr.sbin.chronyd && exit 1
+    # use workaround for broken aa-disable
+    sudo ln -s /etc/apparmor.d/usr.sbin.chronyd /etc/apparmor.d/disable/
+    sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.chronyd
+
     printf "Recheck AppArmor status\n"
     sudo aa-status
   displayName: Disable AppArmor conflicting profiles on Host
