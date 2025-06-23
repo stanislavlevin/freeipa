@@ -409,6 +409,9 @@ class TestIpaHealthCheck(IntegrationTest):
             assert not is_fips_enabled
         elif check[0]["kw"]["fips"] == "enabled":
             assert is_fips_enabled
+        elif check[0]["kw"]["fips"] == f"missing {paths.PROC_FIPS_ENABLED}":
+            # alt: fips is not loaded
+            assert not is_fips_enabled
         else:
             raise ValueError("File %s doesn't exist or contains unexpected "
                              "value, this is a kernel issue!"
