@@ -9,6 +9,12 @@ RUN \
         -o 'Debug::pkgRemoveDepends=yes' \
         -o 'Debug::pkgMarkInstall=yes' \
         -y \
+        libldb-modules-ldap \
+    && apt-get install \
+        -o 'Debug::pkgProblemResolver=yes' \
+        -o 'Debug::pkgRemoveDepends=yes' \
+        -o 'Debug::pkgMarkInstall=yes' \
+        -y \
         /root/rpms/*.rpm openssh \
         gssproxy-nfs-server nfs-server \
     && apt-get clean \
