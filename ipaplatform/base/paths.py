@@ -105,6 +105,7 @@ class BasePathNamespace:
     NAMED_CRYPTO_POLICY_FILE = None
     NAMED_RNDC_CONF = ""
     UNBOUND_CONF_SRC = '/usr/share/ipa/client/unbound.conf.template'
+    UNBOUND_CONFIG_DIR = "/etc/unbound/conf.d/"
     UNBOUND_CONF = "/etc/unbound/conf.d/zzz-ipa.conf"
     NSLCD_CONF = "/etc/nslcd.conf"
     NSS_LDAP_CONF = "/etc/nss_ldap.conf"
