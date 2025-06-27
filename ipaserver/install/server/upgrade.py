@@ -553,14 +553,14 @@ def dnssec_set_openssl_engine(dnskeysyncd):
     if constants.NAMED_OPENSSL_ENGINE is None:
         return False
 
-    if sysupgrade.get_upgrade_state('dns', 'openssl_engine'):
+    if sysupgrade.get_upgrade_state('dns', 'openssl_engine_force_login'):
         return False
 
     logger.info('[Set OpenSSL engine for BIND]')
     dnskeysyncd.setup_named_openssl_conf()
     dnskeysyncd.setup_named_sysconfig()
     dnskeysyncd.setup_ipa_dnskeysyncd_sysconfig()
-    sysupgrade.set_upgrade_state('dns', 'openssl_engine', True)
+    sysupgrade.set_upgrade_state('dns', 'openssl_engine_force_login', True)
 
     return True
 
