@@ -314,13 +314,18 @@ Summary: Virtual package to install packages required for Active Directory trust
 Group: System/Base
 Requires: %name-server = %EVR
 Requires: %name-common = %EVR
-
-Requires: samba-dc-mitkrb5 >= %samba_version
+# see https://bugzilla.altlinux.org/50444
+# deps: ipaserver/install/adtrustinstance.py:check_inst
+# /usr/sbin/smbd
+Requires: samba >= %samba_version
+# /usb/bin/net
+Requires: samba-common-tools >= %samba_version
 Requires: samba-winbind
-
 Requires: python3-module-samba
 Requires: python3-module-sss_nss_idmap
 Requires: python3-module-sss
+# only works with mit samba (/usr/sbin/smbd)
+Conflicts: samba-dc
 
 %description server-trust-ad
 Cross-realm trusts with Active Directory in IPA require working Samba 4
