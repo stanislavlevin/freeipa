@@ -622,6 +622,13 @@ vms:
       clients: 1
 
 - vm_jobs:
+  - container_job: hsm_TestHSMInstallPasswordFile
+    tests:
+    - test_integration/test_hsm.py::TestHSMInstallPasswordFile
+    containers:
+      replicas: 1
+
+- vm_jobs:
   - container_job: hsm_TestHSMInstallADTrustBase
     tests:
     - test_integration/test_hsm.py::TestHSMInstallADTrustBase
