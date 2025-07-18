@@ -1007,9 +1007,6 @@ class TestHSMACME(CALessBase):
         check_version(cls.master)
         super(TestHSMACME, cls).install(mh)
 
-        # install packages before client install in case of IPA DNS problems
-        cls.acme_server = prepare_acme_client(cls.master, cls.clients[0])
-
         # Enable pkiuser to read softhsm tokens
         cls.master.run_command(['usermod', 'pkiuser', '-a', '-G', 'ods'])
 
@@ -1022,6 +1019,8 @@ class TestHSMACME(CALessBase):
                 '--token-password', cls.token_password
             )
         )
+
+        cls.acme_server = prepare_acme_client(cls.master, cls.clients[0])
 
         tasks.install_client(cls.master, cls.clients[0])
 
@@ -1185,9 +1184,6 @@ class TestHSMACMEPrune(IntegrationTest):
         check_version(cls.master)
         super(TestHSMACMEPrune, cls).install(mh)
 
-        # install packages before client install in case of IPA DNS problems
-        cls.acme_server = prepare_acme_client(cls.master, cls.clients[0])
-
         # Enable pkiuser to read softhsm tokens
         cls.master.run_command(['usermod', 'pkiuser', '-a', '-G', 'ods'])
 
@@ -1201,6 +1197,8 @@ class TestHSMACMEPrune(IntegrationTest):
                 '--token-password', cls.token_password
             )
         )
+
+        cls.acme_server = prepare_acme_client(cls.master, cls.clients[0])
         tasks.install_client(cls.master, cls.clients[0])
 
     @classmethod
