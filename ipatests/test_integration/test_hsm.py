@@ -304,8 +304,8 @@ class TestHSMInstall(BaseHSMTest):
 
     def test_hsm_install_healthcheck(self):
         check_version(self.master)
-        set_excludes(self.master, "key", "DSCLE0004")
         tasks.install_packages(self.master, ['*ipa-healthcheck'])
+        set_excludes(self.master, "key", "DSCLE0004")
         returncode, output = run_healthcheck(
             self.master, output_type="human", failures_only=True
         )
