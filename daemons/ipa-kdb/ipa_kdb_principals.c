@@ -182,25 +182,6 @@ done:
     return ret;
 }
 
-static bool
-is_tgs_princ(krb5_context kcontext, krb5_const_principal princ)
-{
-    krb5_data *primary;
-    size_t l_tgs_name;
-
-    if (2 != krb5_princ_size(kcontext, princ))
-        return false;
-
-    primary = krb5_princ_component(kcontext, princ, 0);
-
-    l_tgs_name = strlen(KRB5_TGS_NAME);
-
-    if (l_tgs_name != primary->length)
-        return false;
-
-    return 0 == memcmp(primary->data, KRB5_TGS_NAME, l_tgs_name);
-}
-
 static krb5_error_code ipadb_set_tl_data(krb5_db_entry *entry,
                                          krb5_int16 type,
                                          krb5_ui_2 length,
@@ -1839,7 +1820,7 @@ krb5_error_code ipadb_get_principal(krb5_context kcontext,
 
 #if KRB5_KDB_DAL_MAJOR_VERSION <= 8
     /* If TGS principal, some virtual attributes may be added */
-    if (is_tgs_princ(kcontext, (*entry)->princ)) {
+    if (ipadb_is_tgs_princ(kcontext, (*entry)->princ)) {
         kerr = krb5_dbe_set_string(kcontext, *entry,
                                    KRB5_KDB_SK_OPTIONAL_AD_SIGNEDPATH,
                                    "true");
