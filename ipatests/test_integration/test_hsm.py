@@ -359,6 +359,10 @@ class TestHSMInstallPasswordFile(BaseHSMTest):
         )
 
 
+@pytest.mark.xfail(
+    reason="replica installation fails without master's DNS",
+    strict=True,
+)
 class TestHSMInstallADTrustBase(BaseHSMTest):
     """
     Base test for builtin AD trust installation in combination with other
@@ -698,6 +702,10 @@ class TestHSMcertFixKRA(BaseHSMTest):
         check_status(self.master, 12, "MONITORING")
 
 
+@pytest.mark.xfail(
+    reason="replica installation fails without master's DNS",
+    strict=True,
+)
 class TestHSMcertFixReplica(BaseHSMTest):
 
     num_replicas = 1
