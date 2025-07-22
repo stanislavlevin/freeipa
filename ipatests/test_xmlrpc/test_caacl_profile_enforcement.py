@@ -8,6 +8,7 @@ from __future__ import absolute_import
 import os
 import pytest
 import tempfile
+import time
 
 import six
 
@@ -292,6 +293,11 @@ class TestCertSignMIMEwithSubCA(XMLRPC_test):
 
     def test_create_subca(self, smime_signing_ca):
         smime_signing_ca.ensure_exists()
+        # https://github.com/dogtagpki/pki/issues/4681
+        # https://github.com/dogtagpki/pki/issues/4677
+        # looks like KeyRetriever doesn't get LWCA key in time
+        # fails on dogtag pki 11.6.1+
+        time.sleep(10)
 
     def test_add_profile_to_acl(self, smime_acl, smime_profile):
         smime_acl.add_profile(certprofile=smime_profile.name)
