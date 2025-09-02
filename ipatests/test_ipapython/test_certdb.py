@@ -105,6 +105,13 @@ def test_sql_tmp():
     not nss_supports_dbm(),
     reason="NSS is built without support of the legacy database(DBM)",
 )
+@pytest.mark.xfail(
+    reason=(
+        "fails with nss 3.114 "
+        "(https://bugzilla.mozilla.org/show_bug.cgi?id=1982807)"
+    ),
+    strict=True,
+)
 def test_convert_db():
     with NSSDatabase(dbtype='dbm') as nssdb:
         assert nssdb.dbtype == 'dbm'
@@ -143,6 +150,13 @@ def test_convert_db():
 @pytest.mark.skipif(
     not nss_supports_dbm(),
     reason="NSS is built without support of the legacy database(DBM)",
+)
+@pytest.mark.xfail(
+    reason=(
+        "fails with nss 3.114 "
+        "(https://bugzilla.mozilla.org/show_bug.cgi?id=1982807)"
+    ),
+    strict=True,
 )
 def test_convert_db_nokey():
     with NSSDatabase(dbtype='dbm') as nssdb:
