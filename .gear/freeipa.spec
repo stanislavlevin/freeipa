@@ -36,7 +36,9 @@
 %define bind_version 9.11
 %define bind_dyndb_ldap_version 11.1-alt7
 %define certmonger_version 0.79.7
-%define ds_version 1.4.3.24
+# https://www.freeipa.org/release-notes/4-12-5.html
+# CVE-2025-7493 requires https://github.com/389ds/389-ds-base/issues/6857
+%define ds_version 2.2.10-alt2.p10.1
 %define gssproxy_version 0.8.0-alt2
 %define krb5_version 1.16.3
 %define pki_version 10.10.5
