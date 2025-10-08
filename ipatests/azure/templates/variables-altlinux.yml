@@ -1,6 +1,6 @@
 variables:
   IPA_PLATFORM: altlinux
-  DISTRO_BRANCH: sisyphus
+  DISTRO_BRANCH: p11
   # the Docker public image to build IPA packages (rpms)
   DOCKER_BUILD_IMAGE: ${{ format('stanislavlevin/freeipa-build-altlinux:{0}', variables.DISTRO_BRANCH) }}
   DOCKER_TESTS_IMAGE: ${{ format('stanislavlevin/freeipa-tests-altlinux:{0}', variables.DISTRO_BRANCH) }}
