@@ -56,6 +56,7 @@ vms:
       replicas: 1
       clients: 1
 
+- vm_jobs:
   - container_job: ntp_options_openntpd
     tests:
     - test_integration/test_ntp_options.py::TestNTPoptions
@@ -109,6 +110,7 @@ vms:
       #     mem_limit: "2300m"
       #     memswap_limit: "3100m"
 
+# hangs
 - vm_jobs:
   - container_job: dns_locations
     tests:
@@ -120,6 +122,7 @@ vms:
       #     mem_limit: "2300m"
       #     memswap_limit: "3100m"
 
+- vm_jobs:
   - container_job: pkinit_manage
     tests:
     - test_integration/test_pkinit_manage.py
@@ -196,6 +199,7 @@ vms:
     tests:
     - test_integration/test_backup_and_restore.py::TestReplicaInstallAfterRestore
 
+# hangs
 - vm_jobs:
   - container_job: backup_and_restore_TestBackupRoles
     containers:
@@ -203,6 +207,7 @@ vms:
     tests:
     - test_integration/test_backup_and_restore.py::TestBackupRoles
 
+- vm_jobs:
   - container_job: backup_and_restore_TestBackupAndRestoreTrust
     tests:
     - test_integration/test_backup_and_restore.py::TestBackupAndRestoreTrust
@@ -266,6 +271,7 @@ vms:
     tests:
     - test_integration/test_caless.py::TestServerInstall
 
+- vm_jobs:
   - container_job: caless_TestReplicaInstall
     tests:
     - test_integration/test_caless.py::TestReplicaInstall
@@ -298,6 +304,7 @@ vms:
     containers:
       replicas: 1
 
+- vm_jobs:
   - container_job: caless_TestServerReplicaCALessToCAFull
     tests:
     - test_integration/test_caless.py::TestServerReplicaCALessToCAFull
@@ -315,6 +322,7 @@ vms:
     tests:
     - test_integration/test_caless.py::TestServerCALessToExternalCA
 
+- vm_jobs:
   - container_job: cli_TestIPANotConfigured
     # requires nothing
     tests:
@@ -349,6 +357,7 @@ vms:
     tests:
     - test_integration/test_external_ca.py::TestExternalCAdirsrvStop
 
+- vm_jobs:
   - container_job: TestMultipleExternalCA
     tests:
     - test_integration/test_external_ca.py::TestMultipleExternalCA
@@ -387,6 +396,7 @@ vms:
     tests:
     - test_integration/test_installation.py::TestInstallMasterKRA
 
+- vm_jobs:
   - container_job: TestInstallMasterReplica
     tests:
     - test_integration/test_installation.py::TestInstallMasterReplica
@@ -570,6 +580,7 @@ vms:
     containers:
       replicas: 1
 
+- vm_jobs:
   - container_job: replica_promotion_TestWrongClientDomain
     tests:
     - test_integration/test_replica_promotion.py::TestWrongClientDomain
@@ -743,6 +754,7 @@ vms:
     tests:
     - test_integration/test_custom_plugins.py
 
+- vm_jobs:
   - container_job: pkinit_install
     containers:
       clients: 1

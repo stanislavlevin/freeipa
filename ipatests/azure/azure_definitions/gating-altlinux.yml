@@ -87,6 +87,8 @@ vms:
     tests:
     - test_integration/test_sudo.py
 
+# either external_ca_ExternalCA or external_ca_ExternalCAConstraints hangs
+- vm_jobs:
   - container_job: external_ca_ExternalCA
     containers:
       replicas: 1
@@ -101,6 +103,7 @@ vms:
     tests:
     - test_integration/test_external_ca.py::TestExternalCA
 
+- vm_jobs:
   - container_job: external_ca_ExternalCAConstraints
     containers:
       clients: 1
@@ -146,6 +149,7 @@ vms:
     tests:
     - test_integration/test_replica_promotion.py::TestSubCAkeyReplication
 
+- vm_jobs:
   - container_job: adtrust_install
     tests:
     - test_integration/test_adtrust_install.py
@@ -164,6 +168,7 @@ vms:
       #     mem_limit: "2300m"
       #     memswap_limit: "3300m"
 
+- vm_jobs:
   - container_job: external_ca_SelfExternalSelf
     tests:
     - test_integration/test_external_ca.py::TestSelfExternalSelf
@@ -178,12 +183,17 @@ vms:
     tests:
     - test_integration/test_upgrade.py
 
+# hangs on
+# [2025-10-09 09:07:27] [ipatests.pytest_ipa.integration.host.Host.master1.cmd29]   [6/8]: restarting Directory Server to take MS PAC and LDAP plugins changes into account
+# [2025-10-09 09:07:37] [ipatests.pytest_ipa.integration.host.Host.master1.cmd29]   [7/8]: adding fallback group
+- vm_jobs:
   - container_job: subids
     tests:
     - test_integration/test_subids.py
     containers:
       clients: 1
 
+- vm_jobs:
   - container_job: membermanager
     tests:
     - test_integration/test_membermanager.py
