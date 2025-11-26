@@ -12,6 +12,12 @@ from ipalib import api, errors
 testuser = u'tuser'
 password = u'password'
 
+# completely xfail, related to either Python 3.13 or cryptography
+pytestmark = pytest.mark.xfail(
+    reason="df319b973847b82d4d3447f4b8233a24eda0608d",
+    strict=True,
+)
+
 
 @pytest.mark.tier1
 class test_migratepw(XMLRPC_test, Unauthorized_HTTP_test):
