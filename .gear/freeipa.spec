@@ -311,6 +311,16 @@ Integrated DNS server is BIND 9. OpenDNSSEC provides key management.
 
 ###############################################################################
 
+%package server-encrypted-dns
+Summary: Support for encrypted DNS in IPA integrated DNS server
+Group: System/Base
+Requires: %name-client-encrypted-dns
+
+%description server-encrypted-dns
+Provides support for enabling DNS over TLS in the IPA integrated DNS server.
+
+###############################################################################
+
 %package server-trust-ad
 Summary: Virtual package to install packages required for Active Directory trusts
 Group: System/Base
@@ -369,6 +379,17 @@ and integration with Active Directory based infrastructures (Trusts).
 If your network uses IPA for authentication, this package should be
 installed on every client machine.
 This package provides command-line tools for IPA administrators.
+
+###############################################################################
+
+%package client-encrypted-dns
+Summary: Enable encrypted DNS support for IPA clients
+Group: System/Base
+Requires: unbound
+
+%description client-encrypted-dns
+This package enables support for installing IPA clients with encrypted DNS
+via DNS over TLS.
 
 ###############################################################################
 
@@ -1050,6 +1071,8 @@ fi
 %attr(644,root,root) %_unitdir/ipa-ods-exporter.socket
 %attr(644,root,root) %_unitdir/ipa-ods-exporter.service
 
+%files server-encrypted-dns
+
 %files server-trust-ad
 %_sbindir/ipa-adtrust-install
 %_datadir/ipa/smb.conf.empty
@@ -1110,6 +1133,8 @@ fi
 %_sbindir/ipa-client-automount
 %_mandir/man1/ipa-client-automount.1*
 %python3_sitelibdir/ipaclient/install/ipa_client_automount.py
+
+%files client-encrypted-dns
 
 %files -n python3-module-ipaclient
 %python3_sitelibdir/ipaclient/
