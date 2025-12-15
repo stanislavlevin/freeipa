@@ -881,7 +881,6 @@ fi
 %_sbindir/ipa-ldap-updater
 %_sbindir/ipa-otptoken-import
 %_sbindir/ipa-compat-manage
-%_sbindir/ipa-nis-manage
 %_sbindir/ipa-managed-entries
 %_sbindir/ipactl
 %_sbindir/ipa-advise
@@ -955,7 +954,6 @@ fi
 %_man1dir/ipa-ca-install.1*
 %_man1dir/ipa-kra-install.1*
 %_man1dir/ipa-compat-manage.1*
-%_man1dir/ipa-nis-manage.1*
 %_man1dir/ipa-managed-entries.1*
 %_man1dir/ipa-ldap-updater.1*
 %_man1dir/ipa-backup.1*
