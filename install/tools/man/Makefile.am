@@ -18,7 +18,6 @@ dist_man1_MANS = 			\
 	ipa-kra-install.1		\
 	ipa-ldap-updater.1		\
 	ipa-compat-manage.1		\
-	ipa-nis-manage.1		\
 	ipa-managed-entries.1		\
 	ipa-backup.1			\
 	ipa-restore.1			\
@@ -29,6 +28,7 @@ dist_man1_MANS = 			\
 	ipa-pkinit-manage.1		\
 	ipa-crlgen-manage.1		\
 	ipa-cert-fix.1			\
+	ipa-idrange-fix.1		\
 	ipa-acme-manage.1		\
 	ipa-migrate.1			\
 	$(NULL)

@@ -20,8 +20,8 @@
 #  ->  "1.0.0"                                         #
 ########################################################
 define(IPA_VERSION_MAJOR, 4)
-define(IPA_VERSION_MINOR, 12)
-define(IPA_VERSION_RELEASE, 5)
+define(IPA_VERSION_MINOR, 13)
+define(IPA_VERSION_RELEASE, 0)
 
 ########################################################
 # For 'pre' releases the version will be               #
@@ -86,8 +86,8 @@ define(IPA_DATA_VERSION, 20100614120000)
 #                                                      #
 ########################################################
 define(IPA_API_VERSION_MAJOR, 2)
-# Last change: add keeponly option to batch command
-define(IPA_API_VERSION_MINOR, 254)
+# Last change: add key_type_size option to config
+define(IPA_API_VERSION_MINOR, 257)
 
 ########################################################
 # Following values are auto-generated from values above

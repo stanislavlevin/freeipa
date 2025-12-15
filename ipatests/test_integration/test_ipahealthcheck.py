@@ -18,7 +18,7 @@ import uuid
 
 import pytest
 
-from ipalib import x509
+from ipalib import errors, x509
 from ipapython.dn import DN
 from ipapython.ipaldap import realm_to_serverid
 from ipapython.certdb import NSS_SQL_FILES
@@ -26,6 +26,7 @@ from ipatests.pytest_ipa.integration import tasks
 from ipaplatform.paths import paths
 from ipaplatform.osinfo import osinfo
 from ipaserver.install.installutils import resolve_ip_addresses_nss
+from ipatests.test_integration.test_caless import CALessBase
 from ipatests.test_integration.base import IntegrationTest
 from packaging.version import parse as parse_version
 from ipatests.test_integration.test_cert import get_certmonger_fs_id
@@ -106,6 +107,7 @@ ipatrust_checks = [
     "IPATrustControllerServiceCheck",
     "IPATrustControllerConfCheck",
     "IPATrustControllerGroupSIDCheck",
+    "IPATrustControllerAdminSIDCheck",
     "IPATrustPackageCheck",
 ]
 
@@ -370,6 +372,16 @@ class TestIpaHealthCheck(IntegrationTest):
 
         https://pagure.io/freeipa/issue/8951
         """
+        healthcheck_version = tasks.get_healthcheck_version(self.master)
+        if (
+            parse_version(healthcheck_version) < parse_version("0.17")
+            and osinfo.id == 'rhel'
+            and osinfo.version_number == (10,0)
+        ):
+            # Patch: https://github.com/freeipa/freeipa-healthcheck/pull/349
+            pytest.skip("Patch is unavailable for RHEL 10.0 "
+                        "freeipa-healthcheck version 0.16 or less")
+
         returncode, check = run_healthcheck(self.master,
                                             source="ipahealthcheck.meta.core",
                                             check="MetaCheck",
@@ -377,21 +389,18 @@ class TestIpaHealthCheck(IntegrationTest):
                                             failures_only=False)
         assert returncode == 0
 
-        cmd = self.master.run_command(
-            [paths.FIPS_MODE_SETUP, "--is-enabled"], raiseonerr=False
-        )
-        returncode = cmd.returncode
+        is_fips_enabled = tasks.is_fips_enabled(self.master)
 
         assert "fips" in check[0]["kw"]
 
         if check[0]["kw"]["fips"] == "disabled":
-            assert returncode == 2
+            assert not is_fips_enabled
         elif check[0]["kw"]["fips"] == "enabled":
-            assert returncode == 0
-        elif check[0]["kw"]["fips"] == f"missing {paths.FIPS_MODE_SETUP}":
-            assert returncode == 127
+            assert is_fips_enabled
         else:
-            assert returncode == 1
+            raise ValueError("File %s doesn't exist or contains unexpected "
+                             "value, this is a kernel issue!"
+                             % paths.PROC_FIPS_ENABLED)
 
     def test_ipa_healthcheck_after_certupdate(self):
         """
@@ -450,11 +459,26 @@ class TestIpaHealthCheck(IntegrationTest):
         Testcase to verify checks available in
         ipahealthcheck.ipa.trust source
         """
-        result = self.master.run_command(
-            ["ipa-healthcheck", "--source", "ipahealthcheck.ipa.trust"]
-        )
-        for check in ipatrust_checks:
-            assert check in result.stdout_text
+        # earlier trust check used to return an empty SUCCESS message when
+        # trust is not configured.But now it actually returns a message
+        not_a_trust_agent = ["IPATrustAgentCheck", "IPATrustCatalogCheck",
+                             "IPAsidgenpluginCheck", "IPATrustAgentMemberCheck",
+                             "IPATrustDomainsCheck", "IPATrustPackageCheck"]
+
+        not_a_trust_controller = ["IPATrustControllerPrincipalCheck",
+                                  "IPATrustControllerServiceCheck",
+                                  "IPATrustControllerConfCheck",
+                                  "IPATrustControllerGroupSIDCheck",
+                                  "IPATrustControllerAdminSIDCheck"]
+
+        _returncode, data = run_healthcheck(
+            self.master, source="ipahealthcheck.ipa.trust")
+
+        for check in data:
+            if check["check"] in not_a_trust_agent:
+                assert "Skipped. Not a trust agent" in check["kw"]["msg"]
+            elif check["check"] in not_a_trust_controller:
+                assert "Skipped. Not a trust controller" in check["kw"]["msg"]
 
     def test_source_ipahealthcheck_meta_services_check(self, restart_service):
         """
@@ -554,8 +578,8 @@ class TestIpaHealthCheck(IntegrationTest):
         error_msg = "Request for certificate failed"
         additional_msg = (
             "Certificate operation cannot be completed: "
-            "Request failed with status 503: "
-            "Non-2xx response from CA REST API: 503.  (503)"
+            "Unable to communicate with CMS "
+            "(Failed to retrieve certificate: 503"
         )
         returncode, data = run_healthcheck(
             self.master, "ipahealthcheck.dogtag.ca",
@@ -568,7 +592,7 @@ class TestIpaHealthCheck(IntegrationTest):
             # pre ipa-healthcheck 0.11, the additional msg was in msg
             # but moved to "error" with 0.11+
             assert additional_msg in check["kw"]["msg"] or \
-                   additional_msg == check["kw"]["error"]
+                   additional_msg in check["kw"]["error"]
 
     def test_ipahealthcheck_ca_not_configured(self):
         """
@@ -1146,8 +1170,14 @@ class TestIpaHealthCheck(IntegrationTest):
         )
         entry = ldap.get_entry(dn)
         entry.single_value["nsslapd-logging-hr-timestamps-enabled"] = 'off'
-        ldap.update_entry(entry)
-
+        try:
+            ldap.update_entry(entry)
+        except errors.DatabaseError as e:
+            expected_msg = "Unknown attribute " \
+                           "nsslapd-logging-hr-timestamps-enabled"
+            if expected_msg in e.message:
+                pytest.skip(
+                    "389-ds removed nsslapd-logging-hr-timestamps-enabled")
         yield
 
         entry = ldap.get_entry(dn)
@@ -1219,6 +1249,9 @@ class TestIpaHealthCheck(IntegrationTest):
         This testcase checks that when ClonesConnectivyAndDataCheck
         is run it doesn't display source not found error
         """
+        if (tasks.get_pki_version(
+                self.master) >= tasks.parse_version('11.5.5')):
+            raise pytest.skip("PKI dropped ClonesConnectivyAndDataCheck")
         error_msg = (
             "Source 'pki.server.healthcheck.clones.connectivity_and_data' "
             "not found"
@@ -1396,7 +1429,7 @@ class TestIpaHealthCheck(IntegrationTest):
         msg = "[plugin:ipa] collecting path '{}'".format(HEALTHCHECK_LOG)
         cmd = self.master.run_command(
             [
-                "sosreport",
+                "sos", "report",
                 "-o",
                 "ipa",
                 "--case-id",
@@ -1499,7 +1532,7 @@ class TestIpaHealthCheck(IntegrationTest):
         caseid = "123456"
         self.master.run_command(
             [
-                "sosreport",
+                "sos", "report",
                 "-o",
                 "ipa",
                 "--case-id",
@@ -1509,6 +1542,48 @@ class TestIpaHealthCheck(IntegrationTest):
                 "--build",
             ]
         )
+
+    @pytest.fixture
+    def change_pwd_plugin_default(self):
+        """
+        Fixture to change the password plugin feature
+        to AllowNThash and change it to default
+        """
+        self.master.run_command(
+            [
+                "ipa", "config-mod", "--delattr",
+                "ipaconfigstring=KDC:Disable Last Success"
+            ]
+        )
+        yield
+        self.master.run_command(
+            [
+                "ipa", "config-mod", "--addattr",
+                "ipaconfigstring=KDC:Disable Last Success"
+            ]
+        )
+
+    def test_krbLastSuccessfulAuth_warning(self, change_pwd_plugin_default):
+        """
+        This test checks that warning message is displayed
+        when password plugin feature is modified to
+        AllowNThash
+        """
+        err_msg = (
+            "Last Successful Auth is enabled. "
+            "It may cause performance problems."
+        )
+        version = tasks.get_healthcheck_version(self.master)
+        if parse_version(version) < parse_version("0.18"):
+            pytest.skip("Check does not exist in ipa-healthcheck < 0.18")
+        returncode, data = run_healthcheck(
+            self.master, "ipahealthcheck.ipa.config",
+            "IPAkrbLastSuccessfulAuth",
+        )
+        assert returncode == 1
+        for check in data:
+            assert check["result"] == "WARNING"
+            assert check["kw"]["msg"] == err_msg
 
     @pytest.fixture
     def expire_cert_critical(self):
@@ -1536,7 +1611,6 @@ class TestIpaHealthCheck(IntegrationTest):
             assert check["kw"]["key"] == "DSCERTLE0002"
             assert "Expired Certificate" in check["kw"]["items"]
             assert check["kw"]["msg"] == msg
-
 
     def test_ipa_healthcheck_expiring(self, restart_service):
         """
@@ -1624,6 +1698,11 @@ class TestIpaHealthCheck(IntegrationTest):
             grace_date = cert_expiry - timedelta(days=10)
             grace_date = datetime.strftime(grace_date, "%Y-%m-%d 00:00:01 Z")
             self.master.run_command(['date', '-s', grace_date])
+
+            # Restart dirsrv as it doesn't like time jumps
+            instance = realm_to_serverid(self.master.domain.realm)
+            cmd = ["systemctl", "restart", "dirsrv@{}".format(instance)]
+            self.master.run_command(cmd)
 
             for check in ("IPACertmongerExpirationCheck",
                           "IPACertfileExpirationCheck",):
@@ -2458,6 +2537,12 @@ class TestIpaHealthCLI(IntegrationTest):
         )
         tasks.install_packages(cls.master, HEALTHCHECK_PKG)
         set_excludes(cls.master, "key", "DSCLE0004")
+        # Because of issue PKI#4906, skip the check ipahealthcheck.ipa.files
+        # TomcatFileCheck if random serial numbers are enabled
+        cs_cfg = cls.master.get_file_contents(paths.CA_CS_CFG_PATH,
+                                              encoding='utf-8')
+        if "dbs.cert.id.generator=random" in cs_cfg:
+            set_excludes(cls.master, "check", "TomcatFileCheck")
 
     def test_indent(self):
         """
@@ -3073,3 +3158,53 @@ class TestIpaHealthCheckSingleMaster(IntegrationTest):
         finally:
             # cleanup
             tasks.uninstall_master(self.master)
+
+
+class TestIPAHealthcheckWithCALess(CALessBase):
+    """
+    Install CALess server with user provided certificate.
+    """
+    num_replicas = 0
+
+    @classmethod
+    def install(cls, mh):
+        super(TestIPAHealthcheckWithCALess, cls).install(mh)
+        cls.create_pkcs12('ca1/server')
+        cls.prepare_cacert('ca1')
+        result = cls.install_server()
+        assert result.returncode == 0
+
+    @pytest.fixture
+    def expire_cert_warn(self):
+        """
+        Fixture to move the cert to about to expire, by moving the
+        system date using date -s command and revert it back
+        """
+        self.master.run_command(['date','-s', '+11Months10Days'])
+        yield
+        self.master.run_command(['date','-s', '-11Months10Days'])
+        self.master.run_command(['ipactl', 'restart'])
+
+    def test_ipahealthcheck_warns_on_expired_user_certs(self, expire_cert_warn):
+        """
+        This testcase checks that ipa-healthcheck warns
+        on expiring user-provided certificates.
+        """
+        msg = (
+            'Request id {key} expires in {days} days. '
+            'You need to manually renew this certificate.'
+        )
+        version = tasks.get_healthcheck_version(self.master)
+        if parse_version(version) < parse_version("0.18"):
+            pytest.skip("Check does not exist in ipa-healthcheck < 0.18")
+        returncode, data = run_healthcheck(
+            self.master, "ipahealthcheck.ipa.certs",
+            "IPAUserProvidedExpirationCheck",
+        )
+        assert returncode == 1
+        certs = [d["kw"]["key"] for d in data]
+        assert set(certs) == {'HTTP', 'LDAP', 'KDC'}
+        for check in data:
+            assert check["result"] == "WARNING"
+            assert check["kw"]["key"] in ("LDAP", "HTTP", "KDC")
+            assert check["kw"]["msg"] == msg

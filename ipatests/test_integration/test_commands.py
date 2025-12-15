@@ -24,6 +24,7 @@ from cryptography import x509
 from datetime import datetime, timedelta
 
 from ipalib.constants import IPAAPI_USER
+from ipalib.errors import DatabaseError
 
 from ipaplatform.paths import paths
 
@@ -38,6 +39,7 @@ from ipaplatform.tasks import tasks as platform_tasks
 from ipatests.create_external_ca import ExternalCA
 from ipatests.test_ipalib.test_x509 import good_pkcs7, badcert
 from ipapython.ipautil import realm_to_suffix, ipa_generate_password
+from ipatests.test_integration.test_topology import find_segment
 from ipaserver.install.installutils import realm_to_serverid
 from packaging.version import parse as parse_version
 
@@ -85,41 +87,146 @@ isrgrootx1 = (
 )
 isrgrootx1_nick = 'CN=ISRG Root X1,O=Internet Security Research Group,C=US'
 
-# This sub-CA expires on Sep 15, 2025 and will need to be replaced
+# This sub-CA expires on March 12, 2027 and will need to be replaced
 # after this date. Otherwise TestIPACommand::test_cacert_manage fails.
-letsencryptauthorityr3 = (
+letsencryptauthorityr12 = (
     b'-----BEGIN CERTIFICATE-----\n'
-    b'MIIFFjCCAv6gAwIBAgIRAJErCErPDBinU/bWLiWnX1owDQYJKoZIhvcNAQELBQAw\n'
+    b'MIIFBjCCAu6gAwIBAgIRAMISMktwqbSRcdxA9+KFJjwwDQYJKoZIhvcNAQELBQAw\n'
     b'TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh\n'
-    b'cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMjAwOTA0MDAwMDAw\n'
-    b'WhcNMjUwOTE1MTYwMDAwWjAyMQswCQYDVQQGEwJVUzEWMBQGA1UEChMNTGV0J3Mg\n'
-    b'RW5jcnlwdDELMAkGA1UEAxMCUjMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK\n'
-    b'AoIBAQC7AhUozPaglNMPEuyNVZLD+ILxmaZ6QoinXSaqtSu5xUyxr45r+XXIo9cP\n'
-    b'R5QUVTVXjJ6oojkZ9YI8QqlObvU7wy7bjcCwXPNZOOftz2nwWgsbvsCUJCWH+jdx\n'
-    b'sxPnHKzhm+/b5DtFUkWWqcFTzjTIUu61ru2P3mBw4qVUq7ZtDpelQDRrK9O8Zutm\n'
-    b'NHz6a4uPVymZ+DAXXbpyb/uBxa3Shlg9F8fnCbvxK/eG3MHacV3URuPMrSXBiLxg\n'
-    b'Z3Vms/EY96Jc5lP/Ooi2R6X/ExjqmAl3P51T+c8B5fWmcBcUr2Ok/5mzk53cU6cG\n'
-    b'/kiFHaFpriV1uxPMUgP17VGhi9sVAgMBAAGjggEIMIIBBDAOBgNVHQ8BAf8EBAMC\n'
-    b'AYYwHQYDVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMBIGA1UdEwEB/wQIMAYB\n'
-    b'Af8CAQAwHQYDVR0OBBYEFBQusxe3WFbLrlAJQOYfr52LFMLGMB8GA1UdIwQYMBaA\n'
-    b'FHm0WeZ7tuXkAXOACIjIGlj26ZtuMDIGCCsGAQUFBwEBBCYwJDAiBggrBgEFBQcw\n'
-    b'AoYWaHR0cDovL3gxLmkubGVuY3Iub3JnLzAnBgNVHR8EIDAeMBygGqAYhhZodHRw\n'
-    b'Oi8veDEuYy5sZW5jci5vcmcvMCIGA1UdIAQbMBkwCAYGZ4EMAQIBMA0GCysGAQQB\n'
-    b'gt8TAQEBMA0GCSqGSIb3DQEBCwUAA4ICAQCFyk5HPqP3hUSFvNVneLKYY611TR6W\n'
-    b'PTNlclQtgaDqw+34IL9fzLdwALduO/ZelN7kIJ+m74uyA+eitRY8kc607TkC53wl\n'
-    b'ikfmZW4/RvTZ8M6UK+5UzhK8jCdLuMGYL6KvzXGRSgi3yLgjewQtCPkIVz6D2QQz\n'
-    b'CkcheAmCJ8MqyJu5zlzyZMjAvnnAT45tRAxekrsu94sQ4egdRCnbWSDtY7kh+BIm\n'
-    b'lJNXoB1lBMEKIq4QDUOXoRgffuDghje1WrG9ML+Hbisq/yFOGwXD9RiX8F6sw6W4\n'
-    b'avAuvDszue5L3sz85K+EC4Y/wFVDNvZo4TYXao6Z0f+lQKc0t8DQYzk1OXVu8rp2\n'
-    b'yJMC6alLbBfODALZvYH7n7do1AZls4I9d1P4jnkDrQoxB3UqQ9hVl3LEKQ73xF1O\n'
-    b'yK5GhDDX8oVfGKF5u+decIsH4YaTw7mP3GFxJSqv3+0lUFJoi5Lc5da149p90Ids\n'
-    b'hCExroL1+7mryIkXPeFM5TgO9r0rvZaBFOvV2z0gp35Z0+L4WPlbuEjN/lxPFin+\n'
-    b'HlUjr8gRsI3qfJOQFy/9rKIJR0Y/8Omwt/8oTWgy1mdeHmmjk7j1nYsvC9JSQ6Zv\n'
-    b'MldlTTKB3zhThV1+XWYp6rjd5JW1zbVWEkLNxE7GJThEUG3szgBVGP7pSWTUTsqX\n'
-    b'nLRbwHOoq7hHwg==\n'
+    b'cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMjQwMzEzMDAwMDAw\n'
+    b'WhcNMjcwMzEyMjM1OTU5WjAzMQswCQYDVQQGEwJVUzEWMBQGA1UEChMNTGV0J3Mg\n'
+    b'RW5jcnlwdDEMMAoGA1UEAxMDUjEyMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB\n'
+    b'CgKCAQEA2pgodK2+lP474B7i5Ut1qywSf+2nAzJ+Npfs6DGPpRONC5kuHs0BUT1M\n'
+    b'5ShuCVUxqqUiXXL0LQfCTUA83wEjuXg39RplMjTmhnGdBO+ECFu9AhqZ66YBAJpz\n'
+    b'kG2Pogeg0JfT2kVhgTU9FPnEwF9q3AuWGrCf4yrqvSrWmMebcas7dA8827JgvlpL\n'
+    b'Thjp2ypzXIlhZZ7+7Tymy05v5J75AEaz/xlNKmOzjmbGGIVwx1Blbzt05UiDDwhY\n'
+    b'XS0jnV6j/ujbAKHS9OMZTfLuevYnnuXNnC2i8n+cF63vEzc50bTILEHWhsDp7CH4\n'
+    b'WRt/uTp8n1wBnWIEwii9Cq08yhDsGwIDAQABo4H4MIH1MA4GA1UdDwEB/wQEAwIB\n'
+    b'hjAdBgNVHSUEFjAUBggrBgEFBQcDAgYIKwYBBQUHAwEwEgYDVR0TAQH/BAgwBgEB\n'
+    b'/wIBADAdBgNVHQ4EFgQUALUp8i2ObzHom0yteD763OkM0dIwHwYDVR0jBBgwFoAU\n'
+    b'ebRZ5nu25eQBc4AIiMgaWPbpm24wMgYIKwYBBQUHAQEEJjAkMCIGCCsGAQUFBzAC\n'
+    b'hhZodHRwOi8veDEuaS5sZW5jci5vcmcvMBMGA1UdIAQMMAowCAYGZ4EMAQIBMCcG\n'
+    b'A1UdHwQgMB4wHKAaoBiGFmh0dHA6Ly94MS5jLmxlbmNyLm9yZy8wDQYJKoZIhvcN\n'
+    b'AQELBQADggIBAI910AnPanZIZTKS3rVEyIV29BWEjAK/duuz8eL5boSoVpHhkkv3\n'
+    b'4eoAeEiPdZLj5EZ7G2ArIK+gzhTlRQ1q4FKGpPPaFBSpqV/xbUb5UlAXQOnkHn3m\n'
+    b'FVj+qYv87/WeY+Bm4sN3Ox8BhyaU7UAQ3LeZ7N1X01xxQe4wIAAE3JVLUCiHmZL+\n'
+    b'qoCUtgYIFPgcg350QMUIWgxPXNGEncT921ne7nluI02V8pLUmClqXOsCwULw+PVO\n'
+    b'ZCB7qOMxxMBoCUeL2Ll4oMpOSr5pJCpLN3tRA2s6P1KLs9TSrVhOk+7LX28NMUlI\n'
+    b'usQ/nxLJID0RhAeFtPjyOCOscQBA53+NRjSCak7P4A5jX7ppmkcJECL+S0i3kXVU\n'
+    b'y5Me5BbrU8973jZNv/ax6+ZK6TM8jWmimL6of6OrX7ZU6E2WqazzsFrLG3o2kySb\n'
+    b'zlhSgJ81Cl4tv3SbYiYXnJExKQvzf83DYotox3f0fwv7xln1A2ZLplCb0O+l/AK0\n'
+    b'YE0DS2FPxSAHi0iwMfW2nNHJrXcY3LLHD77gRgje4Eveubi2xxa+Nmk/hmhLdIET\n'
+    b'iVDFanoCrMVIpQ59XWHkzdFmoHXHBV7oibVjGSO7ULSQ7MJ1Nz51phuDJSgAIU7A\n'
+    b'0zrLnOrAj/dfrlEWRhCvAgbuwLZX1A2sjNjXoPOHbsPiy+lO1KF8/XY7\n'
     b'-----END CERTIFICATE-----\n'
 )
-le_r3_nick = "CN=R3,O=Let's Encrypt,C=US"
+le_r12_nick = "CN=R12,O=Let's Encrypt,C=US"
+
+# Certificates for reproducing duplicate ipaCertSubject values.
+# The trick to creating the second intermediate is for the validity
+# period to be different. In this case the second CA certificate
+# was issued 3 years+1day after the original.
+originalsubjectchain = (
+    b'-----BEGIN CERTIFICATE-----\n'
+    b'MIIDcjCCAlqgAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwRDEeMBwGA1UECgwVQ2Vy\n'
+    b'dGlmaWNhdGUgU2hhY2sgTHRkMSIwIAYDVQQDDBlDZXJ0aWZpY2F0ZSBTaGFjayBS\n'
+    b'b290IENBMB4XDTIxMDgwNzE4MDQyNloXDTQxMDgwMTE4MDQyNlowTDEeMBwGA1UE\n'
+    b'CgwVQ2VydGlmaWNhdGUgU2hhY2sgTHRkMSowKAYDVQQDDCFDZXJ0aWZpY2F0ZSBT\n'
+    b'aGFjayBJbnRlcm1lZGlhdGUgQ0EwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK\n'
+    b'AoIBAQC2RNo7atuVWC/6tDCGforNFvvSFdUwqHxltFmg61i2hmdHAjTaYI1ZJdgB\n'
+    b'y7ApGc8RYc7tfaNrUNA8Chd/9Cu4eW2KuTnAozxytXQneNXloK2xb9iLIhETa1FC\n'
+    b'Hw5BbrmJSWjiVYQsM6bzeiFsKJs4qnP1T9iFHuqmggTtCTPajoYhn6ZKfK3pmB8P\n'
+    b'6XRcp5O9vUhNHJWdpuUjOL32fsBEpV0vKWlsemqDhJrhzj3+YCKt6xrSdpK64HUW\n'
+    b'Kf3YM/K4G6vU5M8DgSFex6T1u2vCsQYJ4Mv8LVCho8awTZoBsimy1tiM0V7GmmBE\n'
+    b'0Uck/U0381NBpNYdv7eyF682SbihAgMBAAGjZjBkMB0GA1UdDgQWBBTtHQCp1dBF\n'
+    b'ypsegtWcXhXDdopIgDAfBgNVHSMEGDAWgBRJuz/14J1ZXqvpOuikJJ62NtuiGTAS\n'
+    b'BgNVHRMBAf8ECDAGAQH/AgEBMA4GA1UdDwEB/wQEAwIBhjANBgkqhkiG9w0BAQsF\n'
+    b'AAOCAQEAkCBm6u+k/x4QoqqwOJvy8sjq7bUCh73qNPAFlqVSSB8UdCyu21EaXCj8\n'
+    b'dbZa3GNRGk6JACTEUVQ1SD8SkC1E1/IWuEzYOKOP6FmTFbC4V5zU9LAnGFJapS6Q\n'
+    b'CGwU2F44oflBbfOodFznqKPPuENX0gmm4ddvoT915WUOvVLKLuVujkU/ffGKAc8U\n'
+    b'RxRIJ3W2Ybjs9ANg7JqB3Ny8i5QAGHzjRVwU+IgTrJCYPS2DrRYtN3glKBTlyKyR\n'
+    b'xMy0PVKwVo/ItDO3fZ0fsAiIO+4pI51A0lFge5Bg/DzsotZxcWhdTelWjYI9JNca\n'
+    b'y2GPzV1wlxK+ui1uLCWEvKbPtaCfeQ==\n'
+    b'-----END CERTIFICATE-----\n'
+    b'-----BEGIN CERTIFICATE-----\n'
+    b'MIIDeTCCAmGgAwIBAgIUUbo+eGRT5jiS2eIoEzRhXaUx4gwwDQYJKoZIhvcNAQEL\n'
+    b'BQAwRDEeMBwGA1UECgwVQ2VydGlmaWNhdGUgU2hhY2sgTHRkMSIwIAYDVQQDDBlD\n'
+    b'ZXJ0aWZpY2F0ZSBTaGFjayBSb290IENBMB4XDTIxMDgwNzE4MDQyNloXDTQxMDgw\n'
+    b'MjE4MDQyNlowRDEeMBwGA1UECgwVQ2VydGlmaWNhdGUgU2hhY2sgTHRkMSIwIAYD\n'
+    b'VQQDDBlDZXJ0aWZpY2F0ZSBTaGFjayBSb290IENBMIIBIjANBgkqhkiG9w0BAQEF\n'
+    b'AAOCAQ8AMIIBCgKCAQEArh41PPmI6rg7nz3cRqsbCqGgD3+vAD4DNs/Cnp+vhM//\n'
+    b'7Di8FuMoyyLDpD+RdT/Vkvh2Xhp+OcjYSFLX8xeFRy0blfzel2Tq7PiD83BwewsG\n'
+    b'BOarlhkbQGxlGxkr4Fi6z0kNNAfbE2ZzBIs4XSppm7xl4YJyLQD0FkzdrU+zrZuK\n'
+    b'3ELQzk3UWfSSrnbYABY2LBgkny5m7y/kJOMyqn+/T1CUthXD3OpGtyQm2kuEooDZ\n'
+    b'xP1eq30gS8oGYAw2nR/8vJPuyeZaMxM4eNLuc35uq8/6pI+xNEpzGt7xAk1ul/xc\n'
+    b'ewOY2kjh4KJCNK/nCjALzxqhNRHhnH8bA6xtOcgdBwIDAQABo2MwYTAdBgNVHQ4E\n'
+    b'FgQUSbs/9eCdWV6r6TropCSetjbbohkwHwYDVR0jBBgwFoAUSbs/9eCdWV6r6Tro\n'
+    b'pCSetjbbohkwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAYYwDQYJKoZI\n'
+    b'hvcNAQELBQADggEBAC35stv/1WZhWblRTZP3XHhH0usHRGTUY7zNSrgS5sb3ERsf\n'
+    b'hgbmFbomra5jKaBqffToOZKLEo+n3tfIPokus35NUQn7ox/6qPp0rJEK8dfLx9jA\n'
+    b'0VTqREbgaAf5xLaX874++OTiM1sPVYG3Egsb1A/YCtDek8mZkKk21g+DZlFMOSDl\n'
+    b'Hw+c3gZUnv6bIT8P09z+9yca2Lvg/dpj2ln3PbOykXzwuGSoNxjUt2OSdCbwyN+f\n'
+    b'hO4NFtDvx74Ggi5bcTrz0ZKO6g8SQotii7cSKAdpIWDpXl8cfsK3SRbkCsg+Fg1S\n'
+    b'kMJEFyDEkKu8Qe6zwKXIAoeKULLO6ADgFVH9CmM=\n'
+    b'-----END CERTIFICATE-----\n'
+)
+interm_nick = "CN=Certificate Shack Intermediate CA,O=Certificate Shack Ltd"
+intermediate_serial = "4096"
+
+duplicatesubject = (
+    b'-----BEGIN CERTIFICATE-----\n'
+    b'MIIDcjCCAlqgAwIBAgICEAEwDQYJKoZIhvcNAQELBQAwRDEeMBwGA1UECgwVQ2Vy\n'
+    b'dGlmaWNhdGUgU2hhY2sgTHRkMSIwIAYDVQQDDBlDZXJ0aWZpY2F0ZSBTaGFjayBS\n'
+    b'b290IENBMB4XDTI0MDgwODE4MDQyNloXDTQ0MDgwMjE4MDQyNlowTDEeMBwGA1UE\n'
+    b'CgwVQ2VydGlmaWNhdGUgU2hhY2sgTHRkMSowKAYDVQQDDCFDZXJ0aWZpY2F0ZSBT\n'
+    b'aGFjayBJbnRlcm1lZGlhdGUgQ0EwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK\n'
+    b'AoIBAQCzUmUBEO/w1wslS8H304/qfsbeIJX0C5Tm8K2H9JXoauFFej1GZoHqeE+x\n'
+    b'YQvSMuMFcKks3ps9+9yVKuBPtMwbmXsqwlQXORU8DuKhtRzKIOj7nEGw6AQIsfkG\n'
+    b'Q4DjD1ytXliyM7vVfxYD+P1CFDK4NR+K1JLdi3WkYOdCelOQMwNspN/ebiqvwonl\n'
+    b'2asQ6+a13Y0ln1AdrLBvqtR5Z+Gq5+tiC5tA+LKea0e3neQGKjfp/BNPJ+ooNHPR\n'
+    b'86iKDjBKAabvfrHLG2t6oo9+N4xRBGtPYQh9LOQPZ4OedciCo1s2zs+F+4/6co6T\n'
+    b'DsbQt7NJKQ3BJKosvZBhC62lc4evAgMBAAGjZjBkMB0GA1UdDgQWBBTvALT5i2gq\n'
+    b'8yq2Uh8lZGgMoKVClzAfBgNVHSMEGDAWgBRJuz/14J1ZXqvpOuikJJ62NtuiGTAS\n'
+    b'BgNVHRMBAf8ECDAGAQH/AgEBMA4GA1UdDwEB/wQEAwIBhjANBgkqhkiG9w0BAQsF\n'
+    b'AAOCAQEAVjx1aGNK08/Nhf0JYMxMb9Dqg5m7LNOVBs1jurPtwS3uN+84997GRqIQ\n'
+    b'i+gp/tQVF2YT/RAmt+X0aDLFiSkBcOk87zoFRkR7PZrhhtPo6pSVMN7ngD4/dmp9\n'
+    b'ESbiI8+iF5ZxqI7c3o2N/LtZpi+hWSCJ/xwbOl05jpNQ6ddl+UzDpJ0oNsyndiJA\n'
+    b'yciaCvluK027J4xNym166lqwm6CqiOkm8R/G6NJrEH2Xs5XBCyfeH9V0pkXDbrUe\n'
+    b'Ldqc9ys7l7/MGZi6Qg2nA7J8ErCkrI6eZOocJktSF6SRfXd1NqiqCiNZZQjD6XKZ\n'
+    b'4fMKTKPX6Q2k10iriAIn4RgVjzM05A==\n'
+    b'-----END CERTIFICATE-----\n'
+)
+duplicate_serial = "4097"
+
+
+@pytest.fixture()
+def expire_password():
+    """
+    Fixture to expire a user's password far into the future past
+    2038, then revert time back.
+    """
+    hosts = dict()
+
+    def _expire_password(host):
+        hosts['host'] = host
+        tasks.move_date(host, 'stop', '+20Years')
+        host.run_command(
+            ['ipactl', 'restart', '--ignore-service-failures']
+        )
+
+    yield _expire_password
+
+    host = hosts.pop('host')
+    # Prior to uninstall remove all the cert tracking to prevent
+    # errors from certmonger trying to check the status of certs
+    # that don't matter because we are uninstalling.
+    host.run_command(['systemctl', 'stop', 'certmonger'])
+    # Important: run_command with a str argument is able to
+    # perform shell expansion but run_command with a list of
+    # arguments is not
+    host.run_command('rm -fv ' + paths.CERTMONGER_REQUESTS_DIR + '*')
+    tasks.uninstall_master(host)
+    tasks.move_date(host, 'start', '-20Years')
 
 
 class TestIPACommand(IntegrationTest):
@@ -825,6 +932,12 @@ class TestIPACommand(IntegrationTest):
                 paths.IPA_CACERT_MANAGE,
                 'install',
                 filename])
+        # remove the subject of good_pkcs7 we just added to avoid
+        # future failures.
+        self.master.run_command([
+            paths.IPA_CACERT_MANAGE,
+            'delete',
+            'CN=Certificate Authority,O=EXAMPLE.COM'])
 
         for contents in (badcert,):
             self.master.put_file_contents(filename, contents)
@@ -1145,7 +1258,7 @@ class TestIPACommand(IntegrationTest):
                result.stderr_text
 
         # Install 3rd party CA's, Let's Encrypt in this case
-        for cert in (isrgrootx1, letsencryptauthorityr3):
+        for cert in (isrgrootx1, letsencryptauthorityr12):
             certfile = os.path.join(self.master.config.test_dir, 'cert.pem')
             self.master.put_file_contents(certfile, cert)
             result = self.master.run_command(
@@ -1158,7 +1271,7 @@ class TestIPACommand(IntegrationTest):
             raiseonerr=False
         )
         assert result.returncode != 0
-        assert "Verifying \'%s\' failed. Removing part of the " \
+        assert "Verifying removal of \'%s\' failed. Removing part of the " \
                "chain? certutil: certificate is invalid: Peer's " \
                "Certificate issuer is not recognized." \
                % isrgrootx1_nick in result.stderr_text
@@ -1172,7 +1285,7 @@ class TestIPACommand(IntegrationTest):
 
         # deletion of a subca
         result = self.master.run_command(
-            ['ipa-cacert-manage', 'delete', le_r3_nick],
+            ['ipa-cacert-manage', 'delete', le_r12_nick],
             raiseonerr=False
         )
         assert result.returncode == 0
@@ -1269,93 +1382,6 @@ class TestIPACommand(IntegrationTest):
         serverid = realm_to_serverid(self.master.domain.realm)
         return ("dirsrv@%s.service" % serverid)
 
-    def test_ipa_nis_manage_enable(self):
-        """
-        This testcase checks if ipa-nis-manage enable
-        command enables plugin on an IPA master
-        """
-        dirsrv_service = self.get_dirsrv_id()
-        console_msg = (
-            "Enabling plugin\n"
-            "This setting will not take effect until "
-            "you restart Directory Server.\n"
-            "The rpcbind service may need to be started"
-        )
-        status_msg = "Plugin is enabled"
-        tasks.kinit_admin(self.master)
-        result = self.master.run_command(
-            ["ipa-nis-manage", "enable"],
-            stdin_text=self.master.config.admin_password,
-        )
-        assert console_msg in result.stdout_text
-        # verify using backend
-        conn = self.master.ldap_connect()
-        dn = DN(('cn', 'NIS Server'), ('cn', 'plugins'), ('cn', 'config'))
-        entry = conn.get_entry(dn)
-        nispluginstring = entry.get('nsslapd-pluginEnabled')
-        assert 'on' in nispluginstring
-        # restart for changes to take effect
-        self.master.run_command(["systemctl", "restart", dirsrv_service])
-        self.master.run_command(["systemctl", "restart", "rpcbind"])
-        time.sleep(DIRSRV_SLEEP)
-        # check status msg on the console
-        result = self.master.run_command(
-            ["ipa-nis-manage", "status"],
-            stdin_text=self.master.config.admin_password,
-        )
-        assert status_msg in result.stdout_text
-
-    def test_ipa_nis_manage_disable(self):
-        """
-        This testcase checks if ipa-nis-manage disable
-        command disable plugin on an IPA Master
-        """
-        dirsrv_service = self.get_dirsrv_id()
-        msg = (
-            "This setting will not take effect "
-            "until you restart Directory Server."
-        )
-        status_msg = "Plugin is not enabled"
-        tasks.kinit_admin(self.master)
-        result = self.master.run_command(
-            ["ipa-nis-manage", "disable"],
-            stdin_text=self.master.config.admin_password,
-        )
-        assert msg in result.stdout_text
-        # verify using backend
-        conn = self.master.ldap_connect()
-        dn = DN(('cn', 'NIS Server'), ('cn', 'plugins'), ('cn', 'config'))
-        entry = conn.get_entry(dn)
-        nispluginstring = entry.get('nsslapd-pluginEnabled')
-        assert 'off' in nispluginstring
-        # restart dirsrv for changes to take effect
-        self.master.run_command(["systemctl", "restart", dirsrv_service])
-        time.sleep(DIRSRV_SLEEP)
-        # check status msg on the console
-        result = self.master.run_command(
-            ["ipa-nis-manage", "status"],
-            stdin_text=self.master.config.admin_password,
-            raiseonerr=False,
-        )
-        assert result.returncode == 4
-        assert status_msg in result.stdout_text
-
-    def test_ipa_nis_manage_enable_incorrect_password(self):
-        """
-        This testcase checks if ipa-nis-manage enable
-        command throws error on console for invalid DS admin password
-        """
-        msg1 = "Insufficient access: "
-        msg2 = "Invalid credentials"
-        result = self.master.run_command(
-            ["ipa-nis-manage", "enable"],
-            stdin_text='Invalid_pwd',
-            raiseonerr=False,
-        )
-        assert result.returncode == 1
-        assert msg1 in result.stderr_text
-        assert msg2 in result.stderr_text
-
     def test_pkispawn_log_is_present(self):
         """
         This testcase checks if pkispawn logged properly.
@@ -1378,6 +1404,42 @@ class TestIPACommand(IntegrationTest):
         assert len(pkispawnlog) > 1024
         assert "DEBUG" in pkispawnlog
         assert "INFO" in pkispawnlog
+
+    def test_password_lock_ldap_logs(self):
+        """
+        Test that when a user fails LDAP authentication while in lockout
+        that it is logged.
+        """
+        user = 'ldapuser'
+        password = 'Secret123'
+        bad_password = 'foo'
+        basedn = self.master.domain.basedn
+        binddn = DN(f"uid={user},cn=users,cn=accounts,{basedn}")
+
+        tasks.kinit_admin(self.master)
+        tasks.create_active_user(
+            self.master, user, password=password
+        )
+
+        serverid = realm_to_serverid(self.master.domain.realm)
+        log_file = '/var/log/dirsrv/slapd-{}/errors'.format(serverid)
+
+        logsize = len(self.master.get_file_contents(log_file))
+
+        # Lock out the user on master
+        for _i in range(0, 7):
+            tasks.kinit_user(self.master, user, bad_password, raiseonerr=False)
+
+        conn = self.master.ldap_connect()
+        try:
+            conn.simple_bind(binddn, f"{password}")
+        except DatabaseError:
+            # This is expected
+            pass
+
+        error_log = self.master.get_file_contents(log_file)[logsize:]
+
+        assert b'Too many failed authentication attempts' in error_log
 
     def test_reset_password_unlock(self):
         """
@@ -1625,28 +1687,212 @@ class TestIPACommand(IntegrationTest):
         assert result.returncode == 1
         assert 'cannot be deleted or disabled' in result.stderr_text
 
-    def test_ipa_cacert_manage_prune(self):
-        """Test for ipa-cacert-manage prune"""
+    def test_ipa_systemd_journal(self):
+        """
+        This testcase checks that administrative user credentials
+        is not leaked to journald log
+        """
+        tasks.kinit_admin(self.master)
+        tasks.kinit_admin(self.replicas[0])
+        tasks.kinit_admin(self.clients[0])
+        cmds = [
+            ['/usr/sbin/ipa-adtrust-install', '-a',
+             self.master.config.admin_password, '-U'],
+            ['/usr/sbin/ipa-replica-manage', 'del',
+             f"dummyhost.{self.master.domain.name}", '-p',
+             self.master.config.dirman_password],
+            ['/usr/sbin/ipa-csreplica-manage', 'del',
+             f"dummyhost.{self.master.domain.name}", '-p',
+             self.master.config.dirman_password],
+            ['/usr/sbin/ipa-kra-install', '-p',
+             self.master.config.dirman_password, '-U'],
+            ['/usr/sbin/ipa-server-certinstall', '-k', '--pin',
+             self.master.config.dirman_password, '-p',
+             self.master.config.dirman_password, paths.KDC_CERT,
+             paths.KDC_KEY]
+        ]
+        for cmd in cmds:
+            self.master.run_command(cmd, raiseonerr=False)
+            tasks.check_journal_does_not_contain_secret(
+                self.master, cmd[0]
+            )
+        for cmd in cmds:
+            self.replicas[0].run_command(cmd, raiseonerr=False)
+            tasks.check_journal_does_not_contain_secret(
+                self.replicas[0], cmd[0]
+            )
+        tasks.check_journal_does_not_contain_secret(
+            self.clients[0], 'python3'
+        )
+        # Backup and restore IPA and check secrets are not leaked.
+        backup_path = tasks.get_backup_dir(self.master)
+        restore_cmd = (
+            ['/usr/sbin/ipa-restore', '-p',
+             self.master.config.dirman_password,
+             backup_path, '-U']
+        )
+        self.master.run_command(restore_cmd)
 
-        certfile = os.path.join(self.master.config.test_dir, 'cert.pem')
-        self.master.put_file_contents(certfile, isrgrootx1)
+        # re-initializing topology after restore
+        for topo_suffix in 'domain', 'ca':
+            topo_name = find_segment(self.master, self.replicas[0], topo_suffix)
+            arg = ['ipa', 'topologysegment-reinitialize',
+                   topo_suffix, topo_name]
+            if topo_name.split('-to-', maxsplit=1)[0] != self.master.hostname:
+                arg.append('--left')
+            else:
+                arg.append('--right')
+            self.replicas[0].run_command(arg)
+
+        # wait sometime for re-initialization
+        tasks.wait_for_replication(self.replicas[0].ldap_connect())
+
+        tasks.check_journal_does_not_contain_secret(
+            self.master, restore_cmd[0]
+        )
+        # Checking for secrets in IPA server install
+        tasks.check_journal_does_not_contain_secret(
+            self.master, '/usr/sbin/ipa-server-install'
+        )
+        # Checking for secrets in IPA replica install
+        tasks.check_journal_does_not_contain_secret(
+            self.replicas[0], '/usr/sbin/ipa-replica-install'
+        )
+
+    def test_ipa_cacert_manage_duplicate_certsubject(self):
+        """Test for ipa-cacert-manage install with duplicated
+           certificate subjects. This relies on the behavior
+           of NSS to show the certificates separately rather than
+           lumping the duplicates together. This requires different
+           validity periods, say 3 years + 1 day.
+        """
+
+        certfile = os.path.join(self.master.config.test_dir, 'chain.pem')
+        self.master.put_file_contents(certfile, originalsubjectchain)
         result = self.master.run_command(
             [paths.IPA_CACERT_MANAGE, 'install', certfile])
 
-        certs_before_prune = self.master.run_command(
+        certs = self.master.run_command(
             [paths.IPA_CACERT_MANAGE, 'list'], raiseonerr=False
         ).stdout_text
 
-        assert isrgrootx1_nick in certs_before_prune
+        assert f"{interm_nick}  {intermediate_serial}" in certs
 
-        # Jump in time to make sure the cert is expired
-        self.master.run_command(['date', '-s', '+15Years'])
+        certfile = os.path.join(self.master.config.test_dir, 'interm.pem')
+        self.master.put_file_contents(certfile, duplicatesubject)
         result = self.master.run_command(
-            [paths.IPA_CACERT_MANAGE, 'prune'], raiseonerr=False
-        ).stdout_text
-        self.master.run_command(['date', '-s', '-15Years'])
+            [paths.IPA_CACERT_MANAGE, 'install', certfile])
 
-        assert isrgrootx1_nick in result
+        certs = self.master.run_command(
+            [paths.IPA_CACERT_MANAGE, 'list'], raiseonerr=False
+        ).stdout_text
+
+        # If the duplicate subject certificates are not sufficiently
+        # different in validity period, or prior to the this fix,
+        # the test will fail because only one of the duplicately named
+        # subject certificates will be visible: the second one (4097).
+        assert f"{interm_nick}  {intermediate_serial}" in certs
+        assert f"{interm_nick}  {duplicate_serial}" in certs
+
+        # Make sure we can install the new certs systemwide
+        # No assertions needed, it will work or it won't
+        self.master.run_command(["ipa-certupdate"])
+
+        # delete one of the duplicate subjects, no serial number
+        result = self.master.run_command(
+            ['ipa-cacert-manage', 'delete', interm_nick],
+            raiseonerr=False
+        )
+        assert result.returncode == 1
+        assert 'Multiple matching certificates' in result.stderr_text
+
+        # delete one of the duplicate subjects by the serial number
+        result = self.master.run_command(
+            ['ipa-cacert-manage', 'delete', interm_nick,
+             '--serial', intermediate_serial,],
+            raiseonerr=False
+        )
+        assert result.returncode == 0
+
+        certs = self.master.run_command(
+            [paths.IPA_CACERT_MANAGE, 'list'], raiseonerr=False
+        ).stdout_text
+
+        assert f"{interm_nick}  {intermediate_serial}" not in certs
+        assert f"{interm_nick}  {duplicate_serial}" in certs
+
+    def test_ipa_force_server(self):
+        """
+        Test ipa command with --force-server option
+        Do ping to a replica from the master, verify that the ipa tool
+        connected to the replica
+        """
+        tasks.kinit_admin(self.master)
+        replica = self.replicas[0]
+
+        result = self.master.run_command(
+            ["ipa", "--force-server", replica.hostname, "--debug", "ping"],
+        )
+        assert replica.hostname in result.stderr_text
+
+        # test with invalid server
+        failresult = self.master.run_command(
+            ["ipa",
+             "--force-server",
+             '1' + str(replica.hostname),
+             "--debug",
+             "ping"],
+            raiseonerr=False
+        )
+        assert '[Errno -2] Name or service not known' in failresult.stderr_text
+
+        # test with not running valid server
+        self.master.run_command(
+            ["systemctl", "stop", "ipa"]
+        )
+        failresult = self.master.run_command(
+            ["ipa",
+             "--force-server",
+             self.master.hostname,
+             "--debug",
+             "ping"],
+            raiseonerr=False
+        )
+        assert '[Errno 111] Connection refused' in failresult.stderr_text
+        self.master.run_command(
+            ["systemctl", "start", "ipa"]
+        )
+
+    def test_expiration_date_post_2038(self, expire_password):
+        """Test that expiration dates after 2038 function without
+           overflow.
+        """
+        testuser = 'testuser2038'
+        password = 'Secret@123'
+
+        tasks.kinit_admin(self.master)
+        tasks.user_add(self.master, testuser, password=password)
+        self.master.run_command([
+            'ipa', 'user-mod', testuser, '--password-expiration',
+            '20381112175322Z',
+        ])
+
+        tasks.kdestroy_all(self.master)
+        expire_password(self.master)
+
+        new_password = "%s\n%s\n%s\n" % (password,
+                                         password,
+                                         password)
+
+        # kinit_user will pass in the "password" value as stdin. We
+        # should see a prompt about an expired password and set a new
+        # one (to the same thing). If this kinit succeeds then the
+        # expiration date was honored and a new one can be set. Time will
+        # be restored on return from this function.
+        tasks.kinit_user(self.master, testuser, new_password)
+
+        # This must be the last test in this class because it moves
+        # time and uninstalls the server when it is finished.
 
 
 class TestIPACommandWithoutReplica(IntegrationTest):
@@ -1682,10 +1928,9 @@ class TestIPACommandWithoutReplica(IntegrationTest):
         self.master.run_command(['ipa', 'user-show', 'ipauser1'])
 
     def test_basesearch_compat_tree(self):
-        """Test ldapsearch against compat tree is working
-
+        """
+        Test ldapsearch against compat tree is working
         This to ensure that ldapsearch with base scope is not failing.
-
         related: https://bugzilla.redhat.com/show_bug.cgi?id=1958909
         """
         version = self.master.run_command(
@@ -1882,6 +2127,62 @@ class TestIPACommandWithoutReplica(IntegrationTest):
         )
         assert old_err_msg not in dirsrv_error_log
         assert re.search(new_err_msg, dirsrv_error_log)
+
+    @pytest.fixture
+    def update_ipaconfigstring(self):
+        """
+        This fixture stores the value of ipaconfigstring parameter
+        and reverts to the initial value
+        """
+        ldap = self.master.ldap_connect()
+        dn = DN(
+            ("cn", "ipaconfig"), ('cn', 'etc'),
+            self.master.domain.basedn
+        )
+        entry = ldap.get_entry(dn)
+        val = entry.get("ipaconfigstring")
+        yield
+
+        # re-read the entry as the value may have been changed by the test
+        entry = ldap.get_entry(dn)
+        entry["ipaconfigstring"] = val
+        ldap.update_entry(entry)
+
+    def test_empty_ipaconfigstring(self, update_ipaconfigstring):
+        """
+        Test for https://pagure.io/freeipa/issue/9794
+
+        Test that setting an empty ipaconfigstring does not fail.
+        Subsequent calls to ipa subid-stats should also succeed.
+        """
+        self.master.run_command(['ipa', 'config-mod', "--ipaconfigstring="])
+        self.master.run_command(['ipa', 'subid-stats'])
+
+    def test_ipa_cacert_manage_prune(self):
+        """Test for ipa-cacert-manage prune
+
+           This twiddles with time so should be run last in the class.
+        """
+
+        certfile = os.path.join(self.master.config.test_dir, 'cert.pem')
+        self.master.put_file_contents(certfile, isrgrootx1)
+        result = self.master.run_command(
+            [paths.IPA_CACERT_MANAGE, 'install', certfile])
+
+        certs_before_prune = self.master.run_command(
+            [paths.IPA_CACERT_MANAGE, 'list'], raiseonerr=False
+        ).stdout_text
+
+        assert isrgrootx1_nick in certs_before_prune
+
+        # Jump in time to make sure the cert is expired
+        self.master.run_command(['date', '-s', '+15Years'])
+        result = self.master.run_command(
+            [paths.IPA_CACERT_MANAGE, 'prune'], raiseonerr=False
+        ).stdout_text
+        self.master.run_command(['date', '-s', '-15Years'])
+
+        assert isrgrootx1_nick in result
 
     def test_unique_krbcanonicalname(self):
         """Verify that the uniqueness for krbcanonicalname is working"""

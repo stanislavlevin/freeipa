@@ -122,7 +122,7 @@ class TestIDPKeycloak(IntegrationTest):
         tasks.kinit_admin(self.master)
         cmd = ["ipa", "idp-add", "keycloakidp", "--provider=keycloak",
                "--client-id=ipa_oidc_client", "--org=master",
-               "--base-url={0}:8443/auth".format(self.client.hostname)]
+               "--base-url={0}:8443".format(self.client.hostname)]
         self.master.run_command(cmd, stdin_text="{0}\n{0}".format(
             self.client.config.admin_password))
         tasks.user_add(self.master, 'keycloakuser',
@@ -217,7 +217,7 @@ class TestIDPKeycloak(IntegrationTest):
             assert "User keycloakuser may run the following commands" in test
             assert "/usr/bin/yum" in test
             kinit_idp(self.client, 'keycloakuser', self.client)
-            test_sudo = 'su -c "sudo yum list yum" keycloakuser'
+            test_sudo = 'su -c "sudo yum list sssd-client" keycloakuser'
             self.client.run_command(test_sudo)
             list_fail = self.master.run_command(cmd).stdout_text
             assert "User keycloakuser is not allowed to run sudo" in list_fail
@@ -282,7 +282,7 @@ class TestIDPKeycloak(IntegrationTest):
         user = "backupuser"
         cmd = ["ipa", "idp-add", "testidp", "--provider=keycloak",
                "--client-id=ipa_oidc_client", "--org=master",
-               "--base-url={0}:8443/auth".format(self.client.hostname)]
+               "--base-url={0}:8443".format(self.client.hostname)]
         self.master.run_command(cmd, stdin_text="{0}\n{0}".format(
             self.client.config.admin_password))
 

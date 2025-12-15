@@ -126,7 +126,7 @@ If no template is specified, the template name "SubCA" is used.
 File containing the IPA CA certificate and the external CA certificate chain. The file is accepted in PEM and DER certificate and PKCS#7 certificate chain formats. This option may be used multiple times.
 .TP
 \fB\-\-random\-serial\-numbers\fR
-Enable Random Serial Numbers. Random serial numbers cannot be used in a mixed environment. Either all CA's have it enabled or none do.
+Enable Random Serial Numbers (RSN) and certificate pruning. This option is enabled by default if the system is installed with a 389-ds version that supports LMDB or if another CA in the topology is configured with Random Serial Numbers. This option remains present to avoid issues with automation. In mixed environments where existing CA servers are configured with sequential numbers, it is recommended to replace the sequential servers as soon as reasonably possible.
 .TP
 \fB\-\-no\-pkinit\fR
 Disables pkinit setup steps.
@@ -172,6 +172,9 @@ The subject base for certificates issued by IPA (default O=REALM.NAME). RDNs are
 .TP
 \fB\-\-ca\-signing\-algorithm\fR=\fIALGORITHM\fR
 Signing algorithm of the IPA CA certificate. Possible values are SHA1withRSA, SHA256withRSA, SHA384withRSA, SHA512withRSA. Default value is SHA256withRSA. Use this option with --external-ca if the external CA does not support the default signing algorithm.
+.TP
+\fB\-\-key\-type\-size\fR=\fITYPE:SIZE\fR
+Specifies the key type and size for the HTTP, LDAP, PKINIT and RA certificates (if configured with a CA). The format is type:size where type is the type of key and size is the number represents the number of bits. Currently type only supports RSA keys. The sizes will depend on what the crypto engines and CA profiles support. Typical RSA sizes are 2048, 3072, 4096, 7168 and 8192. The default is rsa:2048.
 
 .SS "HSM OPTIONS"
 .TP
@@ -252,6 +255,22 @@ Disable DNSSEC validation on this server.
 .TP
 \fB\-\-allow\-zone\-overlap\fR
 Allow creation of (reverse) zone even if the zone is already resolvable. Using this option is discouraged as it result in later problems with domain name resolution.
+.TP
+\fB\-\-dns\-over\-tls\fR
+Configure DNS over TLS.
+.TP
+\fB\-\-dot\-forwarder\fR=\fIIP_ADDRESS#HOSTNAME\fR
+Add a DNS-over-TLS-enabled forwarder in the format of ip#hostname, e.g.: 1.2.3.4#dns.example.com. This option can be used multiple times.
+.TP
+\fB\-\-dns\-over\-tls\-cert\fR=\fIFILE\fR
+Certificate to use for DNS over TLS. If empty, a new certificate will be requested from IPA CA.
+.TP
+\fB\-\-dns\-over\-tls\-key\fR=\fIFILE\fR
+Key for the certificate specified in --dns-over-tls-key.
+.TP
+\fB\-\-dns\-policy\fR=\fIrelaxed|enforced\fR
+Encrypted DNS policy. If enforced, DNS communications will only be allowed through the configured encrypted DNS methods. If relaxed,
+unencrypted DNS queries will be allowed.
 
 .SS "SID GENERATION OPTIONS"
 .TP

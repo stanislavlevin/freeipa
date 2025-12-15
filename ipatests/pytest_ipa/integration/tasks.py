@@ -795,15 +795,22 @@ def remove_trust_info_from_ad(master, ad_domain, ad_hostname):
     kinit_as_user(master,
                   'Administrator@{}'.format(ad_domain.upper()),
                   master.config.ad_admin_password)
+    # Find cache for the user
+    cache_args = []
+    cache = get_credential_cache(master)
+    if cache:
+        cache_args = ["--use-krb5-ccache", cache]
+
     # Detect whether rpcclient supports -k or --use-kerberos option
     res = master.run_command(['rpcclient', '-h'], raiseonerr=False)
     if "--use-kerberos" in res.stderr_text:
         rpcclient_krb5_knob = "--use-kerberos=desired"
     else:
         rpcclient_krb5_knob = "-k"
-    master.run_command(['rpcclient', rpcclient_krb5_knob, ad_hostname,
-                        '-c', 'deletetrustdom {}'.format(master.domain.name)],
-                       raiseonerr=False)
+    cmd_args = ['rpcclient', rpcclient_krb5_knob, ad_hostname]
+    cmd_args.extend(cache_args)
+    cmd_args.extend(['-c', 'deletetrustdom {}'.format(master.domain.name)])
+    master.run_command(cmd_args, raiseonerr=False)
 
 
 def configure_auth_to_local_rule(master, ad):
@@ -1084,6 +1091,16 @@ def kinit_user(host, user, password, raiseonerr=True):
 def kinit_admin(host, raiseonerr=True):
     return kinit_user(host, 'admin', host.config.admin_password,
                       raiseonerr=raiseonerr)
+
+
+def get_credential_cache(host):
+    # Return the credential cache currently in use on host or None
+    result = host.run_command(["klist"]).stdout_text
+    pattern = re.compile(r'Ticket cache: (?P<cache>.*)\n')
+    res = pattern.search(result)
+    if res:
+        return res['cache']
+    return None
 
 
 def uninstall_master(host, ignore_topology_disconnect=True,
@@ -1379,7 +1396,7 @@ def two_connected_topo(master, replicas):
             i += 1
 
     except IndexError:
-        return
+        pass
 
 
 @_topo('double-circle')
@@ -2732,6 +2749,28 @@ def get_package_version(host, pkgname):
     return get_package_version
 
 
+def get_package_version_and_release(host, pkgname):
+    """
+    Get package version-release on remote host
+    """
+    platform = get_platform(host)
+    if platform in ("rhel", "fedora"):
+        cmd = host.run_command(
+            ["rpm", "-qa", "--qf", "%{VERSION}-%{RELEASE}", pkgname]
+        )
+        get_package_version = cmd.stdout_text
+        if not get_package_version:
+            raise ValueError(
+                "get_package_version: "
+                "pkgname package is not installed"
+            )
+    else:
+        raise ValueError(
+            "get_package_version: unknown platform %s" % platform
+        )
+    return get_package_version
+
+
 def get_openldap_client_version(host):
     """Get openldap-clients version on remote host"""
     return get_package_version(host, 'openldap-clients')
@@ -2965,3 +3004,13 @@ def copy_files(source_host, dest_host, filelist):
         dest_host.transport.mkdir_recursive(os.path.dirname(file))
         data = source_host.get_file_contents(file)
         dest_host.transport.put_file_contents(file, data)
+
+
+def check_journal_does_not_contain_secret(host, cmd):
+    """
+    Helper to check journal logs doesnt reveal secrets
+    """
+    journalctl_cmd = ['journalctl', '-t', cmd, '-n1', '-o', 'json-pretty']
+    result = host.run_command(journalctl_cmd, raiseonerr=False)
+    assert (host.config.admin_password not in result.stdout_text)
+    assert (host.config.dirman_password not in result.stdout_text)

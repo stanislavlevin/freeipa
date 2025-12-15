@@ -1,9 +1,13 @@
 srpm:
 	# Setup development environment
 	echo "Installing base development environment"
-	dnf install -y dnf-plugins-core
+	dnf install -y dnf5-plugins git-core
 	echo "Installing FreeIPA development dependencies"
-	dnf builddep -y --skip-broken --spec freeipa.spec.in --best --allowerasing --setopt=install_weak_deps=False
+	cp freeipa.spec.in freeipa.spec
+	dnf builddep -y --best --allowerasing --setopt=install_weak_deps=False freeipa.spec > ${outdir}/builddep.log 2>&1
+
+	# Fetch webui
+	git submodule update --init --recursive
 
 	# Run autoconf
 	autoreconf -i

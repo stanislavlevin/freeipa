@@ -19,6 +19,28 @@ STRIP_OP_ATTRS = [
     'nsuniqueid',
     'dsentrydn',
     'entryuuid',
+    'entrydn',
+    'entryid',
+    'entryusn',
+    'numsubordinates',
+    'parentid',
+    'tombstonenumsubordinates'
+]
+
+# Operational attributes that we would want to remove from the local entry if
+# they don't exist in the remote entry
+POLICY_OP_ATTRS = [
+    'nsaccountlock',
+    'passwordexpiratontime',
+    'passwordgraceusertime',
+    'pwdpolicysubentry',
+    'passwordexpwarned',
+    'passwordretrycount',
+    'retrycountresettime',
+    'accountunlocktime',
+    'passwordhistory',
+    'passwordallowchangetime',
+    'pwdreset'
 ]
 
 # Atributes to strip from users/groups
@@ -49,6 +71,7 @@ IGNORE_ATTRS = [
     'serverhostname',
     'krbpasswordexpiration',
     'krblastadminunlock',
+    'krbpwdpolicyreference',  # COS attribute
 ]
 
 # For production mode, bring everything over
@@ -94,6 +117,8 @@ AD_TRUST_ATTRS = [  # ipaNTTrustedDomain objectclass
     'ipantadditionalsuffixes',
 ]
 
+STATE_OPTIONS = ('adcsn-', 'mdcsn-', 'vucsn-', 'vdcsn-')
+
 DNA_REGEN_VAL = "-1"
 
 DNA_REGEN_ATTRS = [
@@ -110,7 +135,7 @@ STRIP_OC = [
 #
 # The DS_CONFIG mapping breaks each config entry (or type of entry) into its
 # own catagory. Each catagory, or type, as DN list "dn", the attributes# we
-# are intrested in.  These attributes are broken into singel valued "attrs",
+# are intrested in.  These attributes are broken into single valued "attrs",
 # or multi-valued attributes "multivalued".  If the attributes is single
 # valued then the value is replaced, if it's multivalued then it is "appended"
 #
@@ -503,30 +528,6 @@ DS_CONFIG = {
 }
 
 #
-# Slpai NIS is an optional plugin.  It requires special handling
-#
-NIS_PLUGIN = {
-    'dn': 'cn=NIS Server,cn=plugins,cn=config',
-    'attrs': [
-        'nis-domain',
-        'nis-base',
-        'nis-map',
-        'nis-filter',
-        'nis-key-format:',
-        'nis-values-format:',
-        'nis-secure',
-        'nis-disallowed-chars',
-        # Parent plugin entry
-        'nsslapd-pluginarg0',
-        'nsslapd-pluginenabled'
-    ],
-    'multivalued': [],
-    'label': 'NIS Server Plugin',
-    'mode': 'all',
-    'count': 0,
-}
-
-#
 # This mapping is simliar to above but it handles container entries
 # This could be built into the above mapping using the "comma" approach
 #
@@ -564,6 +565,12 @@ DS_INDEXES = {
 # of entries, otherwise it's a single entry.  These two are used together to
 # identify the entry.
 # The "label" and "count" attributes are used for the Summary Report
+#
+# Some entries use ipaUniqueId as the RDN attribute, this makes comparing
+# entries between the remote and local servers problematic. So we need special
+# identifying information to find the local entry. In this case we use the
+# "alt_id" key which is a dict of an attribute 'attr' and partial base DN
+# 'base' - which is expected to end in a comma.
 #
 DB_OBJECTS = {
     # Plugins
@@ -640,8 +647,8 @@ DB_OBJECTS = {
         'oc': ['ipaconfigobject', 'ipaguiconfig'],
         'subtree': 'cn=ipaconfig,cn=etc,$SUFFIX',
         'special_attrs': [
-            # needs special handling, but
-            # ipa-server-upgrade rewrites this attribute anyway!
+            # needs special handling, but ipa-server-upgrade rewrites this
+            # attribute anyway!
             ('ipausersearchfields', 'list'),
         ],
         'label': 'IPA Config',
@@ -772,11 +779,16 @@ DB_OBJECTS = {
         'mode': 'all',
         'count': 0,
     },
-    'subids': {  # unknown what these entries look like TODO
+    'subids': {
         'oc': [],
         'subtree': ',cn=subids,cn=accounts,$SUFFIX',
         'label': 'Sub IDs',
-        'mode': 'all',  # TODO Maybe production only?
+        'mode': 'production',
+        'alt_id': {
+            'attr': 'ipaOwner',
+            'isDN': True,
+            'base': 'cn=subids,cn=accounts,',
+        },
         'count': 0,
     },
 
@@ -836,7 +848,7 @@ DB_OBJECTS = {
         'oc': ['ipantdomainattrs'],
         'subtree': ',cn=ad,cn=etc,$SUFFIX',
         'label': 'AD',
-        'mode': 'all',
+        'mode': 'production',
         'count': 0,
     },
 
@@ -853,7 +865,7 @@ DB_OBJECTS = {
     'pbac_priv': {
         'oc': ['groupofnames'],
         'subtree': ',cn=privileges,cn=pbac,$SUFFIX',
-        'label': 'Privledges',
+        'label': 'Privileges',
         'mode': 'all',
         'count': 0,
     },
@@ -884,6 +896,11 @@ DB_OBJECTS = {
         'oc': ['ipahbacrule'],
         'subtree': ',cn=hbac,$SUFFIX',
         'label': 'HBAC Rules',
+        'alt_id': {
+            'attr': 'cn',
+            'base': 'cn=hbac,',
+            'isDN': False,
+        },
         'mode': 'all',
         'count': 0,
     },
@@ -892,6 +909,11 @@ DB_OBJECTS = {
     'selinux_usermap': {  # Not sure if this is needed, entry is empty  TODO
         'oc': [],
         'subtree': ',cn=usermap,cn=selinux,$SUFFIX',
+        'alt_id': {
+            'attr': 'cn',
+            'base': 'cn=usermap,cn=selinux,',
+            'isDN': False,
+        },
         'label': 'Selinux Usermaps',
         'mode': 'all',
         'count': 0,
@@ -902,12 +924,27 @@ DB_OBJECTS = {
         'oc': ['ipasudorule'],
         'subtree': ',cn=sudorules,cn=sudo,$SUFFIX',
         'label': 'Sudo Rules',
+        'alt_id': {
+            'attr': 'cn',
+            'base': 'cn=sudorules,cn=sudo,',
+            'isDN': False,
+        },
+        'special_attrs': [
+            # schema defines sudoOrder as mutlivalued, but we need to treat
+            # it as single valued
+            ('sudoorder', 'single'),
+        ],
         'mode': 'all',
         'count': 0,
     },
     'sudo_cmds': {
         'oc': ['ipasudocmd'],
         'subtree': ',cn=sudocmds,cn=sudo,$SUFFIX',
+        'alt_id': {
+            'attr': 'sudoCmd',
+            'base': 'cn=sudocmds,cn=sudo,',
+            'isDN': False,
+        },
         'label': 'Sudo Commands',
         'mode': 'all',
         'count': 0,
@@ -935,7 +972,7 @@ DB_OBJECTS = {
         'count': 0,
     },
     'dns_records': {
-        'oc': ['idnsrecord', 'idnszone'],
+        'oc': ['idnsrecord', 'idnszone', 'idnsforwardzone'],
         'subtree': ',cn=dns,$SUFFIX',
         'label': 'DNS Records',
         'mode': 'all',
@@ -991,6 +1028,11 @@ DB_OBJECTS = {
         'oc': ['ipanisnetgroup'],
         'not_oc': ['mepmanagedentry'],
         'subtree': ',cn=ng,cn=alt,$SUFFIX',
+        'alt_id': {
+            'attr': 'cn',
+            'base': 'cn=ng,cn=alt,',
+            'isDN': False,
+        },
         'label': 'Network Groups',
         'mode': 'all',
         'count': 0,
@@ -1006,9 +1048,14 @@ DB_OBJECTS = {
         'count': 0,
     },
     'caacls': {
-        'oc': ['top'],
+        'oc': ['ipacaacl'],
         'subtree': ',cn=caacls,cn=ca,$SUFFIX',
-        'label': 'CA Certificates',
+        'alt_id': {
+            'attr': 'cn',
+            'base': 'cn=caacls,cn=ca,',
+            'isDN': False,
+        },
+        'label': 'CA Certificate ACLs',
         'mode': 'all',
         'count': 0,
     },

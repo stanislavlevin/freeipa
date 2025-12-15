@@ -27,7 +27,7 @@ No arguments.
 * ipauserobjectclasses : :ref:`Str<Str>`
 * ipapwdexpadvnotify : :ref:`Int<Int>`
 * ipaconfigstring : :ref:`StrEnum<StrEnum>`
- * Values: ('AllowNThash', 'KDC:Disable Last Success', 'KDC:Disable Lockout', 'KDC:Disable Default Preauth for SPNs', 'EnforceLDAPOTP')
+ * Values: ('AllowNThash', 'KDC:Disable Last Success', 'KDC:Disable Lockout', 'KDC:Disable Default Preauth for SPNs', 'EnforceLDAPOTP', 'SubID:Disable')
 * ipaselinuxusermaporder : :ref:`Str<Str>`
 * ipaselinuxusermapdefault : :ref:`Str<Str>`
 * ipakrbauthzdata : :ref:`StrEnum<StrEnum>`
@@ -42,6 +42,7 @@ No arguments.
 * add_sids : :ref:`Flag<Flag>`
  * Default: False
 * netbios_name : :ref:`Str<Str>`
+* ipaservicekeytypesize : :ref:`Str<Str>`
 * setattr : :ref:`Str<Str>`
 * addattr : :ref:`Str<Str>`
 * delattr : :ref:`Str<Str>`

@@ -123,9 +123,11 @@ def make_netbios_name(s):
 def map_Guests_to_nobody():
     env = {'LC_ALL': 'C'}
     args = [paths.NET, '-s', '/dev/null', 'groupmap', 'add',
-            'sid=S-1-5-32-546', 'unixgroup=nobody', 'type=builtin']
+            'sid=S-1-5-32-546',
+            'unixgroup="' + constants.NOBODY_GROUP + '"', 'type=builtin']
 
-    logger.debug("Map BUILTIN\\Guests to a group 'nobody'")
+    logger.debug("Map BUILTIN\\Guests to a group '%s'",
+                 constants.NOBODY_GROUP)
     ipautil.run(args, env=env, raiseonerr=False, capture_error=True)
 
 
@@ -960,7 +962,7 @@ class ADTRUSTInstance(service.Service):
         # in /var/lib/samba and /var/lib/samba/private
         for smbpath in (paths.SAMBA_DIR,
                         os.path.join(paths.SAMBA_DIR, "private"),
-                        os.path.join(paths.SAMBA_DIR, "lock")):
+                        paths.SAMBA_LOCKDIR):
             if os.path.isdir(smbpath):
                 tdb_files = [
                     os.path.join(smbpath, tdb_file)

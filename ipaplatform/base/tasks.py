@@ -228,7 +228,7 @@ class BaseTaskNamespace:
 
         raise NotImplementedError()
 
-    def modify_nsswitch_pam_stack(self, sssd, mkhomedir, fstore, statestore,
+    def modify_nsswitch_pam_stack(self, sssd, mkhomedir, statestore,
                                   sudo=True, subid=False):
         """
         If sssd flag is true, configure pam and nsswitch so that SSSD is used
@@ -237,31 +237,6 @@ class BaseTaskNamespace:
         Otherwise, configure pam and nsswitch to leverage pure LDAP.
         """
 
-        raise NotImplementedError()
-
-    def enable_nsswitch_automount(self, statestore):
-        """
-        Sets automount database in nsswitch.conf to 'sss' as a primary service.
-
-        RHEL-based distros rely on default master map configuration which
-        includes option '+auto.master':
-        > Additionally, a map may be included from its source as if it were
-          itself present in the master map by including a line of the form:
-          +[maptype,format:]map[options]
-        Thereby, all the services specified in nsswitch.conf are searched for
-        master map whilst only a first found master map will be used if
-        '+auto.master' is not set.
-
-        ALTLinux's default configuration for autofs doesn't contain
-        '+auto.master'. This and the incorrect order of nsswitch configuration
-        for automount results in IPA's automount mappings are ignored.
-        """
-        raise NotImplementedError()
-
-    def disable_nsswitch_automount(self, statestore):
-        """
-        Restores back automount database in nsswitch.conf
-        """
         raise NotImplementedError()
 
     def modify_pam_to_use_krb5(self, statestore):
@@ -343,9 +318,6 @@ class BaseTaskNamespace:
         raise NotImplementedError()
 
     def configure_http_gssproxy_conf(self, ipauser):
-        raise NotImplementedError()
-
-    def configure_ipa_gssproxy_dir(self):
         raise NotImplementedError()
 
     def remove_httpd_service_ipa_conf(self):
@@ -567,5 +539,30 @@ class BaseTaskNamespace:
             statestore.delete_state(
                 'ipa-client-automount-nsswitch', 'previous-automount'
             )
+
+    def get_masterkey_enctype(self):
+        return 'aes256-sha2'
+
+    # Encryption types allowed for Kerberos keys
+    def get_supported_enctypes(self):
+        return ('aes256-sha2:special', 'aes128-sha2:special',
+                'aes256-sha2:normal', 'aes128-sha2:normal',
+                'aes256-cts:special', 'aes128-cts:special',
+                'aes256-cts:normal', 'aes128-cts:normal',
+                'camellia256-cts:special', 'camellia128-cts:special',
+                'camellia256-cts:normal', 'camellia128-cts:normal')
+
+    # Encryption types used in the past, not supported anymore
+    def get_removed_supported_enctypes(self):
+        return ('des3-hmac-sha1:special')
+
+    # Encryption types used by default when generating Kerberos keys
+    def get_default_enctypes(self):
+        return ('aes256-sha2:special', 'aes128-sha2:special',
+                'aes256-cts:special', 'aes128-cts:special')
+
+    # Encryption types no longer used by default when generating keys
+    def get_removed_default_enctypes(self):
+        return ('des3-hmac-sha1:special', 'arcfour-hmac:special')
 
 tasks = BaseTaskNamespace()

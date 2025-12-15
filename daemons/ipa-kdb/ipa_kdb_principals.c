@@ -22,6 +22,7 @@
 
 #include "ipa_kdb.h"
 #include "ipa_krb5.h"
+#include <stdlib.h>
 #include <unicase.h>
 
 /*
@@ -107,7 +108,6 @@ static char *std_principal_obj_classes[] = {
     "krbprincipal",
     "krbprincipalaux",
     "krbTicketPolicyAux",
-
     NULL
 };
 
@@ -261,22 +261,64 @@ done:
 static int ipadb_ldap_attr_to_key_data(LDAP *lcontext, LDAPMessage *le,
                                        char *attrname,
                                        krb5_key_data **result, int *num,
-                                       krb5_kvno *res_mkvno)
+                                       krb5_kvno *mkvno)
 {
-    struct berval **vals;
-    int mkvno;
+    struct berval **vals, **p;
+    krb5_key_data *cur_res = NULL, *fin_res = NULL, *tmp_res;
+    int fin_mkvno = 0, cur_mkvno, cur_num, fin_num = 0;
     int ret;
 
     vals = ldap_get_values_len(lcontext, le, attrname);
-    if (!vals) {
+    if (!vals)
         return ENOENT;
+
+    for (p = vals; *p; ++p) {
+        ret = ber_decode_krb5_key_data(*p, &cur_mkvno, &cur_num, &cur_res);
+        if (ret)
+            goto end;
+
+        /* All keys in a principal entry should be encrypted with the same
+         * master key. */
+        if (fin_mkvno == 0) {
+            fin_mkvno = cur_mkvno;
+        } else if (cur_mkvno != fin_mkvno) {
+            ret = EINVAL;
+            goto end;
+        }
+
+        if (!fin_res) {
+            fin_res = cur_res;
+        } else {
+            tmp_res = realloc(fin_res, (fin_num + cur_num) * sizeof(*fin_res));
+            if (!tmp_res) {
+                ret = ENOMEM;
+                goto end;
+            } else {
+                fin_res = tmp_res;
+            }
+
+            memcpy(fin_res + fin_num, cur_res, cur_num * sizeof(*fin_res));
+            free(cur_res);
+        }
+
+        cur_res = NULL;
+        fin_num += cur_num;
     }
 
-    ret = ber_decode_krb5_key_data(vals[0], &mkvno, num, result);
-    ldap_value_free_len(vals);
-    if (ret == 0) {
-        *res_mkvno = mkvno;
+    if (mkvno)
+        *mkvno = fin_mkvno;
+    if (num)
+        *num = fin_num;
+    if (result) {
+        *result = fin_res;
+    } else {
+        free(fin_res);
     }
+
+end:
+    ldap_value_free_len(vals);
+    if (cur_res && fin_res != cur_res)
+        free(cur_res);
     return ret;
 }
 
@@ -319,14 +361,16 @@ static void ipadb_validate_otp(struct ipadb_context *ipactx,
     if (dn == NULL)
         return;
     count = asprintf(&filter, ftmpl, dn, datetime, datetime);
-    ldap_memfree(dn);
-    if (count < 0)
+    if (count < 0) {
+        ldap_memfree(dn);
         return;
+    }
 
     /* Fetch the active token list. */
     kerr = ipadb_simple_search(ipactx, ipactx->base, LDAP_SCOPE_SUBTREE,
                                filter, (char**) attrs, &res);
     free(filter);
+    filter = NULL;
     if (kerr != 0 || res == NULL)
         return;
 
@@ -334,10 +378,60 @@ static void ipadb_validate_otp(struct ipadb_context *ipactx,
     count = ldap_count_entries(ipactx->lcontext, res);
     ldap_msgfree(res);
 
-    /* If the user is configured for OTP, but has no active tokens, remove
-     * OTP from the list since the user obviously can't log in this way. */
-    if (count == 0)
+    /*
+     * If there are no valid tokens then we need to remove the OTP flag,
+     * unless OTP is the only auth type allowed...
+     */
+    if (count == 0) {
+        /* Remove the OTP flag for now */
         *ua &= ~IPADB_USER_AUTH_OTP;
+
+        if (*ua == 0) {
+            /*
+             * Ok, we "only" allow OTP, so if there is an expired/disabled
+             * token then add back the OTP flag as the server will double
+             * check the validity and reject the entire bind. Otherwise, this
+             * is the first time the user is authenticating and the user
+             * should be allowed to bind using its password
+             */
+            static const char *expired_ftmpl = "(&"
+                "(objectClass=ipaToken)(ipatokenOwner=%s)"
+                "(|(ipatokenNotAfter<=%s)(!(ipatokenNotAfter=*))"
+                "(ipatokenDisabled=True))"
+            ")";
+            if (asprintf(&filter, expired_ftmpl, dn, datetime) < 0) {
+                ldap_memfree(dn);
+                return;
+            }
+
+            krb5_klog_syslog(LOG_INFO,
+                "Entry (%s) does not have a valid token and only OTP "
+                "authentication is supported, checking for expired tokens...",
+                dn);
+
+            kerr = ipadb_simple_search(ipactx, ipactx->base, LDAP_SCOPE_SUBTREE,
+                                       filter, (char**) attrs, &res);
+            free(filter);
+            if (kerr != 0 || res == NULL) {
+                ldap_memfree(dn);
+                return;
+            }
+
+            if (ldap_count_entries(ipactx->lcontext, res) > 0) {
+                /*
+                 * Ok we only allow OTP, and there are expired/disabled tokens
+                 * so add the OTP flag back, and the server will reject the
+                 * bind
+                 */
+                krb5_klog_syslog(LOG_INFO,
+                    "Entry (%s) does have an expired/disabled token so this "
+                    "user can not fall through to password auth", dn);
+                *ua |= IPADB_USER_AUTH_OTP;
+            }
+            ldap_msgfree(res);
+        }
+    }
+    ldap_memfree(dn);
 }
 
 static void ipadb_validate_radius(struct ipadb_context *ipactx,
@@ -2047,7 +2141,8 @@ void ipadb_free_principal(krb5_context kcontext, krb5_db_entry *entry)
                 for (i = 0; (acl_list != NULL) && (acl_list[i] != NULL); i++) {
                     free(acl_list[i]);
                 }
-                free(acl_list);
+                /* prev->tl_data_contents will be removed below */
+                acl_list = NULL;
             }
             free(prev->tl_data_contents);
             free(prev);
@@ -2462,15 +2557,26 @@ static krb5_error_code ipadb_get_mkvno_from_tl_data(krb5_tl_data *tl_data,
     return 0;
 }
 
+static int desc_key_data(const void *a, const void *b)
+{
+    const krb5_key_data *ka = a;
+    const krb5_key_data *kb = b;
+
+    return ka->key_data_kvno != kb->key_data_kvno
+        ? kb->key_data_kvno - ka->key_data_kvno
+        : kb->key_data_type[0] - ka->key_data_type[0];
+}
+
 static krb5_error_code ipadb_get_ldap_mod_key_data(struct ipadb_mods *imods,
                                                    krb5_key_data *key_data,
                                                    int n_key_data, int mkvno,
                                                    int mod_op)
 {
     krb5_error_code kerr;
-    struct berval *bval = NULL;
+    krb5_key_data *kvno_kdata;
+    struct berval **bvals = NULL;
     LDAPMod *mod;
-    int ret;
+    int i, j, begin, n_kvno;
 
     /* If the key data is empty, remove all keys. */
     if (n_key_data == 0 || key_data == NULL) {
@@ -2489,19 +2595,56 @@ static krb5_error_code ipadb_get_ldap_mod_key_data(struct ipadb_mods *imods,
         return 0;
     }
 
-    ret = ber_encode_krb5_key_data(key_data, n_key_data, mkvno, &bval);
-    if (ret != 0) {
-        kerr = ret;
+    /* Copy key list. */
+    kvno_kdata = calloc(n_key_data, sizeof(*kvno_kdata));
+    if (!kvno_kdata)
+        return ENOMEM;
+
+    memcpy(kvno_kdata, key_data, n_key_data * sizeof(*kvno_kdata));
+
+    /* Make sure the key list is sorted by KVNO and enctype. */
+    qsort(kvno_kdata, n_key_data, sizeof(*kvno_kdata), desc_key_data);
+
+    /* Count number of distinct KVNOs. */
+    for (i = 1, n_kvno = 1; i < n_key_data; ++i) {
+        if (kvno_kdata[i - 1].key_data_kvno != kvno_kdata[i].key_data_kvno)
+            ++n_kvno;
+    }
+
+    bvals = calloc(n_kvno, sizeof(*bvals));
+    if (!bvals) {
+        kerr = ENOMEM;
         goto done;
     }
 
-    kerr = ipadb_get_ldap_mod_bvalues(imods, "krbPrincipalKey",
-                                      &bval, 1, mod_op);
+    /* Add a "krbPrincipalKey" attribute for each KVNO. */
+    for (i = 0, j = 0, begin = 0; i < n_key_data; ++i) {
+        if (kvno_kdata[begin].key_data_kvno != kvno_kdata[i].key_data_kvno) {
+            kerr = ber_encode_krb5_key_data(kvno_kdata + begin, i - begin,
+                                            mkvno, bvals + j);
+            if (kerr)
+                goto done;
+
+            begin = i;
+            ++j;
+        }
+    }
+
+    kerr = ber_encode_krb5_key_data(kvno_kdata + begin, i - begin, mkvno,
+                                    bvals + j);
+    if (kerr)
+        goto done;
+
+    kerr = ipadb_get_ldap_mod_bvalues(imods, "krbPrincipalKey", bvals, n_kvno,
+                                      mod_op);
 
 done:
-    if (kerr) {
-        ber_bvfree(bval);
+    if (kerr && bvals) {
+        for (i = 0; i < n_kvno; ++i)
+            ber_bvfree(bvals[i]);
+        free(bvals);
     }
+    free(kvno_kdata);
     return kerr;
 }
 

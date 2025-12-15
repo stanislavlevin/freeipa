@@ -44,6 +44,7 @@ class DebianPathNamespace(BasePathNamespace):
     OPENSSL_DIR = "/usr/lib/ssl"
     OPENSSL_CERTS_DIR = "/usr/lib/ssl/certs"
     OPENSSL_PRIVATE_DIR = "/usr/lib/ssl/private"
+    SAMBA_LOCKDIR = "/run/samba"
     ETC_DEBIAN_VERSION = "/etc/debian_version"
     # Old versions of freeipa wrote all trusted certificates to a single
     # file, which is not supported by ca-certificates.
@@ -99,6 +100,7 @@ class DebianPathNamespace(BasePathNamespace):
     IPA_HTTPD_PASSWD_READER = "/usr/lib/ipa/ipa-httpd-pwdreader"
     IPA_PKI_WAIT_RUNNING = "/usr/lib/ipa/ipa-pki-wait-running"
     HTTPD = "/usr/sbin/apache2ctl"
+    FONTS_DIR = "/usr/share/fonts/truetype"
     FONTS_OPENSANS_DIR = "/usr/share/fonts/truetype/open-sans"
     FONTS_FONTAWESOME_DIR = "/usr/share/fonts/truetype/font-awesome"
     VAR_KERBEROS_KRB5KDC_DIR = "/var/lib/krb5kdc/"

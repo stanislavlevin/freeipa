@@ -28,6 +28,7 @@ import re
 import shutil
 import sys
 import time
+import textwrap
 
 import ldap
 import six
@@ -50,7 +51,7 @@ from ipapython.admintool import ScriptError
 import ipalib
 from ipalib import api, errors
 from ipalib.constants import IPA_CA_RECORD
-from ipalib.install import dnsforwarders
+from ipalib.install import dnsforwarders, certmonger
 from ipaplatform import services
 from ipaplatform.tasks import tasks
 from ipaplatform.constants import constants
@@ -642,7 +643,7 @@ class DnsBackup:
 
 
 class BindInstance(service.Service):
-    def __init__(self, fstore=None, api=api, ntp_role=False):
+    def __init__(self, fstore=None, api=api):
         super(BindInstance, self).__init__(
             "named",
             service_desc="DNS",
@@ -663,25 +664,42 @@ class BindInstance(service.Service):
         self.sub_dict = None
         self.reverse_zones = ()
         self.named_conflict = services.service('named-conflict', api)
-        self.ntp_role = ntp_role
 
     suffix = ipautil.dn_attribute_property('_suffix')
 
     def setup(self, fqdn, ip_addresses, realm_name, domain_name, forwarders,
               forward_policy, reverse_zones, zonemgr=None,
-              no_dnssec_validation=False):
+              no_dnssec_validation=False, dns_over_tls=False,
+              dns_over_tls_cert=None, dns_over_tls_key=None,
+              dns_policy=None):
         """Setup bindinstance for installation
         """
         self.setup_templating(
             fqdn=fqdn,
             realm_name=realm_name,
             domain_name=domain_name,
-            no_dnssec_validation=no_dnssec_validation
+            no_dnssec_validation=no_dnssec_validation,
+            dns_over_tls=dns_over_tls,
+            dns_over_tls_cert=dns_over_tls_cert,
+            dns_over_tls_key=dns_over_tls_key,
+            dns_policy=dns_policy
         )
         self.ip_addresses = ip_addresses
         self.forwarders = forwarders
         self.forward_policy = forward_policy
         self.reverse_zones = reverse_zones
+
+        self.sstore.backup_state("dns_over_tls", "enabled", dns_over_tls)
+        self.sstore.backup_state("unbound", "running",
+                                 services.knownservices["unbound"].is_running())
+        self.sstore.backup_state("unbound", "enabled",
+                                 services.knownservices["unbound"].is_enabled())
+        self.sstore.backup_state("dnsconfd", "running",
+                                 services.knownservices["dnsconfd"]
+                                 .is_running())
+        self.sstore.backup_state("dnsconfd", "enabled",
+                                 services.knownservices["dnsconfd"]
+                                 .is_enabled())
 
         if not zonemgr:
             self.zonemgr = 'hostmaster.%s' % normalize_zone(self.domain)
@@ -689,7 +707,9 @@ class BindInstance(service.Service):
             self.zonemgr = normalize_zonemgr(zonemgr)
 
     def setup_templating(
-        self, fqdn, realm_name, domain_name, no_dnssec_validation=None
+        self, fqdn, realm_name, domain_name, no_dnssec_validation=None,
+        dns_over_tls=None, dns_over_tls_cert=None, dns_over_tls_key=None,
+        dns_policy=None
     ):
         """Setup bindinstance for templating
         """
@@ -699,6 +719,10 @@ class BindInstance(service.Service):
         self.host = fqdn.split(".")[0]
         self.suffix = ipautil.realm_to_suffix(self.realm)
         self.no_dnssec_validation = no_dnssec_validation
+        self.dns_over_tls = dns_over_tls
+        self.dns_over_tls_cert = dns_over_tls_cert
+        self.dns_over_tls_key = dns_over_tls_key
+        self.dns_policy = dns_policy
         self._setup_sub_dict()
 
     @property
@@ -761,9 +785,6 @@ class BindInstance(service.Service):
             self.step("setting up records for other masters", self.__add_others)
         # all zones must be created before this step
         self.step("adding NS record to the zones", self.__add_self_ns)
-        if self.ntp_role:
-            self.step("adding dns ntp record", self.__add_ntp_record)
-
         # The service entry is used for LDAPI autobind. The keytab is no
         # longer used to authenticate the server. The server still needs
         # the keytab to handle incoming nsupdate requests with TSIG.
@@ -781,7 +802,6 @@ class BindInstance(service.Service):
             "changing resolv.conf to point to ourselves",
             self.setup_resolv_conf
         )
-        self.step("disable chroot for bind", self.__disable_chroot)
         self.start_creation()
 
     def start_named(self):
@@ -877,6 +897,24 @@ class BindInstance(service.Service):
         else:
             crypto_policy = "// not available"
 
+        if self.dns_over_tls:
+            named_tls_conf = textwrap.dedent("""\
+                tls local-tls {{
+                    \tkey-file "{}";
+                    \tcert-file "{}";
+                }};
+            """).format(self.dns_over_tls_key, self.dns_over_tls_cert)
+            unencrypted_iface = ("127.0.0.1" if self.dns_policy == "enforced"
+                                 else "any")
+            named_tls_options = textwrap.dedent("""\
+                \tlisten-on { %s; };
+                \tlisten-on tls local-tls { any; };
+                \tlisten-on-v6 tls local-tls { any; };
+            """ % unencrypted_iface)
+        else:
+            named_tls_options = ""
+            named_tls_conf = ""
+
         self.sub_dict = dict(
             FQDN=self.fqdn,
             SERVER_ID=ipaldap.realm_to_serverid(self.realm),
@@ -896,8 +934,8 @@ class BindInstance(service.Service):
             NAMED_DATA_DIR=constants.NAMED_DATA_DIR,
             NAMED_ZONE_COMMENT=constants.NAMED_ZONE_COMMENT,
             NAMED_DNSSEC_VALIDATION=self._get_dnssec_validation(),
-            NAMED_RNDC_CONF_COMMENT=constants.NAMED_RNDC_CONF_COMMENT,
-            NAMED_RNDC_CONF=paths.NAMED_RNDC_CONF,
+            NAMED_DNS_OVER_TLS_OPTIONS_CONF=named_tls_options,
+            NAMED_DNS_OVER_TLS_CONF=named_tls_conf,
         )
 
     def __setup_dns_container(self):
@@ -949,10 +987,6 @@ class BindInstance(service.Service):
             logger.debug("adding self NS to zone %s apex", zone)
             add_ns_rr(zone, ns_hostname, self.dns_backup, force=True,
                       api=self.api)
-
-    def __add_ntp_record(self):
-        add_rr(self.domain, '_ntp._udp', 'SRV',
-               "0 100 123 {}.".format(self.fqdn))
 
     def __setup_reverse_zone(self):
         # Always use force=True as named is not set up yet
@@ -1166,11 +1200,6 @@ class BindInstance(service.Service):
             # we have to re-initialize it because resolv.conf has changed
             dnsutil.reset_default_resolver()
 
-    def __disable_chroot(self):
-        result = ipautil.run(['control', 'bind-chroot'], capture_output=True)
-        self.sstore.backup_state('control', 'bind-chroot', result.output)
-        ipautil.run(['control', 'bind-chroot', 'disabled'])
-
     def __generate_rndc_key(self):
         installutils.check_entropy()
         ipautil.run([paths.GENERATE_RNDC_KEY])
@@ -1358,11 +1387,27 @@ class BindInstance(service.Service):
         self.disable()
         self.stop()
 
-        value = self.sstore.restore_state('control', 'bind-chroot')
-        if value is not None:
-            ipautil.run(['control', 'bind-chroot', value])
-
         self.named_conflict.unmask()
+
+        if self.sstore.restore_state("dns_over_tls", "enabled"):
+            if not self.sstore.restore_state("dns_over_tls", "external_crt"):
+                certmonger.stop_tracking(certfile=paths.BIND_DNS_OVER_TLS_CRT)
+            # only disable unbound if it was before IPA was deployed
+            if not self.sstore.restore_state("unbound", "enabled"):
+                services.knownservices["unbound"].disable()
+            if not self.sstore.restore_state("unbound", "running"):
+                services.knownservices["unbound"].stop()
+            # restore dnsconfd status prior IPA was deployed
+            if self.sstore.restore_state("dnsconfd", "enabled"):
+                services.knownservices["dnsconfd"].enable()
+            if self.sstore.restore_state("dnsconfd", "running"):
+                services.knownservices["dnsconfd"].start()
+            # restore unbound config files that were removed during IPA install
+            ipautil.remove_file(paths.UNBOUND_CONF)
+            for filename, fileinfo in self.fstore.files.items():
+                if paths.UNBOUND_CONFIG_DIR in fileinfo:
+                    self.fstore.restore_file(
+                        os.path.join(paths.UNBOUND_CONFIG_DIR, filename))
 
         ipautil.remove_file(paths.NAMED_CONF_BAK)
         ipautil.remove_file(paths.NAMED_CUSTOM_CONF)
@@ -1377,6 +1422,8 @@ class BindInstance(service.Service):
                 pass
         except ValueError:
             pass
+        ipautil.remove_file(paths.BIND_DNS_OVER_TLS_CRT)
+        ipautil.remove_file(paths.BIND_DNS_OVER_TLS_KEY)
         ipautil.remove_keytab(self.keytab)
 
         ipautil.remove_ccache(run_as=self.service_user)

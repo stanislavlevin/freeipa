@@ -42,8 +42,8 @@ class DebianTaskNamespace(RedHatTaskNamespace):
         return True
 
     @staticmethod
-    def modify_nsswitch_pam_stack(sssd, mkhomedir, fstore, statestore,
-                                  sudo=True, subid=False):
+    def modify_nsswitch_pam_stack(sssd, mkhomedir, statestore, sudo=True,
+                                  subid=False):
         if mkhomedir:
             try:
                 ipautil.run(["pam-auth-update",
@@ -126,7 +126,7 @@ used by ca-certificates and is provided for information only.\
             logger.error("Could not create %s", path)
             raise
 
-        for cert, nickname, trusted, _ext_key_usage in ca_certs:
+        for cert, nickname, trusted, _ext_key_usage, _serial in ca_certs:
             if not trusted:
                 continue
 
@@ -146,9 +146,15 @@ used by ca-certificates and is provided for information only.\
             # CAs who used the same serial number?)
             filename = f'{subject.ldap_text()} {cert.serial_number}.crt'
 
-            # pylint: disable=old-division
-            cert_path = path / filename
-            # pylint: enable=old-division
+            # Some CAs have DNs with a / or NUL character, which are not legal
+            # in paths. Also escape some other annoying characters for good
+            # measure.
+            bad_chars = {'\0', '/', ':'}
+            safe_filename = ''.join(
+                ('-' if c in bad_chars else c for c in filename)
+            )
+
+            cert_path = os.path.join(path, safe_filename)
             try:
                 f = open(cert_path, 'w')
             except Exception:

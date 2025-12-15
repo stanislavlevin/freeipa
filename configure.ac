@@ -130,35 +130,11 @@ PKG_CHECK_MODULES([CRYPTO], [libcrypto])
 dnl ---------------------------------------------------------------------------
 dnl - Check for pwquality library
 dnl ---------------------------------------------------------------------------
-AM_COND_IF(
-	[ENABLE_SERVER],
-	[AC_ARG_WITH([password_quality_lib],
-		     [AC_HELP_STRING([--with-password-quality-lib],
-				     [Password quality library to use])],
-		     [PASSWORD_QUALITY_LIB=${withval}],
-		     [PASSWORD_QUALITY_LIB="pwquality"])],
-	[PASSWORD_QUALITY_LIB=no],
-)
-
-AC_MSG_CHECKING([supported password quality library])
-
-case "${PASSWORD_QUALITY_LIB}" in
-	pwquality )
+AM_COND_IF([ENABLE_SERVER], [
 	PKG_CHECK_MODULES([PWQUALITY], [pwquality],
-		[AC_DEFINE(
-			USE_PWQUALITY,1,
-			[Use libpwquality for password quality checks]
-		 )]
+		[AC_DEFINE(USE_PWQUALITY,1,[Use password quality checks])]
 	)
-	;;
-	no ) ;;
-	* )
-	AC_MSG_ERROR(
-		[bad value ${PASSWORD_QUALITY_LIB} for --with-password-quality-lib]
-	)
-	;;
-esac
-AM_CONDITIONAL([WITH_PASSWORD_QUALITY_LIB], [test x$PASSWORD_QUALITY_LIB != xno])
+])
 
 dnl ---------------------------------------------------------------------------
 dnl - Check for Python 3
@@ -429,12 +405,6 @@ if test "x${IPAPLATFORM}" == "xdebian"; then
     ODS_GROUP="opendnssec"
     # see https://www.debian.org/doc/packaging-manuals/python-policy/ap-packaging_tools.html
     PYTHON_INSTALL_EXTRA_OPTIONS="--install-layout=deb"
-elif test "x${IPAPLATFORM}" == "xaltlinux"; then
-    KRB5KDC_SERVICE="krb5kdc.service"
-    NAMED_GROUP="named"
-    ODS_USER="_opendnssec"
-    ODS_GROUP="_opendnssec"
-    PYTHON_INSTALL_EXTRA_OPTIONS=""
 else
     HTTPD_GROUP="apache"
     KRB5KDC_SERVICE="krb5kdc.service"
@@ -688,6 +658,7 @@ AC_CONFIG_FILES([
     install/Makefile
     install/certmonger/Makefile
     install/custodia/Makefile
+    install/freeipa-webui/Makefile
     install/html/Makefile
     install/migration/Makefile
     install/share/Makefile

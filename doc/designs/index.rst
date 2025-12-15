@@ -11,6 +11,7 @@ FreeIPA design documentation
    adtrust/sudorules-with-ad-objects.md
    adtrust/auto-private-groups.md
    adtrust/sidconfig.md
+   edns.md
    hsm.md
    krb-ticket-policy.md
    extdom-plugin-protocol.md
@@ -34,3 +35,4 @@ FreeIPA design documentation
    rbcd.md
    id-mapping.md
    audit-ipa-api.md
+   sysaccounts.md

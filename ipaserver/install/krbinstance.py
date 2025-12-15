@@ -22,8 +22,8 @@ from __future__ import print_function
 
 import logging
 import os
-import grp
 import socket
+import tempfile
 import dbus
 
 import dns.name
@@ -55,14 +55,6 @@ from ipaplatform.tasks import tasks
 from ipaplatform.paths import paths
 
 logger = logging.getLogger(__name__)
-
-MASTER_KEY_TYPE = 'aes256-sha2'
-SUPPORTED_ENCTYPES = ('aes256-sha2:special', 'aes128-sha2:special',
-                      'aes256-sha2:normal', 'aes128-sha2:normal',
-                      'aes256-cts:special', 'aes128-cts:special',
-                      'aes256-cts:normal', 'aes128-cts:normal',
-                      'camellia256-cts:special', 'camellia128-cts:special',
-                      'camellia256-cts:normal', 'camellia128-cts:normal')
 
 
 def get_pkinit_request_ca():
@@ -206,11 +198,14 @@ class KrbInstance(service.Service):
         self.step("starting the KDC", self.__start_instance)
         self.step("configuring KDC to start on boot", self.__enable)
 
-    def create_instance(self, realm_name, host_name, domain_name, admin_password, master_password, setup_pkinit=False, pkcs12_info=None, subject_base=None):
+    def create_instance(self, realm_name, host_name, domain_name,
+                        admin_password, master_password, setup_pkinit=False,
+                        pkcs12_info=None, subject_base=None, promote=False):
         self.master_password = master_password
         self.pkcs12_info = pkcs12_info
         self.subject_base = subject_base
         self.config_pkinit = setup_pkinit
+        self.promote = promote
 
         self.__common_setup(realm_name, host_name, domain_name, admin_password)
 
@@ -243,6 +238,7 @@ class KrbInstance(service.Service):
         self.subject_base = subject_base
         self.master_fqdn = master_fqdn
         self.config_pkinit = setup_pkinit
+        self.promote = True
 
         self.__common_setup(realm_name, host_name, domain_name, admin_password)
 
@@ -275,10 +271,9 @@ class KrbInstance(service.Service):
             logger.critical("krb5kdc service failed to start")
 
     def __setup_sub_dict(self):
-        if os.path.exists(paths.COMMON_KRB5_CONF_DIR):
-            includes = 'includedir {}'.format(paths.COMMON_KRB5_CONF_DIR)
-        else:
-            includes = ''
+        if not os.path.exists(paths.COMMON_KRB5_CONF_DIR):
+            os.mkdir(paths.COMMON_KRB5_CONF_DIR, 0o755)
+        includes = 'includedir {}'.format(paths.COMMON_KRB5_CONF_DIR)
 
         fips_enabled = tasks.is_fips_enabled()
         self.sub_dict = dict(FQDN=self.fqdn,
@@ -300,15 +295,18 @@ class KrbInstance(service.Service):
                              INCLUDES=includes,
                              FIPS='#' if fips_enabled else '')
 
-        if fips_enabled:
-            supported_enctypes = list(
-                filter(lambda e: not e.startswith('camellia'),
-                       SUPPORTED_ENCTYPES))
-        else:
-            supported_enctypes = SUPPORTED_ENCTYPES
-        self.sub_dict['SUPPORTED_ENCTYPES'] = ' '.join(supported_enctypes)
+        supported_enctypes = tasks.get_supported_enctypes()
+        str_supported_enctypes = ' '.join(supported_enctypes)
+        ldif_supported_enctypes = ''.join(f'krbSupportedEncSaltTypes: {e}\n'
+                                          for e in supported_enctypes)
+        ldif_default_enctypes = ''.join(f'krbDefaultEncSaltTypes: {e}\n'
+                                        for e in tasks.get_default_enctypes())
 
-        self.sub_dict['MASTER_KEY_TYPE'] = MASTER_KEY_TYPE
+        self.sub_dict['SUPPORTED_ENCTYPES'] = str_supported_enctypes
+        self.sub_dict['LDIF_SUPPORTED_ENCTYPES'] = ldif_supported_enctypes
+        self.sub_dict['LDIF_DEFAULT_ENCTYPES'] = ldif_default_enctypes
+
+        self.sub_dict['MASTER_KEY_TYPE'] = tasks.get_masterkey_enctype()
 
         # IPA server/KDC is not a subdomain of default domain
         # Proper domain-realm mapping needs to be specified
@@ -384,10 +382,8 @@ class KrbInstance(service.Service):
         self.__template_file(paths.KRB5KDC_KDC_CONF, chmod=None)
         self.__template_file(paths.KRB5_CONF)
         self.__template_file(paths.KRB5_FREEIPA_SERVER)
+        self.__template_file(paths.KRB5_FREEIPA_DEFAULTS, client_template=True)
         self.__template_file(paths.KRB5_FREEIPA, client_template=True)
-        self.__template_file(paths.HTML_KRB5_INI)
-        self.__template_file(paths.KRB_CON)
-        self.__template_file(paths.HTML_KRBREALM_CON)
 
         MIN_KRB5KDC_WITH_WORKERS = "1.9"
         cpus = os.sysconf('SC_NPROCESSORS_ONLN')
@@ -432,8 +428,8 @@ class KrbInstance(service.Service):
         installutils.create_keytab(paths.KRB5_KEYTAB, host_principal)
 
         # Make sure access is strictly reserved to root only for now
-        os.chown(paths.KRB5_KEYTAB, 0, grp.getgrnam('_keytab').gr_gid)
-        os.chmod(paths.KRB5_KEYTAB, 0o640)
+        os.chown(paths.KRB5_KEYTAB, 0, 0)
+        os.chmod(paths.KRB5_KEYTAB, 0o600)
 
         self.move_service_to_host(host_principal)
 
@@ -449,6 +445,28 @@ class KrbInstance(service.Service):
                 remote_ldap,
                 kdc_dn,
                 timeout=api.env.replication_wait_timeout
+            )
+
+    def _get_certificate(self):
+        othername_2 = "otherName.2 = 1.3.6.1.5.2.2;SEQUENCE:princ_name"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdb = certs.CertDB(api.env.realm, nssdir=tmpdir)
+            tmpdb.create_from_cacert()
+            tmpdb.pki_issue_certificate(
+                "krbtgt", KDC_PROFILE,
+                paths.KDC_KEY, paths.KDC_CERT,
+                othername_2_san=othername_2,
+            )
+
+            os.chmod(paths.KDC_CERT, 0o644)
+            self.cert = x509.load_certificate_from_file(paths.KDC_CERT)
+            certmonger.start_tracking(
+                certpath=(paths.KDC_CERT, paths.KDC_KEY),
+                dns=[self.fqdn],
+                storage='FILE',
+                profile=KDC_PROFILE,
+                post_command='renew_kdc_cert',
+                perms=(0o644, 0o600),
             )
 
     def _call_certmonger(self, certmonger_ca='IPA'):
@@ -472,7 +490,7 @@ class KrbInstance(service.Service):
             if use_dogtag_submit:
                 ca_args = [
                     paths.CERTMONGER_DOGTAG_SUBMIT,
-                    '--ee-url', 'https://%s:8443/ca/ee/ca' % self.fqdn,
+                    '--jsonrpc-url', 'https://%s/ipa/json' % self.fqdn,
                     '--certfile', paths.RA_AGENT_PEM,
                     '--keyfile', paths.RA_AGENT_KEY,
                     '--cafile', paths.IPA_CA_CRT,
@@ -483,6 +501,7 @@ class KrbInstance(service.Service):
                     certmonger_ca, helper
                 )
 
+            (keytype, keysize) = installutils.lookup_key_type(api)
             certmonger.request_and_wait_for_cert(
                 certpath=certpath,
                 subject=subject,
@@ -493,7 +512,9 @@ class KrbInstance(service.Service):
                 profile=KDC_PROFILE,
                 post_command='renew_kdc_cert',
                 perms=(0o644, 0o600),
-                resubmit_timeout=api.env.certmonger_wait_timeout
+                resubmit_timeout=api.env.certmonger_wait_timeout,
+                keytype=keytype,
+                keysize=keysize,
             )
         except dbus.DBusException as e:
             # if the certificate is already tracked, ignore the error
@@ -537,7 +558,7 @@ class KrbInstance(service.Service):
                                           self.api.env.basedn,
                                           self.api.env.realm,
                                           False)
-        ca_certs = [c for c, _n, t, _u in ca_certs if t is not False]
+        ca_certs = [c for c, _n, t, _u, _s in ca_certs if t is not False]
         x509.write_certificate_list(ca_certs, paths.CACERT_PEM, mode=0o644)
 
     def issue_selfsigned_pkinit_certs(self):
@@ -547,7 +568,10 @@ class KrbInstance(service.Service):
 
     def issue_ipa_ca_signed_pkinit_certs(self):
         try:
-            self._call_certmonger()
+            if self.promote:
+                self._call_certmonger()
+            else:
+                self._get_certificate()
             self._install_pkinit_ca_bundle()
             self.pkinit_enable()
         except RuntimeError as e:
@@ -644,7 +668,7 @@ class KrbInstance(service.Service):
         except Exception:
             pass
 
-        for f in [paths.KRB5KDC_KDC_CONF, paths.KRB5_CONF]:
+        for f in [paths.KRB5KDC_KDC_CONF, paths.KRB5_CONF, paths.KRB5_FREEIPA]:
             try:
                 self.fstore.restore_file(f)
             except ValueError as error:
@@ -666,5 +690,5 @@ class KrbInstance(service.Service):
         self.kpasswd.uninstall()
 
         ipautil.remove_file(paths.KRB5_KEYTAB)
-        ipautil.remove_file(paths.KRB5_FREEIPA)
+        ipautil.remove_file(paths.KRB5_FREEIPA_DEFAULTS)
         ipautil.remove_file(paths.KRB5_FREEIPA_SERVER)

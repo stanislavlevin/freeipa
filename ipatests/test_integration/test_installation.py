@@ -25,6 +25,7 @@ from ipalib.constants import IPA_CA_RECORD
 from ipalib.constants import ALLOWED_NETBIOS_CHARS
 from ipalib.sysrestore import SYSRESTORE_STATEFILE, SYSRESTORE_INDEXFILE
 from ipapython.dn import DN
+from ipapython.ipaldap import realm_to_serverid
 from ipaplatform.constants import constants
 from ipaplatform.osinfo import osinfo
 from ipaplatform.paths import paths
@@ -36,6 +37,7 @@ from ipatests.test_integration.base import IntegrationTest
 from ipatests.test_integration.test_caless import CALessBase, ipa_certs_cleanup
 from ipatests.test_integration.test_cert import get_certmonger_fs_id
 from ipatests.pytest_ipa.integration import skip_if_fips
+from ipatests.util import xfail_context
 from ipaplatform import services
 
 
@@ -587,12 +589,15 @@ class TestInstallWithCA_DNS3(CALessBase):
     ticket 7239
     """
 
-    @pytest.mark.xfail(
-        osinfo.id == 'fedora' and osinfo.version_number >= (36,),
-        reason='freeipa ticket 9135', strict=True)
     @server_install_setup
     def test_number_of_zones(self):
         """There should be two zones: one forward, one reverse"""
+
+        # Removed xfail for test_number_of_zones
+        # This test is xpass when executed in IdM-CI
+        # but still failing in PRCI. There is a different configuration
+        # in the 2 CIs and with this we will get a green test
+        # in IdM-CI nightly tests.
 
         self.create_pkcs12('ca1/server')
         self.prepare_cacert('ca1')
@@ -1190,6 +1195,21 @@ class TestInstallMaster(IntegrationTest):
                 expected_stdout=f'href="https://{self.master.hostname}/'
             )
 
+    def test_pac_configuration_enabled(self):
+        """
+        This testcase checks that the default PAC type
+        is added to configuration.
+        """
+        base_dn = str(self.master.domain.basedn)
+        dn = DN(
+            ("cn", "ipaConfig"),
+            ("cn", "etc"),
+            base_dn
+        )
+        result = tasks.ldapsearch_dm(self.master, str(dn),
+                                     ["ipaKrbAuthzData"])
+        assert 'ipaKrbAuthzData: MS-PAC' in result.stdout_text
+
     def test_hostname_parameter(self, server_cleanup):
         """
         Test that --hostname parameter is respected in interactive mode.
@@ -1307,7 +1327,7 @@ class TestInstallMaster(IntegrationTest):
 
 class TestInstallMasterKRA(IntegrationTest):
 
-    num_replicas = 0
+    num_replicas = 1
 
     @classmethod
     def install(cls, mh):
@@ -1363,6 +1383,14 @@ class TestInstallMasterKRA(IntegrationTest):
                 nickname
             )
             assert starting_serial != int(cert.serial_number)
+
+    def test_install_replica_after_kracert_renewal(self):
+        """
+        Test replica installation with CA after the KRA certs renewal
+        """
+        tasks.install_replica(self.master, self.replicas[0],
+                              setup_ca=True)
+        tasks.install_kra(self.replicas[0])
 
 
 class TestInstallMasterDNS(IntegrationTest):
@@ -1601,8 +1629,18 @@ class TestKRAinstallAfterCertRenew(IntegrationTest):
 
         passwd = "{passwd}\n{passwd}\n{passwd}".format(passwd=admin_pass)
         self.master.run_command(['kinit', 'admin'], stdin_text=passwd)
-        cmd = self.master.run_command(['ipa-kra-install', '-p', dm_pass, '-U'])
-        self.master.run_command(['systemctl', 'start', 'chronyd'])
+        try:
+            # With PKI 11.6 the validity of the cert in
+            # /root/.dogtag/pki-tomcat/ca_admin.cert is checked
+            # and KRA install fails. Known IPA issue
+            pki_version = tasks.get_pki_version(self.master)
+            with xfail_context(pki_version >= tasks.parse_version('11.6.0'),
+                               'https://pagure.io/freeipa/issue/9763'):
+                cmd = self.master.run_command([
+                    'ipa-kra-install', '-p', dm_pass, '-U'
+                ])
+        finally:
+            self.master.run_command(['systemctl', 'start', 'chronyd'])
 
 
 class TestKRAinstallOnReplicaWithCAHost(IntegrationTest):
@@ -2189,3 +2227,42 @@ class TestNsslapdIgnoreTimeSkew(IntegrationTest):
         conn = self.replicas[0].ldap_connect()
         ldap_entry = conn.get_entry(DN("cn=config"))
         assert ldap_entry.single_value['nsslapd-ignore-time-skew'] == "on"
+
+
+class TestInstallKeySizes(IntegrationTest):
+
+    num_replicas = 1
+    master_with_dns = True
+
+    @classmethod
+    def install(cls, mh):
+        extra_args = ["--key-type-size", "rsa:3072",]
+        tasks.install_master(cls.master, setup_dns=True,
+                             extra_args=extra_args)
+        tasks.install_replica(
+            cls.master, cls.replicas[0], setup_ca=False)
+
+    def check_key_sizes(self, host):
+        serverid = (realm_to_serverid(host.domain.realm)).upper()
+        instance = paths.ETC_DIRSRV_SLAPD_INSTANCE_TEMPLATE % serverid
+        result = host.run_command(
+            "certutil -L -d %s -n Server-Cert -a | "
+            "openssl x509 -text -noout | "
+            "grep Public-Key" % instance)
+        assert "3072 bit" in result.stdout_text
+
+        for file in (
+            paths.HTTPD_CERT_FILE,
+            paths.KDC_CERT,
+            paths.RA_AGENT_PEM,
+        ):
+            result = host.run_command(
+                "openssl x509 -text -noout -in %s | "
+                "grep Public-Key" % file)
+            assert "3072 bit" in result.stdout_text
+
+    def test_master_key_sizes(self):
+        self.check_key_sizes(self.master)
+
+    def test_replica_key_sizes(self):
+        self.check_key_sizes(self.replicas[0])

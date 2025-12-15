@@ -34,7 +34,6 @@ from ipalib import _
 from ipalib.plugable import Registry
 from ipalib.request import context
 from ipapython.dn import DN
-from ipaplatform.constants import constants as platformconstants
 
 import six
 
@@ -66,6 +65,20 @@ are associated with are removed.
 Grace period defines the number of LDAP logins allowed after expiration.
 -1 means do not enforce expiration to match previous behavior. 0 allows
 no additional logins after expiration.
+
+The pwquality options are either mutually exclusive, or take
+precedence, over the standard password policy values. In the case
+of minimum password length if any pwquality-based options are used then
+the minimum length must be >= 6.
+
+The "credit" settings are used to adjust password complexity requirements.
+- With a value of 0, the default, the option is ignored.
+- With a positive value each character of that type in the password
+  contributes towards meeting the mininum length requirement.
+   For example, with a password policy of `minlength=6`, `dcredit=1`,
+   these passwords are valid: abcdef or abcd1
+- With a negative value signifies a minimum number of that character type
+  that must be present.
 
 EXAMPLES:
 
@@ -250,6 +263,7 @@ class pwpolicy(LDAPObject):
         'krbpwdlockoutduration', 'ipapwdmaxrepeat',
         'ipapwdmaxsequence', 'ipapwddictcheck',
         'ipapwdusercheck', 'passwordgracelimit',
+        'ipapwddcredit', 'ipapwducredit', 'ipapwdlcredit', 'ipapwdocredit',
     ]
     managed_permissions = {
         'System: Read Group Password Policy': {
@@ -262,7 +276,8 @@ class pwpolicy(LDAPObject):
                 'krbpwdlockoutduration', 'krbpwdmaxfailure',
                 'krbpwdmindiffchars', 'krbpwdminlength', 'objectclass',
                 'ipapwdmaxrepeat', 'ipapwdmaxsequence', 'ipapwddictcheck',
-                'ipapwdusercheck', 'passwordgracelimit',
+                'ipapwdusercheck', 'passwordgracelimit', 'ipapwddcredit',
+                'ipapwducredit', 'ipapwdlcredit', 'ipapwdocredit',
             },
             'default_privileges': {
                 'Password Policy Readers',
@@ -290,7 +305,9 @@ class pwpolicy(LDAPObject):
                 'krbpwdhistorylength', 'krbpwdlockoutduration',
                 'krbpwdmaxfailure', 'krbpwdmindiffchars', 'krbpwdminlength',
                 'ipapwdmaxrepeat', 'ipapwdmaxsequence', 'ipapwddictcheck',
-                'ipapwdusercheck', 'passwordgracelimit',
+                'ipapwdusercheck', 'passwordgracelimit', 'ipapwddcredit',
+                'ipapwducredit', 'ipapwdlcredit', 'ipapwdocredit',
+
             },
             'replaces': [
                 '(targetattr = "krbmaxpwdlife || krbminpwdlife || krbpwdhistorylength || krbpwdmindiffchars || krbpwdminlength || krbpwdmaxfailure || krbpwdfailurecountinterval || krbpwdlockoutduration")(target = "ldap:///cn=*,cn=$REALM,cn=kerberos,$SUFFIX")(version 3.0;acl "permission:Modify Group Password Policy";allow (write) groupdn = "ldap:///cn=Modify Group Password Policy,cn=permissions,cn=pbac,$SUFFIX";)',
@@ -370,19 +387,6 @@ class pwpolicy(LDAPObject):
             minvalue=0,
         ),
         Int(
-            'passwordgracelimit?',
-            cli_name='gracelimit',
-            label=_('Grace login limit'),
-            doc=_('Number of LDAP authentications allowed after expiration'),
-            minvalue=-1,
-            maxvalue=Int.MAXINT,
-            default=-1,
-            autofill=True,
-        ),
-    )
-
-    pwquality_lib_params = (
-        Int(
             'ipapwdmaxrepeat?',
             cli_name='maxrepeat',
             label=_('Max repeat'),
@@ -414,10 +418,53 @@ class pwpolicy(LDAPObject):
             doc=_('Check if the password contains the username'),
             default=False,
         ),
+        Int(
+            'ipapwddcredit?',
+            cli_name='dcredit',
+            label=_('Digit Credit'),
+            doc=_('The max credit for digits in the password.'),
+            minvalue=-256,
+            maxvalue=256,
+            default=0,
+        ),
+        Int(
+            'ipapwducredit?',
+            cli_name='ucredit',
+            label=_('Uppercase Credit'),
+            doc=_('The max credit for uppercase characters in the password.'),
+            minvalue=-256,
+            maxvalue=256,
+            default=0,
+        ),
+        Int(
+            'ipapwdlcredit?',
+            cli_name='lcredit',
+            label=_('Lowercase Credit'),
+            doc=_('The max credit for lowercase characters in the password.'),
+            minvalue=-256,
+            maxvalue=256,
+            default=0,
+        ),
+        Int(
+            'ipapwdocredit?',
+            cli_name='ocredit',
+            label=_('Other Credit'),
+            doc=_('The max credit for other characters in the password.'),
+            minvalue=-256,
+            maxvalue=256,
+            default=0,
+        ),
+        Int(
+            'passwordgracelimit?',
+            cli_name='gracelimit',
+            label=_('Grace login limit'),
+            doc=_('Number of LDAP authentications allowed after expiration'),
+            minvalue=-1,
+            maxvalue=Int.MAXINT,
+            default=-1,
+            autofill=True,
+        ),
     )
-
-    if platformconstants.PASSWORD_QUALITY_LIB is not None:
-        takes_params += pwquality_lib_params
 
     def get_dn(self, *keys, **options):
         if keys[-1] is not None:
@@ -462,14 +509,26 @@ class pwpolicy(LDAPObject):
 
         def has_pwquality_set(entry):
             for attr in ['ipapwdmaxrepeat', 'ipapwdmaxsequence',
-                         'ipapwddictcheck', 'ipapwdusercheck']:
+                         'ipapwddictcheck', 'ipapwdusercheck',
+                         'ipapwddcredit', 'ipapwducredit',
+                         'ipapwdlcredit', 'ipapwdocredit',]:
+                val = get_val(entry, attr)
+                if val not in (False, 'FALSE', '0', 0, None):
+                    return True
+            return False
+
+        def has_credit_set(entry):
+            for attr in ['ipapwddcredit', 'ipapwducredit',
+                         'ipapwdlcredit', 'ipapwdocredit',]:
                 val = get_val(entry, attr)
                 if val not in (False, 'FALSE', '0', 0, None):
                     return True
             return False
 
         has_pwquality_value = False
+        has_credit_value = False
         min_length = 0
+        minclasses = False
         if not add:
             if len(keys) > 0:
                 existing_entry = self.api.Command.pwpolicy_show(
@@ -480,17 +539,27 @@ class pwpolicy(LDAPObject):
             existing_entry.update(entry_attrs)
             if existing_entry.get('krbpwdminlength'):
                 min_length = int(get_val(existing_entry, 'krbpwdminlength'))
+            if existing_entry.get('krbpwdmindiffchars'):
+                minclasses = int(get_val(existing_entry, 'krbpwdmindiffchars'))
             has_pwquality_value = has_pwquality_set(existing_entry)
+            has_credit_value = has_credit_set(existing_entry)
         else:
             if entry_attrs.get('krbpwdminlength'):
                 min_length = int(get_val(entry_attrs, 'krbpwdminlength'))
             has_pwquality_value = has_pwquality_set(entry_attrs)
+            has_credit_value = has_credit_set(entry_attrs)
 
         if min_length < 6 and has_pwquality_value:
             raise errors.ValidationError(
                 name='minlength',
                 error=_('Minimum length must be >= 6 if maxrepeat, '
                         'maxsequence, dictcheck or usercheck are defined')
+            )
+        if minclasses > 0 and has_credit_value:
+            raise errors.ValidationError(
+                name='minclasses',
+                error=_('Minimum number of classes cannot be used when '
+                        'character credit are defined')
             )
 
     def validate_lifetime(self, entry_attrs, add=False, *keys):

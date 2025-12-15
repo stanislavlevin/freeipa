@@ -276,25 +276,12 @@ class TestCLIParsing:
                 ipasecondarybaserid=u'500000',
             )
 
-        def test_without_options():
-            self.check_command(
-                'idrange_add range1 --base-id=1 --range-size=1',
-                'idrange_add',
-                cn=u'range1',
-                ipabaseid=u'1',
-                ipaidrangesize=u'1',
-            )
-
         adtrust_dn = 'cn=ADTRUST,cn=%s,cn=masters,cn=ipa,cn=etc,%s' % \
                      (api.env.host, api.env.basedn)
         adtrust_is_enabled = api.Command['adtrust_is_enabled']()['result']
         mockldap = None
 
         if not adtrust_is_enabled:
-            # ipa-adtrust-install not run - no need to pass rid-base
-            # and secondary-rid-base
-            test_without_options()
-
             # Create a mock service object to test against
             adtrust_add = dict(
                 ipaconfigstring=b'enabledService',
@@ -385,7 +372,6 @@ IPA_CLIENT_NOT_CONFIGURED = b'IPA client is not configured on this system'
           '/usr/share/ipa/updates/05-pre_upgrade_plugins.update'],
          2, None, IPA_NOT_CONFIGURED),
         (['ipa-managed-entries'], 2, None, IPA_NOT_CONFIGURED),
-        (['ipa-nis-manage'], 2, None, IPA_NOT_CONFIGURED),
         (['ipa-pkinit-manage'], 2, None, IPA_NOT_CONFIGURED),
         (['ipa-replica-manage', 'list'], 1, IPA_NOT_CONFIGURED, None),
         (['ipa-server-certinstall'], 2, None, IPA_NOT_CONFIGURED),

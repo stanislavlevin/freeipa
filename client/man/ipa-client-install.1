@@ -201,6 +201,12 @@ Use \fIIP_ADDRESS\fR in DNS A/AAAA record for this host. May be specified multip
 .TP
 \fB\-\-all\-ip\-addresses\fR
 Create DNS A/AAAA record for each IP address on this host.
+.TP
+\fB\-\-dns\-over\-tls\fR
+Configure DNS over TLS.
+.TP
+\fB\-\-no\-dnssec\-validation\fR
+Disable DNSSEC validation for DNS over TLS.
 
 .SS "SSSD OPTIONS"
 .TP
@@ -231,17 +237,17 @@ uninstall.
 
 .SS "PKINIT OPTIONS"
 .TP
-\fB\-\-pkinit\-identity=\fIDENTITY\fR
+\fB\-\-pkinit\-identity=\fIIDENTITY\fR
 Identity string for PKINIT authentication to use to join the IPA realm,
-for example 'FILE:/path/to/cert.pem,/path/to/key.pem'. See krb5.conf(5)
+for example \fIFILE:/path/to/cert.pem,/path/to/key.pem\fR. See krb5.conf(5)
 for more information. The option is mutually exclusive with
 \fB\-\-password\fR and \fB\-\-keytab\fR.
 .TP
 \fB\-\-pkinit\-anchor\fR=\fIFILEDIR\fR
 Trust anchors (root and intermediate CA certs) for PKINIT. \fIFILEDIR\fR is
 either the absolute path to a PEM bundle (for example
-'FILE:/etc/pki/tls/cert.pem') or to an OpenSSL hash directory (for example
-'DIR:/etc/ssl/certs/'). The option can be used multiple times. PKINIT
+\fIFILE:/etc/pki/tls/cert.pem\fR) or to an OpenSSL hash directory (for example
+\fIDIR:/etc/ssl/certs/\fR). The option can be used multiple times. PKINIT
 requires the full trust chain of the Kerberos KDC server as well as the full
 trust chain of the identity certificate.
 

@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 
 import os
-import subprocess
 
 import pytest
 
@@ -12,7 +11,6 @@ from ipapython.certdb import (
 )
 from ipapython import ipautil
 from ipaplatform.osinfo import osinfo
-from ipaplatform.tasks import tasks
 
 CERTNICK = 'testcert'
 CERTSAN = 'testcert.certdb.test'
@@ -24,22 +22,6 @@ if osinfo.id == 'fedora':
         NSS_DEFAULT = 'dbm'
 else:
     NSS_DEFAULT = None
-
-
-def nss_3_114_alt1():
-    """
-    Return True if nss is 3.114-alt1 or newer:
-    https://bugzilla.mozilla.org/show_bug.cgi?id=1982807
-    """
-    res=subprocess.run(
-        ["rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", "libnss"],
-        check=True,
-        capture_output=True,
-        encoding="utf-8",
-    )
-    installed_version = tasks.parse_ipa_version(res.stdout)
-    target_version = tasks.parse_ipa_version("3.114-alt1")
-    return installed_version >= target_version
 
 
 def create_selfsigned(nssdb):
@@ -123,14 +105,6 @@ def test_sql_tmp():
     not nss_supports_dbm(),
     reason="NSS is built without support of the legacy database(DBM)",
 )
-@pytest.mark.xfail(
-    nss_3_114_alt1(),
-    reason=(
-        "fails with nss 3.114 "
-        "(https://bugzilla.mozilla.org/show_bug.cgi?id=1982807)"
-    ),
-    strict=True,
-)
 def test_convert_db():
     with NSSDatabase(dbtype='dbm') as nssdb:
         assert nssdb.dbtype == 'dbm'
@@ -169,14 +143,6 @@ def test_convert_db():
 @pytest.mark.skipif(
     not nss_supports_dbm(),
     reason="NSS is built without support of the legacy database(DBM)",
-)
-@pytest.mark.xfail(
-    nss_3_114_alt1(),
-    reason=(
-        "fails with nss 3.114 "
-        "(https://bugzilla.mozilla.org/show_bug.cgi?id=1982807)"
-    ),
-    strict=True,
 )
 def test_convert_db_nokey():
     with NSSDatabase(dbtype='dbm') as nssdb:

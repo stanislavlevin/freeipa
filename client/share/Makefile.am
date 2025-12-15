@@ -3,8 +3,10 @@ NULL =
 appdir = $(IPA_DATA_DIR)/client
 dist_app_DATA =				\
 	freeipa.template		\
+	freeipa-realm.template  \
 	sshd_ipa.conf.template	\
 	ssh_ipa.conf.template	\
+	unbound.conf.template	\
 	$(NULL)
 
 epnconfdir = $(IPA_SYSCONF_DIR)

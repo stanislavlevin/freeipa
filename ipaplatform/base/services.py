@@ -53,17 +53,16 @@ wellknownservices = [
     'named', 'ods_enforcerd', 'ods_signerd', 'gssproxy',
     'nfs-utils', 'sssd', 'NetworkManager', 'ipa-custodia',
     'ipa-dnskeysyncd', 'ipa-otpd', 'ipa-ods-exporter',
-    'systemd-resolved',
-    'nfs_client',
+    'systemd-resolved', 'unbound', 'dnsconfd',
 ]
 
 # The common ports for these services. This is used to wait for the
 # service to become available.
 wellknownports = {
     'dirsrv': [389],  # only used if the incoming instance name is blank
-    'pki-tomcatd@pki-tomcat.service': [8090, 8443],
-    'pki-tomcat': [8090, 8443],
-    'pki-tomcatd': [8090, 8443],  # used if the incoming instance name is blank
+    'pki-tomcatd@pki-tomcat.service': [8080, 8443],
+    'pki-tomcat': [8080, 8443],
+    'pki-tomcatd': [8080, 8443],  # used if the incoming instance name is blank
 }
 
 SERVICE_POLL_INTERVAL = 0.1 # seconds

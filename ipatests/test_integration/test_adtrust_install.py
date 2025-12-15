@@ -360,27 +360,51 @@ class TestIpaAdTrustInstall(IntegrationTest):
         assert msg in result.stdout_text
         assert result.returncode == 0
 
-    def test_adtrust_install_with_non_ipa_user(self):
+    @pytest.fixture
+    def create_user(self):
+        # create a user with 'othername' as 2nd krbprincipalname but
+        # no krbcanonicalname
+        basedn = self.master.domain.basedn
+        self.test_user = 'idmuser'
+        self.test_alias = 'othername'
+        tasks.create_active_user(
+            self.master, self.test_user, self.master.config.admin_password,
+            first=self.test_user, last=self.test_user)
+        user_update_ldif = textwrap.dedent("""
+            dn: uid={user},cn=users,cn=accounts,{base_dn}
+            changetype: modify
+            add: krbprincipalname
+            krbprincipalname: {alias}@{realm}
+            -
+            delete: krbcanonicalname
+            """.format(base_dn=basedn, user=self.test_user,
+                       alias=self.test_alias, realm=self.master.domain.realm))
+        tasks.ldapmodify_dm(self.master, user_update_ldif)
+        yield
+        tasks.kinit_admin(self.master)
+        self.master.run_command(["ipa", "user-del", self.test_user])
+
+    def test_adtrust_install_with_user_missing_krbcanonical(self, create_user):
         """
         Test that ipa-adtrust-install command returns
-        an error when kinit is done as alias
-        i.e root which is not an ipa user.
+        an error when kinit is done as an alias
+        for which there is no krbcanonicalname.
         """
-        msg = (
-            'Unrecognized error during check of admin rights: '
-            'root: user not found'
-        )
-        user = 'root'
+        self.master.run_command(["kdestroy", "-A"])
         self.master.run_command(
-            ["kinit", "-E", user],
-            stdin_text=self.master.config.admin_password
-        )
+            ["kinit", "-E", self.test_alias],
+            stdin_text=self.master.config.admin_password)
+
         result = self.master.run_command(
-            ["ipa-adtrust-install", "-A", user,
+            ["ipa-adtrust-install", "-A", self.test_alias,
              "-a", self.master.config.admin_password,
              "-U"], raiseonerr=False
         )
         assert result.returncode != 0
+        msg = (
+            'Unrecognized error during check of admin rights: '
+            '{alias}: user not found'
+        ).format(alias=self.test_alias)
         assert msg in result.stderr_text
 
     def test_adtrust_install_as_regular_ipa_user(self):
@@ -853,6 +877,8 @@ class TestIpaAdTrustInstall(IntegrationTest):
              self.master.config.admin_password,
              "-U"]
         )
+        # Wait for SSSD to become online before doing any other check
+        tasks.wait_for_sssd_domain_status_online(self.master)
         self.master.run_command(["mkdir", "/freeipa4234"])
         self.master.run_command(
             ["chcon", "-t", "samba_share_t",
@@ -871,17 +897,25 @@ class TestIpaAdTrustInstall(IntegrationTest):
              "path", "/freeipa4234"])
         self.master.run_command(["touch", "before"])
         self.master.run_command(["touch", "after"])
-        self.master.run_command(
-            ["smbclient", "--use-kerberos=desired",
-             "-c=put before", "//{}/share".format(
-                 self.master.hostname)]
-        )
+        # Find cache for the admin user
+        cache_args = []
+        cache = tasks.get_credential_cache(self.master)
+        if cache:
+            cache_args = ["--use-krb5-ccache", cache]
+
+        cmd_args = ["smbclient", "--use-kerberos=desired"]
+        cmd_args.extend(cache_args)
+        cmd_args.extend([
+            "-c=put before", "//{}/share".format(self.master.hostname)
+        ])
+        self.master.run_command(cmd_args)
         self.master.run_command(
             ["net", "conf", "setparm", "share",
              "valid users", "@admins"])
-        result = self.master.run_command(
-            ["smbclient", "--use-kerberos=desired",
-             "-c=put after", "//{}/share".format(
-                 self.master.hostname)]
-        )
+        cmd_args = ["smbclient", "--use-kerberos=desired"]
+        cmd_args.extend(cache_args)
+        cmd_args.extend([
+            "-c=put after", "//{}/share".format(self.master.hostname)
+        ])
+        result = self.master.run_command(cmd_args)
         assert msg not in result.stdout_text

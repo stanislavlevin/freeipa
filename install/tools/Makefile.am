@@ -19,7 +19,6 @@ dist_noinst_DATA =		\
 	ipa-server-upgrade.in	\
 	ipactl.in			\
 	ipa-compat-manage.in	\
-	ipa-nis-manage.in		\
 	ipa-managed-entries.in     \
 	ipa-ldap-updater.in	\
 	ipa-otptoken-import.in	\
@@ -31,6 +30,7 @@ dist_noinst_DATA =		\
 	ipa-pkinit-manage.in	\
 	ipa-crlgen-manage.in	\
 	ipa-cert-fix.in		\
+	ipa-idrange-fix.in  \
 	ipa-custodia.in		\
 	ipa-custodia-check.in	\
 	ipa-httpd-kdcproxy.in	\
@@ -56,7 +56,6 @@ nodist_sbin_SCRIPTS =		\
 	ipa-server-upgrade	\
 	ipactl			\
 	ipa-compat-manage	\
-	ipa-nis-manage		\
 	ipa-managed-entries     \
 	ipa-ldap-updater	\
 	ipa-otptoken-import	\
@@ -68,6 +67,7 @@ nodist_sbin_SCRIPTS =		\
 	ipa-pkinit-manage	\
 	ipa-crlgen-manage	\
 	ipa-cert-fix		\
+	ipa-idrange-fix		\
 	ipa-acme-manage		\
 	ipa-migrate	\
 	$(NULL)

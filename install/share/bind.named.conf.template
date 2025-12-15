@@ -21,6 +21,8 @@ options {
 
 	managed-keys-directory "$MANAGED_KEYS_DIR";
 
+	$NAMED_DNS_OVER_TLS_OPTIONS_CONF
+
 	/* user customizations of options */
 	include "$NAMED_CUSTOM_OPTIONS_CONF";
 
@@ -46,9 +48,10 @@ ${NAMED_ZONE_COMMENT}	type hint;
 ${NAMED_ZONE_COMMENT}	file "named.ca";
 ${NAMED_ZONE_COMMENT}};
 
-${NAMED_RNDC_CONF_COMMENT}include "$NAMED_RNDC_CONF";
 include "$RFC1912_ZONES";
 include "$ROOT_KEY";
+
+$NAMED_DNS_OVER_TLS_CONF
 
 /* user customization */
 include "$NAMED_CUSTOM_CONF";

@@ -15,8 +15,6 @@ import tempfile
 
 import pki.util
 
-import six
-
 from ipalib.constants import IPA_CA_CN
 from ipalib.install import certstore
 from ipalib.install.service import enroll_only, master_install_only, replica_install_only
@@ -37,8 +35,6 @@ from ipapython.dn import DN
 
 from . import conncheck, dogtag, cainstance
 
-if six.PY3:
-    unicode = str
 
 VALID_SUBJECT_BASE_ATTRS = {
     'st', 'o', 'ou', 'dnqualifier', 'c', 'serialnumber', 'l', 'title', 'sn',
@@ -56,8 +52,8 @@ external_ca_file = None
 
 
 def subject_validator(valid_attrs, value):
-    if not isinstance(value, unicode):
-        v = unicode(value, 'utf-8')
+    if not isinstance(value, str):
+        v = str(value, 'utf-8')
     else:
         v = value
     if any(ord(c) < 0x20 for c in v):
@@ -94,22 +90,8 @@ def random_serial_numbers_validator(enabled):
 
 
 def lookup_ca_subject(api, subject_base):
-    dn = DN(('cn', IPA_CA_CN), api.env.container_ca, api.env.basedn)
-    try:
-        # we do not use api.Command.ca_show because it attempts to
-        # talk to the CA (to read certificate / chain), but the RA
-        # backend may be unavailable (ipa-replica-install) or unusable
-        # due to RA Agent cert not yet created (ipa-ca-install).
-        ca_subject = api.Backend.ldap2.get_entry(dn)['ipacasubjectdn'][0]
-    except errors.NotFound:
-        # if the entry doesn't exist, we are dealing with a pre-v4.4
-        # installation, where the default CA subject was always based
-        # on the subject_base.
-        #
-        # installutils.default_ca_subject_dn is NOT used here in
-        # case the default changes in the future.
-        ca_subject = DN(('CN', 'Certificate Authority'), subject_base)
-    return str(ca_subject)
+    """Function moved to installutils with stub retained for API compat"""
+    return installutils.lookup_ca_subject(api, subject_base)
 
 
 def lookup_random_serial_number_version(api):
@@ -517,7 +499,7 @@ def install_check(standalone, replica_config, options):
     if not options.external_cert_files:
         if not cainstance.check_ports():
             print(
-                "IPA requires ports 8090 and 8443 for PKI, but one or more "
+                "IPA requires ports 8080 and 8443 for PKI, but one or more "
                 "are currently in use."
             )
             raise ScriptError("Aborting installation")

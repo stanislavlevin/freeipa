@@ -49,13 +49,14 @@ from ipaplatform.tasks import tasks
 from ipapython import directivesetter
 from ipapython import dogtag
 from ipapython import ipautil
-from ipapython.certdb import get_ca_nickname
+from ipapython.certdb import (
+    get_ca_nickname,
+    IPA_CA_TRUST_FLAGS,
+    EMPTY_TRUST_FLAGS)
 from ipapython.dn import DN, RDN
-from ipapython.ipa_log_manager import standard_logging_setup
 from ipaserver.secrets.kem import IPAKEMKeys
 
 from ipaserver.install import certs
-from ipaserver.install import dsinstance
 from ipaserver.install import installutils
 from ipaserver.install import replication
 from ipaserver.install import sysupgrade
@@ -86,12 +87,12 @@ ACME_CONFIG_FILES = (
 
 
 def check_ports():
-    """Check that dogtag ports (8090, 8443) are available.
+    """Check that dogtag ports (8080, 8443) are available.
 
     Returns True when ports are free, False if they are taken.
     """
     return all([ipautil.check_port_bindable(8443),
-                ipautil.check_port_bindable(8090)])
+                ipautil.check_port_bindable(8080)])
 
 
 def get_preop_pin(instance_root, instance_name):
@@ -259,6 +260,18 @@ def is_ca_installed_locally():
     return os.path.exists(paths.CA_CS_CFG_PATH)
 
 
+def lookup_ldap_backend(api):
+    """Look up the LDAP backend database value and return it"""
+    dn = DN("cn=config,cn=ldbm database,cn=plugins,cn=config")
+    try:
+        entry = api.Backend.ldap2.get_entry(dn)
+    except errors.NotFound:
+        ldap_backend = 'bdb'
+    else:
+        ldap_backend = entry.get('nsslapd-backend-implement', ['bdb'])[0]
+    return ldap_backend
+
+
 class InconsistentCRLGenConfigException(Exception):
     pass
 
@@ -266,13 +279,8 @@ class InconsistentCRLGenConfigException(Exception):
 class CAInstance(DogtagInstance):
     """
     When using a dogtag CA the DS database contains just the
-    server cert for DS. The mod_nss database will contain the RA agent
-    cert that will be used to do authenticated requests against dogtag.
-
-    This is done because we use python-nss and will inherit the opened
-    NSS database in mod_python. In nsslib.py we do an nssinit but this will
-    return success if the database is already initialized. It doesn't care
-    if the database is different or not.
+    server cert for DS. The RA agent cert that will be used
+    to do authenticated requests against dogtag.
 
     external is a state machine:
        0 = not an externally signed CA
@@ -280,21 +288,14 @@ class CAInstance(DogtagInstance):
        2 = have signed cert, continue installation
     """
 
-    server_cert_name = 'Server-Cert cert-pki-ca'
-
     # Mapping of nicknames for tracking requests, and the profile to
     # use for that certificate.  'configure_renewal()' reads this
     # dict.  The profile MUST be specified.
-    tracking_reqs = {
-        'auditSigningCert cert-pki-ca': 'caSignedLogCert',
-        'ocspSigningCert cert-pki-ca': 'caOCSPCert',
-        'subsystemCert cert-pki-ca': 'caSubsystemCert',
-        'caSigningCert cert-pki-ca': 'caCACert',
-        server_cert_name: 'caServerCert',
-    }
+    tracking_reqs = ipalib.constants.CA_TRACKING_REQS
+
     token_names = {
         # Server-Cert always on internal token
-        server_cert_name: INTERNAL_TOKEN,
+        'Server-Cert cert-pki-ca': INTERNAL_TOKEN,
     }
 
     # The following must be aligned with the RewriteRule defined in
@@ -388,6 +389,15 @@ class CAInstance(DogtagInstance):
             self.ca_type = x509.ExternalCAType.GENERIC.value
         self.external_ca_profile = external_ca_profile
         self.random_serial_numbers = random_serial_numbers
+        ldap_backend = lookup_ldap_backend(api)
+
+        if ldap_backend != 'bdb' and not random_serial_numbers:
+            # override selection for lmdb due to VLV performance issues.
+            logger.info(
+                'Forcing random serial numbers to be enabled for the %s '
+                'backend', ldap_backend
+            )
+            self.random_serial_numbers = True
 
         self.no_db_setup = promote
         self.use_ldaps = use_ldaps
@@ -450,6 +460,8 @@ class CAInstance(DogtagInstance):
             self.step(
                 "Ensuring backward compatibility",
                 self.__dogtag10_migration)
+            if self.random_serial_numbers:
+                self.step("enable certificate pruning", self.enable_pruning)
             if promote:
                 self.step("destroying installation admin user",
                           self.teardown_admin)
@@ -507,6 +519,9 @@ class CAInstance(DogtagInstance):
 
                 self.step("configuring certmonger renewal for lightweight CAs",
                           self.add_lightweight_ca_tracking_requests)
+                if self.clone and self.random_serial_numbers:
+                    self.step("Recording random serial number state",
+                              self.__store_random_serial_number_state)
                 if minimum_acme_support():
                     self.step("deploying ACME service", self.setup_acme)
 
@@ -774,6 +789,17 @@ class CAInstance(DogtagInstance):
                                    'NSS_ENABLE_PKIX_VERIFY', '1',
                                    quotes=False, separator='=')
 
+    def enable_pruning(self):
+        directivesetter.set_directive(paths.CA_CS_CFG_PATH,
+                                      'jobsScheduler.enabled', 'true',
+                                      quotes=False, separator='=')
+        directivesetter.set_directive(paths.CA_CS_CFG_PATH,
+                                      'jobsScheduler.job.pruning.enabled',
+                                      'true', quotes=False, separator='=')
+        directivesetter.set_directive(paths.CA_CS_CFG_PATH,
+                                      'jobsScheduler.job.pruning.owner',
+                                      'ipara', quotes=False, separator='=')
+
     def __import_ra_cert(self):
         """
         Helper method for IPA domain level 0 replica install
@@ -902,88 +928,71 @@ class CAInstance(DogtagInstance):
         in a usual deployment would be used in the UI to handle
         administrative duties. IPA does not use this certificate
         except as a bootstrap to generate the RA.
-
-        To do this it bends over backwards a bit by modifying the
-        way typical certificates are retrieved using certmonger by
-        forcing it to call dogtag-submit directly.
         """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdb = certs.CertDB(self.realm, nssdir=tmpdir)
+            chain_file = os.path.join(tmpdir, "chain.pem")
 
-        # create a temp PEM file storing the CA chain
-        chain_file = tempfile.NamedTemporaryFile(
-            mode="w", dir=paths.VAR_LIB_IPA, delete=False)
-        chain_file.close()
+            chain = self.__get_ca_chain()
+            data = base64.b64decode(chain)
+            ipautil.run(
+                [paths.OPENSSL,
+                 "pkcs7",
+                 "-inform",
+                 "DER",
+                 "-print_certs",
+                 "-out", chain_file,
+                 ], stdin=data, capture_output=False)
 
-        chain = self.__get_ca_chain()
-        data = base64.b64decode(chain)
-        ipautil.run(
-            [paths.OPENSSL,
-             "pkcs7",
-             "-inform",
-             "DER",
-             "-print_certs",
-             "-out", chain_file.name,
-             ], stdin=data, capture_output=False)
+            tmpdb.create_noise_file()
+            tmpdb.create_passwd_file()
+            tmpdb.create_certdbs()
+            tmpdb.load_cacert(chain_file, IPA_CA_TRUST_FLAGS)
 
-        # CA agent cert in PEM form
-        agent_cert = tempfile.NamedTemporaryFile(
-            mode="w", dir=paths.VAR_LIB_IPA, delete=False)
-        agent_cert.close()
+            tmpdb.import_pkcs12(
+                paths.DOGTAG_ADMIN_P12, pkcs12_passwd=self.dm_password)
 
-        # CA agent key in PEM form
-        agent_key = tempfile.NamedTemporaryFile(
-            mode="w", dir=paths.VAR_LIB_IPA, delete=False)
-        agent_key.close()
+            (_keytype, keysize) = api.env.key_type_size.split(':', 1)
 
-        certs.install_pem_from_p12(paths.DOGTAG_ADMIN_P12,
-                                   self.dm_password,
-                                   agent_cert.name)
-        certs.install_key_from_p12(paths.DOGTAG_ADMIN_P12,
-                                   self.dm_password,
-                                   agent_key.name)
-
-        agent_args = [paths.CERTMONGER_DOGTAG_SUBMIT,
-                      "--cafile", chain_file.name,
-                      "--ee-url", 'http://%s:8090/ca/ee/ca/' % self.fqdn,
-                      "--agent-url",
-                      'https://%s:8443/ca/agent/ca/' % self.fqdn,
-                      "--certfile", agent_cert.name,
-                      "--keyfile", agent_key.name, ]
-
-        helper = " ".join(agent_args)
-
-        # configure certmonger renew agent to use temporary agent cert
-        old_helper = certmonger.modify_ca_helper(
-            ipalib.constants.RENEWAL_CA_NAME, helper)
-
-        try:
-            # The certificate must be requested using caSubsystemCert profile
-            # because this profile does not require agent authentication
-            reqId = certmonger.request_and_wait_for_cert(
-                certpath=(paths.RA_AGENT_PEM, paths.RA_AGENT_KEY),
-                principal='host/%s' % self.fqdn,
-                subject=str(DN(('CN', 'IPA RA'), self.subject_base)),
-                ca=ipalib.constants.RENEWAL_CA_NAME,
-                profile=ipalib.constants.RA_AGENT_PROFILE,
-                pre_command='renew_ra_cert_pre',
-                post_command='renew_ra_cert',
-                storage="FILE",
-                resubmit_timeout=api.env.certmonger_wait_timeout
+            csrfile = os.path.join(tmpdb.secdir, "csr")
+            ipautil.run(
+                [paths.CERTUTIL,
+                 "-d", tmpdb.secdir,
+                 "-R", "-s", str(DN(('CN', 'IPA RA'), self.subject_base)),
+                 # eventually use -q curve-name for ECC
+                 "-g", keysize,
+                 "-z", os.path.join(tmpdb.secdir, tmpdb.noise_fname),
+                 "-f", tmpdb.passwd_fname,
+                 "-o", csrfile,
+                 "-a",]
             )
-            self._set_ra_cert_perms()
 
-            self.requestId = str(reqId)
+            tmpdb.pki_issue_ra_certificate(
+                csrfile=csrfile,
+                certfile=paths.RA_AGENT_PEM,
+                dm_password=self.dm_password)
+
             self.ra_cert = x509.load_certificate_from_file(
                 paths.RA_AGENT_PEM)
-        finally:
-            # we can restore the helper parameters
-            certmonger.modify_ca_helper(
-                ipalib.constants.RENEWAL_CA_NAME, old_helper)
-            # remove any temporary files
-            for f in (chain_file, agent_cert, agent_key):
-                try:
-                    os.remove(f.name)
-                except OSError:
-                    pass
+            tmpdb.add_cert(self.ra_cert, 'IPA RA', EMPTY_TRUST_FLAGS)
+            pk12_pwdfile = ipautil.write_tmp_file(self.dm_password)
+            tmpdb.export_pkcs12(
+                os.path.join(tmpdb.secdir, "ra.p12"),
+                pk12_pwdfile.name,
+                'IPA RA')
+            certs.install_key_from_p12(
+                os.path.join(tmpdb.secdir, "ra.p12"),
+                self.dm_password, paths.RA_AGENT_KEY)
+        self._set_ra_cert_perms()
+        update_people_entry(self.ra_cert)
+        certmonger.start_tracking(
+            certpath=(paths.RA_AGENT_PEM, paths.RA_AGENT_KEY),
+            ca=ipalib.constants.RENEWAL_CA_NAME,
+            profile=ipalib.constants.RA_AGENT_PROFILE,
+            pre_command='renew_ra_cert_pre',
+            post_command='renew_ra_cert',
+            storage='FILE',
+        )
 
     def prepare_crl_publish_dir(self):
         """
@@ -1233,11 +1242,14 @@ class CAInstance(DogtagInstance):
         """
 
         # The cert directive to update per nickname
-        directives = {'auditSigningCert cert-pki-ca': 'ca.audit_signing.cert',
-                      'ocspSigningCert cert-pki-ca': 'ca.ocsp_signing.cert',
-                      'caSigningCert cert-pki-ca': 'ca.signing.cert',
-                      'subsystemCert cert-pki-ca': 'ca.subsystem.cert',
-                      'Server-Cert cert-pki-ca': 'ca.sslserver.cert'}
+        directives = {
+            'auditSigningCert cert-pki-ca': 'ca.audit_signing.cert',
+            'ocspSigningCert cert-pki-ca': 'ca.ocsp_signing.cert',
+            'caSigningCert cert-pki-ca': 'ca.signing.cert',
+            'subsystemCert cert-pki-ca': 'ca.subsystem.cert',
+            'Server-Cert cert-pki-ca': 'ca.sslserver.cert',
+            'transportCert cert-pki-kra': 'ca.connector.KRA.transportCert'
+        }
 
         try:
             self.backup_config()
@@ -1658,6 +1670,11 @@ class CAInstance(DogtagInstance):
         dn = DN(('cn', ipalib.constants.IPA_CA_CN), api.env.container_ca,
                 api.env.basedn)
         entry_attrs = api.Backend.ldap2.get_entry(dn)
+        version = entry_attrs.single_value.get(
+            "ipaCaRandomSerialNumberVersion", "0"
+        )
+        if str(version) == str(value):
+            return
         entry_attrs['ipaCaRandomSerialNumberVersion'] = value
         api.Backend.ldap2.update_entry(entry_attrs)
 
@@ -1810,18 +1827,9 @@ def get_ca_renewal_nickname(subject_base, ca_subject_dn, sdn):
 
     """
     assert isinstance(sdn, DN)
-    nickname_by_subject_dn = {
-        DN(ca_subject_dn): 'caSigningCert cert-pki-ca',
-        DN('CN=CA Audit', subject_base): 'auditSigningCert cert-pki-ca',
-        DN('CN=OCSP Subsystem', subject_base): 'ocspSigningCert cert-pki-ca',
-        DN('CN=CA Subsystem', subject_base): 'subsystemCert cert-pki-ca',
-        DN('CN=KRA Audit', subject_base): 'auditSigningCert cert-pki-kra',
-        DN('CN=KRA Transport Certificate', subject_base):
-            'transportCert cert-pki-kra',
-        DN('CN=KRA Storage Certificate', subject_base):
-            'storageCert cert-pki-kra',
-        DN('CN=IPA RA', subject_base): 'ipaCert',
-    }
+    nickname_by_subject_dn = installutils.get_nickname_by_subject_dn(
+        subject_base, ca_subject_dn
+    )
     return nickname_by_subject_dn.get(sdn)
 
 
@@ -2050,7 +2058,7 @@ def __get_profile_config(profile_id):
         DOMAIN=ipautil.format_netloc(api.env.domain),
         IPA_CA_RECORD=ipalib.constants.IPA_CA_RECORD,
         CRL_ISSUER='CN=Certificate Authority,o=ipaca',
-        SUBJECT_DN_O=dsinstance.DsInstance().find_subject_base(),
+        SUBJECT_DN_O=installutils.find_subject_base(),
         ACME_AGENT_GROUP=ACME_AGENT_GROUP,
     )
 
@@ -2090,7 +2098,7 @@ def import_included_profiles():
     # on what port to use, 443 (remote) or 8443 (local) for importing
     # the profiles.
     #
-    # api.Backend.ra_certprofile invokes the RestClient class
+    # api.Backend.ra_certprofile invokes the APIClient class
     # which will discover and login to the CA REST API. We can
     # use this information to detect where to import the profiles.
     #
@@ -2103,7 +2111,7 @@ def import_included_profiles():
     # Apache but no CA, login fails with 404) so we override to the
     # local server.
     #
-    # When override port was always set to 8443 the RestClient could
+    # When override port was always set to 8443 the APIClient could
     # pick a remote server and since 8443 isn't in our firewall profile
     # setting up a new server would fail.
     try:
@@ -2111,6 +2119,9 @@ def import_included_profiles():
             if profile_api.ca_host == api.env.host:
                 api.Backend.ra_certprofile.override_port = 8443
     except (errors.NetworkError, errors.RemoteRetrieveError) as e:
+        logger.debug('Overriding CA port: %s', e)
+        api.Backend.ra_certprofile.override_port = 8443
+    except Exception as e:
         logger.debug('Overriding CA port: %s', e)
         api.Backend.ra_certprofile.override_port = 8443
 
@@ -2354,10 +2365,16 @@ def ensure_ipa_authority_entry():
     api.Backend.ra_lightweight_ca.override_port = 8443
     with api.Backend.ra_lightweight_ca as lwca:
         data = lwca.read_ca('host-authority')
+        # Loading certificate to properly re-parse issuer and subject DNs in
+        # case CA doesn't recognize some of the OIDs. DN class will re-access
+        # the OIDs based on ATTR_NAME_BY_OID list.
+        cert_data = lwca.read_ca_cert('host-authority')
+        cert = x509.load_der_x509_certificate(cert_data)
+
         attrs = dict(
             ipacaid=data['id'],
-            ipacaissuerdn=data['issuerDN'],
-            ipacasubjectdn=data['dn'],
+            ipacaissuerdn=DN(cert.issuer),
+            ipacasubjectdn=DN(cert.subject),
         )
     api.Backend.ra_lightweight_ca.override_port = None
 
@@ -2487,11 +2504,3 @@ def check_ipa_ca_san(cert):
             name='certificate',
             error='Does not have a \'{}\' SAN'.format(expect)
         )
-
-
-if __name__ == "__main__":
-    standard_logging_setup("install.log")
-    ds = dsinstance.DsInstance()
-
-    ca = CAInstance("EXAMPLE.COM")
-    ca.configure_instance("catest.example.com", "password", "password")

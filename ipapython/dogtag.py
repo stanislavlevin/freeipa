@@ -63,6 +63,14 @@ INCLUDED_PROFILES = {
 
 DEFAULT_PROFILE = u'caIPAserviceCert'
 KDC_PROFILE = u'KDCs_PKINIT_Certs'
+OCSP_PROFILE = 'caOCSPCert'
+SUBSYSTEM_PROFILE = 'caSubsystemCert'
+AUDIT_PROFILE = 'caSignedLogCert'
+CACERT_PROFILE = 'caCACert'
+CASERVER_PROFILE = 'caServerCert'
+KRA_AUDIT_PROFILE = 'caAuditSigningCert'
+KRA_STORAGE_PROFILE = 'caStorageCert'
+KRA_TRANSPORT_PROFILE = 'caTransportCert'
 
 
 if six.PY3:
@@ -92,7 +100,7 @@ def get_ca_certchain(ca_host=None):
     chain = None
     conn = httplib.HTTPConnection(
         ca_host,
-        api.env.ca_install_port or 8090)
+        api.env.ca_install_port or 8080)
     conn.request("GET", "/ca/ee/ca/getCertChain")
     res = conn.getresponse()
     doc = None
@@ -147,7 +155,7 @@ def ca_status(ca_host=None):
     if ca_host is None:
         ca_host = api.env.ca_host
     status, _headers, body = http_request(
-        ca_host, 8090, '/ca/admin/ca/getStatus',
+        ca_host, 8080, '/ca/admin/ca/getStatus',
         # timeout: CA sometimes forgot to answer, we have to try again
         timeout=api.env.http_timeout)
     if status == 503:

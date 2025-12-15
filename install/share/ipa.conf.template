@@ -1,5 +1,5 @@
 #
-# VERSION 33 - DO NOT REMOVE THIS LINE
+# VERSION 34 - DO NOT REMOVE THIS LINE
 #
 # This file may be overwritten on upgrades.
 #
@@ -78,6 +78,7 @@ WSGIScriptReloading Off
   GssapiDelegCcacheUnique On
   GssapiUseS4U2Proxy on
   GssapiAllowedMech krb5
+  GssapiNegotiateOnce On
   Require valid-user
   ErrorDocument 401 /ipa/errors/unauthorized.html
   Header always append X-Frame-Options DENY
@@ -182,18 +183,8 @@ Alias /ipa/crl "$CRL_PUBLISH_PATH"
 
 #  List explicitly only the fonts we want to serve
 Alias /ipa/ui/fonts/open-sans "${FONTS_OPENSANS_DIR}"
-<Directory "${FONTS_OPENSANS_DIR}">
-  SetHandler None
-  AllowOverride None
-  Satisfy Any
-  Require all granted
-  ExpiresActive On
-  ExpiresDefault "access plus 1 year"
-</Directory>
-
-
 Alias /ipa/ui/fonts/fontawesome "${FONTS_FONTAWESOME_DIR}"
-<Directory "${FONTS_FONTAWESOME_DIR}">
+<Directory "${FONTS_DIR}">
   SetHandler None
   AllowOverride None
   Satisfy Any
@@ -215,6 +206,19 @@ Alias /ipa/ui "/usr/share/ipa/ui"
   <FilesMatch "(index.html|loader.js|login.html|reset_password.html)">
         ExpiresDefault "access plus 0 seconds"
   </FilesMatch>
+</Directory>
+
+# Modern WebUI
+Alias /ipa/modern-ui "/usr/share/ipa/modern-ui"
+<Directory "/usr/share/ipa/modern-ui">
+  SetHandler None
+  AllowOverride None
+  Satisfy Any
+  Require all granted
+  RewriteEngine On
+  RewriteRule ^(.*)/assets/(.*)$$ assets/$$2 [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ index.html [QSA,L]
 </Directory>
 
 #  Simple wsgi scripts required by ui

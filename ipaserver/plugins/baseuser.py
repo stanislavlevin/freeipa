@@ -23,10 +23,10 @@ from cryptography.hazmat.primitives.serialization import load_pem_public_key
 import re
 import six
 
-from ipalib import api, errors, constants
+from ipalib import api, errors, constants, messages
 from ipalib import (
     Flag, Int, Password, Str, Bool, StrEnum, DateTime, DNParam)
-from ipalib.parameters import Principal, Certificate
+from ipalib.parameters import Principal, Certificate, MAX_UINT32
 from ipalib.plugable import Registry
 from .baseldap import (
     DN, LDAPObject, LDAPCreate, LDAPUpdate, LDAPSearch, LDAPDelete,
@@ -198,6 +198,22 @@ def validate_passkey(ugettext, key):
     return None
 
 
+def is_in_local_idrange(uidnumber):
+    result = api.Command.idrange_find(
+        iparangetype='ipa-local',
+        sizelimit=0,
+    )
+
+    for r in result['result']:
+        if 'ipabaserid' in r:
+            ipabaseid = int(r['ipabaseid'][0])
+            ipaidrangesize = int(r['ipaidrangesize'][0])
+            if ipabaseid <= uidnumber < ipabaseid + ipaidrangesize:
+                return True
+
+    return False
+
+
 class baseuser(LDAPObject):
     """
     baseuser object.
@@ -348,11 +364,13 @@ class baseuser(LDAPObject):
             label=_('UID'),
             doc=_('User ID Number (system will assign one if not provided)'),
             minvalue=1,
+            maxvalue=MAX_UINT32,
         ),
         Int('gidnumber?',
             label=_('GID'),
             doc=_('Group ID Number'),
             minvalue=1,
+            maxvalue=MAX_UINT32,
         ),
         Str('street?',
             cli_name='street',
@@ -618,6 +636,17 @@ class baseuser_add(LDAPCreate):
         ):
             add_missing_object_class(ldap, 'ipaidpuser', dn,
                                      entry_attrs, update=False)
+
+        # Check and warn if we're out of local idrange
+        # Skip dynamically assigned uid, old clients say 999
+        uidnumber = entry_attrs.get('uidnumber')
+        if (
+            uidnumber != -1
+            and uidnumber != 999
+            and not is_in_local_idrange(uidnumber)
+        ):
+            self.add_message(messages.UidNumberOutOfLocalIDRange(
+                user=entry_attrs.get('uid'), uidnumber=uidnumber))
 
     def post_common_callback(self, ldap, dn, entry_attrs, *keys, **options):
         assert isinstance(dn, DN)

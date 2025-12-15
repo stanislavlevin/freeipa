@@ -506,6 +506,57 @@ class MissingTargetAttributesinPermission(PublicMessage):
                "are set.")
 
 
+class ServerUpgradeRequired(PublicMessage):
+    """
+    **13033** Server upgrade required
+    """
+    errno = 13033
+    type = "warning"
+    format = _(
+        "Change of the state of '%(feature)s' feature requires to run "
+        "'ipa-server-upgrade' command on IPA server %(server)s "
+        "to apply configuration changes."
+    )
+
+
+class UidNumberOutOfLocalIDRange(PublicMessage):
+    """
+    **13034** UID Number is out of all local ID Ranges
+    """
+    errno = 13034
+    type = "warning"
+    format = _(
+        "User '%(user)s', with UID Number '%(uidnumber)d' is out of all ID "
+        "Ranges, 'SID' will not be correctly generated."
+    )
+
+
+class ServerSysacctMgrUpdateRequired(PublicMessage):
+    """
+    **13035** An update of sysaccount manager entry is required on other servers
+    """
+    errno = 13035
+    type = "warning"
+    format = _(
+        "Password reset permission is local to server %(server)s.\n"
+        "Restart the Directory Server services on it. Run the command "
+        "'ipa %(command)s' against each server you want to allow or "
+        "disable to reset passwords on."
+    )
+
+
+class SystemAccountUsage(PublicMessage):
+    """
+    **13036** General sysaccount usage note
+    """
+    errno = 13036
+    type = "info"
+    format = _(
+        "To bind to LDAP with system account '%(uid)s', use the bind DN "
+        "'%(dn)s'."
+    )
+
+
 def iter_messages(variables, base):
     """Return a tuple with all subclasses
     """

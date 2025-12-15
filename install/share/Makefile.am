@@ -50,15 +50,14 @@ dist_app_DATA =				\
 	bind.named.conf.template	\
 	bind.openssl.cnf.template	\
 	bind.openssl.cryptopolicy.cnf.template	\
+	bind.openssl.provider.cnf.template	\
+	bind.openssl.provider.crp.cnf.template	\
 	certmap.conf.template		\
 	kdc.conf.template		\
 	kdc_extensions.template		\
 	kdc_req.conf.template		\
 	krb5.conf.template		\
 	freeipa-server.template		\
-	krb5.ini.template		\
-	krb.con.template		\
-	krbrealm.con.template		\
 	smb.conf.template		\
 	smb.conf.registry.template		\
 	smb.conf.empty			\
@@ -67,8 +66,6 @@ dist_app_DATA =				\
 	master-entry.ldif		\
 	memberof-task.ldif		\
 	memberof-conf.ldif		\
-	nis.uldif			\
-	nis-update.uldif			\
 	opendnssec_conf.template	\
 	opendnssec_kasp.template	\
 	unique-attributes.ldif		\
@@ -90,6 +87,7 @@ dist_app_DATA =				\
 	vault.ldif			\
 	kdcproxy-enable.uldif		\
 	kdcproxy-disable.uldif		\
+	subid-generators.uldif		\
 	ipa-httpd.conf.template		\
 	ipa-httpd-wsgi.conf.template	\
 	gssapi.login			\
@@ -109,6 +107,7 @@ dist_app_DATA =				\
 	pki-acme-issuer.conf.template	\
 	pki-acme-realm.conf.template	\
 	ldbm-tuning.ldif		\
+	openssl_cnf.template		\
 	$(NULL)
 
 kdcproxyconfdir = $(IPA_SYSCONF_DIR)/kdcproxy

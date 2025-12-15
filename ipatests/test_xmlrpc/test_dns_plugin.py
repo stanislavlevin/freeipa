@@ -3417,6 +3417,46 @@ class test_dns(Declarative):
         ),
 
         dict(
+            desc="Ensure --raw and --structure does not work "
+                 "for ipa dnsrecord-add",
+            command=('dnsrecord_add', [zone1, name1],
+                     {'arecord': arec2, u'raw': True, u'structured': True}),
+            expected=errors.MutuallyExclusiveError(
+                reason=u"cannot use structured together with raw"
+            ),
+        ),
+
+        dict(
+            desc="Ensure --raw and --structure does not work "
+                 "for ipa dnsrecord-mod",
+            command=('dnsrecord_mod', [zone1, name1],
+                     {'arecord': arec1, u'raw': True, u'structured': True}),
+            expected=errors.MutuallyExclusiveError(
+                reason=u"cannot use structured together with raw"
+            ),
+        ),
+
+        dict(
+            desc="Ensure --raw and --structure does not work "
+                 "for ipa dnsrecord-show",
+            command=('dnsrecord_show', [zone1, name1],
+                     {u'raw': True, u'structured': True}),
+            expected=errors.MutuallyExclusiveError(
+                reason=u"cannot use structured together with raw"
+            ),
+        ),
+
+        dict(
+            desc="Ensure --raw and --structure does not work "
+                 "for ipa dnsrecord-find",
+            command=('dnsrecord_find', [zone1],
+                     {u'raw': True, u'structured': True}),
+            expected=errors.MutuallyExclusiveError(
+                reason=u"cannot use structured together with raw"
+            ),
+        ),
+
+        dict(
             desc='Delete zone %r' % zone1,
             command=('dnszone_del', [zone1], {}),
             expected={
@@ -3425,7 +3465,6 @@ class test_dns(Declarative):
                 'result': {'failed': []},
             },
         ),
-
     ]
 
 

@@ -27,6 +27,7 @@ from ipalib.facts import is_ipa_configured
 import SSSDConfig
 import ipalib.util
 import ipalib.errors
+from ipaclient.install import timeconf
 from ipaclient.install.client import sssd_enable_ifp
 from ipalib.install.dnsforwarders import detect_resolve1_resolv_conf
 from ipaplatform import services
@@ -231,44 +232,27 @@ def check_certs():
         logger.debug('Certificate file exists')
 
 def update_dbmodules(realm, filename=paths.KRB5_CONF):
-    newfile = []
-    found_dbrealm = False
-    found_realm = False
-    prefix = ''
-
     logger.info('[Verifying that KDC configuration is using ipa-kdb backend]')
-    fd = open(filename)
+    aug = Augeas(flags=Augeas.NO_LOAD | Augeas.NO_MODL_AUTOLOAD,
+                 loadpath=paths.USR_SHARE_IPA_DIR)
+    try:
+        aug.transform('IPAKrb5', filename)
+        aug.load()
 
-    lines = fd.readlines()
-    fd.close()
+        path = "/files{}/dbmodules/{}/db_library"
+        path = path.format(filename, realm)
+        if aug.match(path):
+            if aug.get(path) == "ipadb.so":
+                logger.debug('dbmodules already updated in %s', filename)
+                return
+            aug.remove(path)
 
-    if '    db_library = ipadb.so\n' in lines:
-        logger.debug('dbmodules already updated in %s', filename)
-        return
+        aug.set(path, "ipadb.so")
+        aug.save()
 
-    for line in lines:
-        if line.startswith('[dbmodules]'):
-            found_dbrealm = True
-        if found_dbrealm and line.find(realm) > -1:
-            found_realm = True
-            prefix = '#'
-        if found_dbrealm and line.find('}') > -1 and found_realm:
-            found_realm = False
-            newfile.append('#%s' % line)
-            prefix = ''
-            continue
+    finally:
+        aug.close()
 
-        newfile.append('%s%s' % (prefix, line))
-
-    # Append updated dbmodules information
-    newfile.append('  %s = {\n' % realm)
-    newfile.append('    db_library = ipadb.so\n')
-    newfile.append('  }\n')
-
-    # Write out new file
-    fd = open(filename, 'w')
-    fd.write("".join(newfile))
-    fd.close()
     logger.debug('%s updated', filename)
 
 def cleanup_kdc(fstore):
@@ -546,21 +530,25 @@ def ca_initialize_hsm_state(ca):
         ca.set_hsm_state(config)
 
 
-def dnssec_set_openssl_engine(dnskeysyncd):
+def dnssec_set_openssl_provider(dnskeysyncd):
     """
-    Setup OpenSSL engine for BIND
+    Setup OpenSSL engine or provider for BIND
     """
-    if constants.NAMED_OPENSSL_ENGINE is None:
+    if all([constants.NAMED_OPENSSL_ENGINE is None,
+            constants.NAMED_OPENSSL_PROVIDER is None]):
         return False
 
-    if sysupgrade.get_upgrade_state('dns', 'openssl_engine_force_login'):
+    # Nothing to do if we are using OpenSSL provider already and not on the OS
+    # that requires OpenSSL provider instead.
+    if all([sysupgrade.get_upgrade_state('dns', 'openssl_provider'),
+            constants.NAMED_OPENSSL_PROVIDER is None]):
         return False
 
-    logger.info('[Set OpenSSL engine for BIND]')
+    logger.info('[Set OpenSSL engine or provider for BIND]')
     dnskeysyncd.setup_named_openssl_conf()
     dnskeysyncd.setup_named_sysconfig()
     dnskeysyncd.setup_ipa_dnskeysyncd_sysconfig()
-    sysupgrade.set_upgrade_state('dns', 'openssl_engine_force_login', True)
+    sysupgrade.set_upgrade_state('dns', 'openssl_provider', True)
 
     return True
 
@@ -1087,19 +1075,6 @@ def remove_ds_ra_cert(subject_base):
     sysupgrade.set_upgrade_state('ds', 'remove_ra_cert', True)
 
 
-def migrate_to_mod_ssl(http):
-    logger.info('[Migrating from mod_nss to mod_ssl]')
-
-    if sysupgrade.get_upgrade_state('ssl.conf', 'migrated_to_mod_ssl'):
-        logger.info("Already migrated to mod_ssl")
-        return
-
-    http.migrate_to_mod_ssl()
-
-    sysupgrade.set_upgrade_state('ssl.conf', 'migrated_to_mod_ssl', True)
-
-
-
 def update_ipa_httpd_service_conf(http):
     logger.info('[Updating HTTPD service IPA configuration]')
     http.update_httpd_service_ipa_conf()
@@ -1123,6 +1098,7 @@ def update_http_keytab(http):
                 paths.OLD_IPA_KEYTAB, e
             )
     http.keytab_user.chown(http.keytab)
+    tasks.restore_context(http.keytab)
 
 
 def ds_enable_sidgen_extdom_plugins(ds):
@@ -1331,7 +1307,27 @@ def setup_kpasswd_server(krb):
         aug.close()
 
 
-def ntp_cleanup(fqdn):
+def ntpd_cleanup(fqdn, fstore):
+    sstore = sysrestore.StateFile(paths.SYSRESTORE)
+    timeconf.restore_forced_timeservices(sstore, 'ntpd')
+    if sstore.has_state('ntp'):
+        instance = services.service('ntpd', api)
+        sstore.restore_state(instance.service_name, 'enabled')
+        sstore.restore_state(instance.service_name, 'running')
+        sstore.restore_state(instance.service_name, 'step-tickers')
+        try:
+            instance.disable()
+            instance.stop()
+        except Exception:
+            logger.debug("Service ntpd was not disabled or stopped")
+
+    for ntpd_file in [paths.NTP_CONF, paths.NTP_STEP_TICKERS,
+                      paths.SYSCONFIG_NTPD]:
+        try:
+            fstore.restore_file(ntpd_file)
+        except ValueError as e:
+            logger.debug(e)
+
     try:
         api.Backend.ldap2.delete_entry(DN(('cn', 'NTP'), ('cn', fqdn),
                                        api.env.container_masters))
@@ -1339,9 +1335,9 @@ def ntp_cleanup(fqdn):
         logger.debug("NTP service entry was not found in LDAP.")
 
     ntp_role_instance = servroles.ServiceBasedRole(
-        u"ntp_server_server",
-        u"NTP server",
-        component_services=['NTP']
+         u"ntp_server_server",
+         u"NTP server",
+         component_services=['NTP']
     )
 
     updated_role_instances = tuple()
@@ -1350,6 +1346,7 @@ def ntp_cleanup(fqdn):
             updated_role_instances += tuple([role_instance])
 
     servroles.role_instances = updated_role_instances
+    sysupgrade.set_upgrade_state('ntpd', 'ntpd_cleaned', True)
 
 
 def update_replica_config(db_suffix):
@@ -1659,7 +1656,8 @@ def upgrade_configuration():
     if not ds_running:
         ds.start(ds.serverid)
 
-    ntp_cleanup(fqdn)
+    if not sysupgrade.get_upgrade_state('ntpd', 'ntpd_cleaned'):
+        ntpd_cleanup(fqdn, fstore)
 
     if tasks.configure_pkcs11_modules(fstore):
         print("Disabled p11-kit-proxy")
@@ -1678,6 +1676,7 @@ def upgrade_configuration():
         WSGI_PREFIX_DIR=paths.WSGI_PREFIX_DIR,
         WSGI_PROCESSES=constants.WSGI_PROCESSES,
         GSSAPI_SESSION_KEY=paths.GSSAPI_SESSION_KEY,
+        FONTS_DIR=paths.FONTS_DIR,
         FONTS_OPENSANS_DIR=paths.FONTS_OPENSANS_DIR,
         FONTS_FONTAWESOME_DIR=paths.FONTS_FONTAWESOME_DIR,
         IPA_CCACHES=paths.IPA_CCACHES,
@@ -1849,11 +1848,8 @@ def upgrade_configuration():
     http.stop()
     update_ipa_httpd_service_conf(http)
     update_ipa_http_wsgi_conf(http)
-    migrate_to_mod_ssl(http)
-    tasks.configure_ipa_gssproxy_dir()
     update_http_keytab(http)
     http.configure_gssproxy()
-    http.configure_httpd_mods()
     http.start()
 
     uninstall_selfsign(ds, http)
@@ -1879,7 +1875,7 @@ def upgrade_configuration():
                 dnskeysyncd.create_instance(fqdn, api.env.realm)
                 dnskeysyncd.start_dnskeysyncd()
             else:
-                if dnssec_set_openssl_engine(dnskeysyncd):
+                if dnssec_set_openssl_provider(dnskeysyncd):
                     dnskeysyncd.start_dnskeysyncd()
             dnskeysyncd.set_dyndb_ldap_workdir_permissions()
 
@@ -2038,7 +2034,7 @@ def empty_ccache():
         if old_path:
             os.environ['KRB5CCNAME'] = old_path
         else:
-            del os.environ['KRB5CCNAME']
+            os.environ.pop('KRB5CCNAME', None)
         shutil.rmtree(kpath_dir)
 
 

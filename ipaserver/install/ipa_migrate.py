@@ -32,8 +32,8 @@ from ipapython.admintool import admin_cleanup_global_argv
 from ipaserver.install.ipa_migrate_constants import (
     DS_CONFIG, DB_OBJECTS, DS_INDEXES, BIND_DN, LOG_FILE_NAME,
     STRIP_OP_ATTRS, STRIP_ATTRS, STRIP_OC, PROD_ATTRS,
-    DNA_REGEN_VAL, DNA_REGEN_ATTRS, NIS_PLUGIN, IGNORE_ATTRS,
-    DB_EXCLUDE_TREES
+    DNA_REGEN_VAL, DNA_REGEN_ATTRS, IGNORE_ATTRS,
+    DB_EXCLUDE_TREES, POLICY_OP_ATTRS, STATE_OPTIONS
 )
 
 """
@@ -202,6 +202,15 @@ def decode_attr_vals(entry_attrs):
     decoded_attrs = {}
     for attr in entry_attrs:
         vals = ensure_list_str(entry_attrs[attr])
+        # Remove "only" replication state data, but don't remove other attr
+        # options like ";binary"
+        #    e.g.  userCertificate;binary;adcsn=<CSN>
+        parts = attr.split(";")
+        attr_parts = [
+            parts[0]] + [p for p in parts[1:]
+                         if not any(p.startswith(opt)
+                                    for opt in STATE_OPTIONS)]
+        attr = (';').join(attr_parts)
         decoded_attrs[attr] = vals
     return decoded_attrs
 
@@ -269,19 +278,19 @@ class LDIFParser(ldif.LDIFParser):
         if self.mc is None:
             return
 
+        entry_attrs = decode_attr_vals(entry)
         if self.get_realm:
             # Get the realm from krb container
             if DN(("cn", "kerberos"), self.mc.remote_suffix) in DN(dn):
                 # check objectclass krbrealmcontainer
                 oc_attr = 'objectClass'
-                if 'objectclass' in entry:
+                if 'objectclass' in entry_attrs:
                     oc_attr = 'objectclass'
-                if 'krbrealmcontainer' in ensure_list_str(entry[oc_attr]):
-                    self.mc.remote_realm = ensure_str(entry['cn'][0])
+                if 'krbrealmcontainer' in entry_attrs[oc_attr]:
+                    self.mc.remote_realm = ensure_str(entry_attrs['cn'][0])
                     self.mc.log_debug("Found remote realm from ldif: "
                                       f"{self.mc.remote_realm}")
         else:
-            entry_attrs = decode_attr_vals(entry)
             self.mc.process_db_entry(entry_dn=dn, entry_attrs=entry_attrs)
 
 
@@ -543,6 +552,14 @@ class IPAMigrate():
     #
     # Helper functions
     #
+    def attr_is_operational(self, attr):
+        schema = self.local_conn.schema
+        attr_obj = schema.get_obj(ldap.schema.AttributeType, attr)
+        if attr_obj is not None:
+            if attr_obj.usage == 1:
+                return True
+        return False
+
     def replace_suffix(self, entry_dn):
         """
         Replace the base DN in an entry DN
@@ -628,7 +645,7 @@ class IPAMigrate():
                 else:
                     action = "replace"
                 ldif_entry += f"{action}: {attr}\n"
-                for val in vals:
+                for val in list(vals or []):
                     ldif_entry += get_ldif_attr_val(attr, val)
                 ldif_entry += "-\n"
             ldif_entry += "\n"
@@ -732,8 +749,7 @@ class IPAMigrate():
         self.log_info(title)
         self.log_info('-' * (len(title) - 1))
         logged_something = self.log_stats(DS_CONFIG)
-        if self.args.verbose or NIS_PLUGIN['count'] > 0:
-            self.log_info(f" - NIS Server Plugin:       {NIS_PLUGIN['count']}")
+        if self.args.verbose:
             logged_something = True
         if not self.log_stats(DS_INDEXES) and not logged_something:
             self.log_info(" - No updates")
@@ -1068,11 +1084,9 @@ class IPAMigrate():
         if isinstance(val, bytes) or isinstance(val, DN):
             return val
 
-        # Replace base DN
-        val = self.replace_suffix_value(val)
-
         # For DNS DN we only replace suffix
         if dns:
+            val = self.replace_suffix_value(val)
             return val
 
         # Replace host
@@ -1085,6 +1099,9 @@ class IPAMigrate():
 
         # Replace realm
         val = val.replace(self.remote_realm, self.realm)
+
+        # Lastly, replace base DN
+        val = self.replace_suffix_value(val)
 
         return val
 
@@ -1135,6 +1152,18 @@ class IPAMigrate():
         if range_reset:
             stats['reset_range'] += 1
         return entry
+
+    def attr_is_required(self, attr, entry):
+        """
+        Check if an attribute is required in this entry
+        """
+        entry_oc = entry['objectClass']
+        for oc in entry_oc:
+            required_attrs = self.local_conn.get_allowed_attributes(
+                [oc], raise_on_unknown=False, attributes="must")
+            if attr.lower() in required_attrs:
+                return True
+        return False
 
     def clean_entry(self, entry_dn, entry_type, entry_attrs):
         """
@@ -1325,7 +1354,17 @@ class IPAMigrate():
                                                    f"'{old_value}' "
                                                    "new value "
                                                    f"'{local_entry[attr][0]}'")
-
+                            elif 'single' == sp_attr[1]:
+                                # The attribute is defined as multivalued, but
+                                # we really need to treat it as single valued
+                                self.log_debug("Entry is different and will "
+                                               f"be updated: '{local_dn}' "
+                                               f"attribute '{attr}' replaced "
+                                               "with val "
+                                               f"'{remote_attrs[attr][0]}' "
+                                               "old value: "
+                                               f"{local_entry[attr][0]}")
+                                local_entry[attr][0] = remote_attrs[attr][0]
                             goto_next_attr = True
                             break
 
@@ -1372,6 +1411,31 @@ class IPAMigrate():
                 local_entry[attr] = remote_attrs[attr]
                 entry_updated = True
 
+        # Remove attributes in the local entry that do not exist in the
+        # remote entry
+        remove_attrs = []
+        for attr in local_entry:
+            if (self.attr_is_operational(attr)
+                and attr.lower() not in POLICY_OP_ATTRS) or \
+               attr.lower() in IGNORE_ATTRS or \
+               attr.lower() in STRIP_ATTRS or \
+               attr.lower() == "usercertificate":
+                # This is an attribute that we do not want to remove
+                continue
+
+            if attr not in remote_attrs and \
+               not self.attr_is_required(attr, local_entry):
+                # Mark this attribute for deletion
+                remove_attrs.append(attr)
+                entry_updated = True
+
+        # Remove attributes
+        for remove_attr in remove_attrs:
+            self.log_debug("Entry is different and will be updated: "
+                           f"'{local_dn}' attribute '{remove_attr}' "
+                           "is being removed")
+            del local_entry[remove_attr]
+
         if range_reset:
             stats['reset_range'] += 1
 
@@ -1384,6 +1448,9 @@ class IPAMigrate():
     def process_db_entry(self, entry_dn, entry_attrs):
         """
         Process chunks of remote entries from a paged results search
+
+        entry_dn = the remote entry DN
+        entry_attrs = the remote entry's attributes stored in a dict
 
         Identify entry type
         Process entry (removing/change attr/val/schema)
@@ -1403,6 +1470,10 @@ class IPAMigrate():
                                             str(self.remote_suffix))
             if DN(exclude_dn) in DN(entry_dn):
                 return
+
+        # Skip tombstones
+        if 'nsTombstone' in entry_attrs['objectClass']:
+            return
 
         # Determine entry type: user, group, hbac, etc
         entry_type = self.get_entry_type(entry_dn, entry_attrs)
@@ -1440,6 +1511,47 @@ class IPAMigrate():
         # Based on the entry type do additional work
         #
 
+        # For entries with alternate identifying needs we need to rebuild the
+        # local dn. Typically this is for entries that use ipaUniqueId as the
+        # RDN attr
+        if entry_type != "custom" and 'alt_id' in DB_OBJECTS[entry_type]:
+            attr = DB_OBJECTS[entry_type]['alt_id']['attr']
+            base = DB_OBJECTS[entry_type]['alt_id']['base']
+            srch_filter = f'({attr}={entry_attrs[attr][0]})'
+            if DB_OBJECTS[entry_type]['alt_id']['isDN'] is True:
+                # Convert the filter to match the local suffix
+                srch_filter = self.replace_suffix_value(srch_filter)
+            srch_base = base + str(self.local_suffix)
+
+            try:
+                entries = self.local_conn.get_entries(DN(srch_base),
+                                                      filter=srch_filter)
+                if len(entries) == 1:
+                    local_dn = entries[0].dn
+                elif len(entries) == 0:
+                    # Not found, no problem just proceed and we will add it
+                    pass
+                else:
+                    # Found too many entries - should not happen
+                    self.log_error('Found too many local matching entries '
+                                   f'for "{local_dn}"')
+                    if self.args.force:
+                        stats['ignored_errors'] += 1
+                        return
+                    else:
+                        sys.exit(1)
+            except errors.EmptyResult:
+                # Not found, no problem just proceed and we will add it later
+                pass
+            except (errors.NetworkError, errors.DatabaseError) as e:
+                self.log_error('Failed to find a local matching entry for '
+                               f'"{local_dn}" error: {str(e)}')
+                if self.args.force:
+                    stats['ignored_errors'] += 1
+                    return
+                else:
+                    sys.exit(1)
+
         # See if the entry exists on the local server
         try:
             local_entry = self.local_conn.get_entry(DN(local_dn),
@@ -1455,14 +1567,24 @@ class IPAMigrate():
 
             if self.dryrun:
                 self.write_update_to_ldif(local_entry)
-                DB_OBJECTS[entry_type]['count'] += 1
+                if entry_type == "custom":
+                    stats['custom'] += 1
+                else:
+                    DB_OBJECTS[entry_type]['count'] += 1
                 stats['total_db_migrated'] += 1
                 return
 
             # Update the local entry
             try:
                 self.local_conn.update_entry(local_entry)
-                DB_OBJECTS[entry_type]['count'] += 1
+                if entry_type == "custom":
+                    stats['custom'] += 1
+                else:
+                    DB_OBJECTS[entry_type]['count'] += 1
+            except errors.MidairCollision as e:
+                # Typically means no such attribute, ok to ignore
+                self.log_debug(f'Failed to update "{local_dn}" error: '
+                               f'{str(e)} - ok to ignore')
             except errors.ExecutionError as e:
                 self.log_error(f'Failed to update "{local_dn}" error: '
                                f'{str(e)}')
@@ -1581,7 +1703,7 @@ class IPAMigrate():
         """
         Used paged search for online method to avoid large memory footprint
         """
-        self.log_info("Migrating database ... (this make take a while)")
+        self.log_info("Migrating database ... (this may take a while)")
         if self.args.db_ldif is not None:
             self.processDBOffline()
         else:
@@ -1622,7 +1744,7 @@ class IPAMigrate():
                        f"{len(objectclasses)} objectClasses")
 
         # Loop over attributes and objectclasses and count them
-        schema = self.local_conn._get_schema()
+        schema = self.local_conn.schema
         local_schema = schema.ldap_entry()
         for schema_type in [(attributes, "attributeTypes"),
                             (objectclasses, "objectClasses")]:
@@ -1861,28 +1983,6 @@ class IPAMigrate():
                         add_missing=True)
                     stats['config_processed'] += 1
 
-            # Slapi NIS Plugin
-            if DN(NIS_PLUGIN['dn']) == DN(entry['dn']):
-                # Parent plugin entry
-                self.process_config_entry(
-                    entry['dn'], entry['attrs'], NIS_PLUGIN,
-                    add_missing=True)
-                stats['config_processed'] += 1
-            elif DN(NIS_PLUGIN['dn']) in DN(entry['dn']):
-                # Child NIS plugin entry
-                nis_dn = entry['dn']
-                lc_remote_realm = self.remote_realm.lower()
-                lc_realm = self.realm.lower()
-                nis_dn = nis_dn.replace(lc_remote_realm, lc_realm)
-                if 'nis-domain' in entry['attrs']:
-                    value = entry['attrs']['nis-domain'][0]
-                    value = value.replace(lc_remote_realm, lc_realm)
-                    entry['attrs']['nis-domain'][0] = value
-                # Process the entry
-                self.process_config_entry(nis_dn, entry['attrs'], NIS_PLUGIN,
-                                          add_missing=True)
-                stats['config_processed'] += 1
-
     #
     # Migration
     #
@@ -1981,7 +2081,7 @@ class IPAMigrate():
 
         # Run ipa-server-upgrade
         self.log_info("Running ipa-server-upgrade ... "
-                      "(this make take a while)")
+                      "(this may take a while)")
         if self.dryrun:
             self.log_info("Skipping ipa-server-upgrade in dryrun mode.")
         else:

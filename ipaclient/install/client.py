@@ -34,7 +34,7 @@ import warnings
 from configparser import RawConfigParser
 from urllib.parse import urlparse, urlunparse
 
-from ipalib import api, errors, x509, createntp
+from ipalib import api, errors, x509
 from ipalib import sysrestore
 from ipalib.constants import FQDN, IPAAPI_USER, MAXHOSTNAMELEN
 from ipalib.install import certmonger, certstore, service
@@ -53,15 +53,7 @@ from ipaplatform import services
 from ipaplatform.constants import constants
 from ipaplatform.paths import paths
 from ipaplatform.tasks import tasks
-from ipapython import (
-    certdb,
-    kernel_keyring,
-    ntpmethods,
-    ipaldap,
-    ipautil,
-    dnsutil,
-)
-from ipapython.ntpmethods import TIME_SERVER
+from ipapython import certdb, kernel_keyring, ipaldap, ipautil, dnsutil
 from ipapython.admintool import ScriptError
 from ipapython.dn import DN
 from ipapython.install import typing
@@ -77,7 +69,7 @@ from ipapython.ssh import SSHPublicKey
 from ipapython import version
 from ipapython.errors import SetseboolError
 
-from . import automount, sssd
+from . import automount, timeconf, sssd
 from ipaclient import discovery
 from ipapython.ipachangeconf import IPAChangeConf
 
@@ -664,25 +656,154 @@ def hardcode_ldap_server(cli_server):
         "hardcoded server name: %s", cli_server[0])
 
 
-# Currently this doesn't support templating, but that could be changed in the
-# future.  Note that this function is also called from %post.
+def configure_krb5_realm(
+        krbconf, cli_realm, cli_domain, cli_server, cli_kdc,
+        dnsok, client_domain, client_hostname, force=False):
+
+    opts = []
+    # the following are necessary only if DNS discovery does not work
+    kropts = []
+    if not dnsok or not cli_kdc or force:
+        # [realms]
+        for server in cli_server:
+            kropts.extend([
+                krbconf.setOption('kdc', ipautil.format_netloc(server, 88)),
+                krbconf.setOption('master_kdc',
+                                  ipautil.format_netloc(server, 88)),
+                krbconf.setOption('admin_server',
+                                  ipautil.format_netloc(server, 749)),
+                krbconf.setOption('kpasswd_server',
+                                  ipautil.format_netloc(server, 464))
+            ])
+    else:
+        # For DNS-based setup we should not have explicit configuration
+        kropts.extend([
+            krbconf.rmOption('kdc'),
+            krbconf.rmOption('master_kdc'),
+            krbconf.rmOption('admin_server'),
+            krbconf.rmOption('kpasswd_server')
+        ])
+
+    kropts.append(krbconf.setOption('default_domain', cli_domain))
+    kropts.append(
+        krbconf.setOption('pkinit_anchors',
+                          'FILE:%s' % paths.KDC_CA_BUNDLE_PEM))
+    kropts.append(
+        krbconf.setOption('pkinit_pool',
+                          'FILE:%s' % paths.CA_BUNDLE_PEM))
+    ropts = [{
+        'name': cli_realm,
+        'type': 'subsection',
+        'value': kropts,
+        'action': 'set'
+    }]
+
+    opts.append(krbconf.setSection('realms', ropts))
+    opts.append(krbconf.emptyLine())
+
+    # [domain_realm]
+    dropts = [
+        krbconf.setOption('.{}'.format(cli_domain), cli_realm),
+        krbconf.setOption(cli_domain, cli_realm),
+        krbconf.setOption(client_hostname, cli_realm)
+    ]
+
+    # add client domain mapping if different from server domain
+    if cli_domain != client_domain:
+        dropts.extend([
+            krbconf.setOption('.{}'.format(client_domain), cli_realm),
+            krbconf.setOption(client_domain, cli_realm)
+        ])
+
+    opts.extend([
+        krbconf.setSection('domain_realm', dropts),
+        krbconf.emptyLine()
+    ])
+
+    return opts
+
+
 def configure_krb5_snippet():
+    template = os.path.join(
+        paths.USR_SHARE_IPA_CLIENT_DIR,
+        os.path.basename(paths.KRB5_FREEIPA_DEFAULTS) + ".template"
+    )
+    shutil.copy(template, paths.KRB5_FREEIPA_DEFAULTS)
+    os.chmod(paths.KRB5_FREEIPA_DEFAULTS, 0o644)
+    tasks.restore_context(paths.KRB5_FREEIPA_DEFAULTS)
+
+
+def configure_krb5_snippet_full(
+        cli_realm, cli_domain, cli_server, cli_kdc,
+        dnsok, client_domain, client_hostname, force=False, fstore=None):
+
+    configure_krb5_snippet()
+
+    # Then, perform the rest of our configuration into krb5.conf itself.
+    krbconf = IPAChangeConf("IPA Installer")
+    krbconf.setOptionAssignment((" = ", " "))
+    krbconf.setSectionNameDelimiters(("[", "]"))
+    krbconf.setSubSectionDelimiters(("{", "}"))
+    krbconf.setIndent(("", "  ", "    "))
+
+    opts = [
+        {
+            'name': 'comment',
+            'type': 'comment',
+            'value': 'File modified by ipa-client-install',
+            'action': 'set'
+        },
+        krbconf.emptyLine(),
+    ]
+
+    new_opts = configure_krb5_realm(
+        krbconf, cli_realm, cli_domain, cli_server, cli_kdc,
+        dnsok, client_domain, client_hostname, force)
+
+    opts.extend(new_opts)
+    logger.debug("Writing Kerberos realm configuration to %s:",
+                 paths.KRB5_FREEIPA)
+    logger.debug("%s", krbconf.dump(opts))
+
     template = os.path.join(
         paths.USR_SHARE_IPA_CLIENT_DIR,
         os.path.basename(paths.KRB5_FREEIPA) + ".template"
     )
-    shutil.copy(template, paths.KRB5_FREEIPA)
-    os.chmod(paths.KRB5_FREEIPA, 0o644)
 
+    # Bootstrap the default configuration
+    sub_dict = {
+        'REALM': cli_realm, 'DOMAIN': cli_domain, 'FQDN': cli_kdc,
+        'KDC_CA_BUNDLE_PEM': paths.KDC_CA_BUNDLE_PEM,
+        'CA_BUNDLE_PEM': paths.CA_BUNDLE_PEM,
+        'OTHER_DOMAIN_REALM_MAPS': ''
+    }
+    if not dnsok or not cli_kdc or force:
+        sub_dict['FQDN'] = cli_server[0]
+
+    conf = ipautil.template_file(template, sub_dict)
+    if fstore is not None:
+        fstore.backup_file(paths.KRB5_FREEIPA)
+    with open(paths.KRB5_FREEIPA, 'w') as f:
+        f.write(conf)
+
+    # Apply the actual setup
+    krbconf.changeConf(paths.KRB5_FREEIPA, opts)
+    # Remove the backup which contained the initialized template
+    remove_file(paths.KRB5_FREEIPA + '.ipabkp')
+    os.chmod(paths.KRB5_FREEIPA, 0o644)
     tasks.restore_context(paths.KRB5_FREEIPA)
 
 
 def configure_krb5_conf(
         cli_realm, cli_domain, cli_server, cli_kdc, dnsok,
         filename, client_domain, client_hostname, force=False,
-        configure_sssd=True):
+        configure_sssd=True, fstore=None):
+
     # First, write a snippet to krb5.conf.d.
-    configure_krb5_snippet()
+    configure_krb5_snippet_full(
+        cli_realm, cli_domain, cli_server, cli_kdc, dnsok,
+        client_domain, client_hostname, force=force, fstore=fstore
+    )
 
     # Then, perform the rest of our configuration into krb5.conf itself.
     krbconf = IPAChangeConf("IPA Installer")
@@ -739,56 +860,6 @@ def configure_krb5_conf(
 
     opts.extend([
         krbconf.setSection('libdefaults', libopts),
-        krbconf.emptyLine()
-    ])
-
-    # the following are necessary only if DNS discovery does not work
-    kropts = []
-    if not dnsok or not cli_kdc or force:
-        # [realms]
-        for server in cli_server:
-            kropts.extend([
-                krbconf.setOption('kdc', ipautil.format_netloc(server, 88)),
-                krbconf.setOption('master_kdc',
-                                  ipautil.format_netloc(server, 88)),
-                krbconf.setOption('admin_server',
-                                  ipautil.format_netloc(server, 749)),
-                krbconf.setOption('kpasswd_server',
-                                  ipautil.format_netloc(server, 464))
-            ])
-        kropts.append(krbconf.setOption('default_domain', cli_domain))
-
-    kropts.append(
-        krbconf.setOption('pkinit_anchors',
-                          'FILE:%s' % paths.KDC_CA_BUNDLE_PEM))
-    kropts.append(
-        krbconf.setOption('pkinit_pool',
-                          'FILE:%s' % paths.CA_BUNDLE_PEM))
-    ropts = [{
-        'name': cli_realm,
-        'type': 'subsection',
-        'value': kropts
-    }]
-
-    opts.append(krbconf.setSection('realms', ropts))
-    opts.append(krbconf.emptyLine())
-
-    # [domain_realm]
-    dropts = [
-        krbconf.setOption('.{}'.format(cli_domain), cli_realm),
-        krbconf.setOption(cli_domain, cli_realm),
-        krbconf.setOption(client_hostname, cli_realm)
-    ]
-
-    # add client domain mapping if different from server domain
-    if cli_domain != client_domain:
-        dropts.extend([
-            krbconf.setOption('.{}'.format(client_domain), cli_realm),
-            krbconf.setOption(client_domain, cli_realm)
-        ])
-
-    opts.extend([
-        krbconf.setSection('domain_realm', dropts),
         krbconf.emptyLine()
     ])
 
@@ -982,6 +1053,8 @@ def configure_sssd_conf(
 
     sssd_enable_service(sssdconfig, 'nss')
     sssd_enable_service(sssdconfig, 'pam')
+    if options.conf_ssh:
+        sssd_enable_service(sssdconfig, 'ssh')
 
     domain.set_option('ipa_domain', cli_domain)
     domain.set_option('ipa_hostname', client_hostname)
@@ -1008,6 +1081,11 @@ def configure_sssd_conf(
 
     if options.dns_updates:
         domain.set_option('dyndns_update', True)
+        if options.dns_over_tls:
+            server_ip = str(list(dnsutil.resolve_ip_addresses(
+                cli_server[0]))[0])
+            domain.set_option('dyndns_server', 'dns+tls://{}:853#{}'
+                              .format(server_ip, cli_server[0]))
         if options.all_ip_addresses:
             domain.set_option('dyndns_iface', '*')
         else:
@@ -1415,8 +1493,9 @@ def get_local_ipaddresses(iface=None):
     return ips
 
 
-def do_nsupdate(update_txt):
+def do_nsupdate(update_txt, options, server):
     logger.debug("Writing nsupdate commands to %s:", UPDATE_FILE)
+
     logger.debug("%s", update_txt)
 
     with open(UPDATE_FILE, "w") as f:
@@ -1424,12 +1503,20 @@ def do_nsupdate(update_txt):
 
     result = False
     try:
-        ipautil.run([paths.NSUPDATE, '-g', UPDATE_FILE])
+        if options.dns_over_tls:
+            ipautil.run([paths.NSUPDATE, '-p', '853', '-S',
+                         '-H', server, '-g', UPDATE_FILE])
+        else:
+            ipautil.run([paths.NSUPDATE, '-g', UPDATE_FILE])
         result = True
     except CalledProcessError as e:
         logger.debug('nsupdate (GSS-TSIG) failed: %s', str(e))
         try:
-            ipautil.run([paths.NSUPDATE, UPDATE_FILE])
+            if options.dns_over_tls:
+                ipautil.run([paths.NSUPDATE, '-p', '853', '-S',
+                             '-H', server, '-g', UPDATE_FILE])
+            else:
+                ipautil.run([paths.NSUPDATE, UPDATE_FILE])
             try:
                 sssdconfig = SSSDConfig.SSSDConfig()
                 sssdconfig.import_config()
@@ -1531,6 +1618,8 @@ def update_dns(server, hostname, options):
     no_matching_interface_for_ip_address_warning(update_ips)
 
     update_txt = "debug\n"
+    if options.dns_over_tls:
+        update_txt += "server %s 853\n" % server
     update_txt += ipautil.template_str(DELETE_TEMPLATE_A,
                                        dict(HOSTNAME=hostname))
     update_txt += ipautil.template_str(DELETE_TEMPLATE_AAAA,
@@ -1544,7 +1633,7 @@ def update_dns(server, hostname, options):
             template = ADD_TEMPLATE_AAAA
         update_txt += ipautil.template_str(template, sub_dict)
 
-    if not do_nsupdate(update_txt):
+    if not do_nsupdate(update_txt, options, server):
         logger.error("Failed to update DNS records.")
     verify_dns_update(hostname, update_ips)
 
@@ -1646,7 +1735,7 @@ def get_server_connection_interface(server):
     raise RuntimeError(msg)
 
 
-def client_dns(server, hostname, options):
+def client_dns(server, hostname, options, statestore):
 
     try:
         verify_host_resolvable(hostname)
@@ -1660,11 +1749,77 @@ def client_dns(server, hostname, options):
                        hostname, ex)
         dns_ok = False
 
+    # Setup DNS over TLS
+    if options.dns_over_tls:
+        fstore = sysrestore.FileStore(paths.IPA_CLIENT_SYSRESTORE)
+        statestore.backup_state("dns_over_tls", "enabled", True)
+        save_state(services.knownservices["unbound"], statestore)
+        save_state(services.knownservices["dnsconfd"], statestore)
+        # setup and enable Unbound as resolver
+        server_ip = str(list(dnsutil.resolve_ip_addresses(server))[0])
+        forward_addr = "forward-addr: %s#%s" % (server_ip, server)
+        # module_config_iterator is commented out if DNSSEC validation is
+        # not disabled.
+        module_config_iterator = '' if options.no_dnssec_validation else '# '
+        # backup and remove all previous Unbound configuration
+        for filename in os.listdir(paths.UNBOUND_CONFIG_DIR):
+            filepath = os.path.join(paths.UNBOUND_CONFIG_DIR, filename)
+            if filepath == paths.UNBOUND_CONF:
+                continue
+            fstore.backup_file(filepath)
+            remove_file(filepath)
+        ipautil.copy_template_file(
+            paths.UNBOUND_CONF_SRC,
+            paths.UNBOUND_CONF,
+            dict(
+                FORWARD_ADDRS=forward_addr,
+                MODULE_CONFIG_ITERATOR=module_config_iterator
+            )
+        )
+        sr = services.knownservices["systemd-resolved"]
+        if sr.is_running():
+            sr.stop()
+            sr.disable()
+
+        dnsconfd = services.knownservices["dnsconfd"]
+        if dnsconfd.is_running():
+            dnsconfd.stop()
+            dnsconfd.disable()
+
+        nm = services.knownservices["NetworkManager"]
+        if nm.is_enabled():
+            with open(paths.NETWORK_MANAGER_IPA_CONF, "w") as f:
+                dns_none = [
+                    "# auto-generated by IPA installer",
+                    "[main]",
+                    "dns=none\n"
+                ]
+                f.write("\n".join(dns_none))
+            nm.reload_or_restart()
+
+        # Overwrite resolv.conf to point to Unbound
+        cfg = [
+            "# auto-generated by IPA installer",
+            "search .",
+            "nameserver 127.0.0.55\n"
+        ]
+        fstore.backup_file(paths.RESOLV_CONF)
+        with open(paths.RESOLV_CONF, 'w') as f:
+            f.write('\n'.join(cfg))
+            os.chmod(paths.RESOLV_CONF, 0o644)
+
+        services.knownservices.unbound.enable()
+        services.knownservices.unbound.restart()
+        logger.info("DNS encryption support was enabled. "
+                    "Unbound is configured to listen on 127.0.0.55:53 and "
+                    "forward to upstream DoT servers.")
+
     if (
         options.dns_updates or options.all_ip_addresses or
         options.ip_addresses or not dns_ok
     ):
         update_dns(server, hostname, options)
+
 
 
 def check_ip_addresses(options):
@@ -1678,7 +1833,7 @@ def check_ip_addresses(options):
     return True
 
 
-def update_ssh_keys(hostname, ssh_dir, create_sshfp):
+def update_ssh_keys(hostname, ssh_dir, options, server):
     if not os.path.isdir(ssh_dir):
         return
 
@@ -1724,10 +1879,12 @@ def update_ssh_keys(hostname, ssh_dir, create_sshfp):
         logger.warning("Failed to upload host SSH public keys.")
         return
 
-    if create_sshfp:
+    if options.create_sshfp:
         ttl = 1200
 
         update_txt = 'debug\n'
+        if options.dns_over_tls:
+            update_txt += "server %s 853\n" % server
         update_txt += 'update delete %s. IN SSHFP\nshow\nsend\n' % hostname
         for pubkey in pubkeys:
             sshfp = pubkey.fingerprint_dns_sha1()
@@ -1740,7 +1897,7 @@ def update_ssh_keys(hostname, ssh_dir, create_sshfp):
                     hostname, ttl, sshfp)
         update_txt += 'show\nsend\n'
 
-        if not do_nsupdate(update_txt):
+        if not do_nsupdate(update_txt, options, server):
             logger.warning("Could not update DNS SSHFP records.")
 
 
@@ -2218,31 +2375,20 @@ def install_check(options):
             "using 'ipa-client-install --uninstall'.")
         raise ScriptError(rval=CLIENT_ALREADY_CONFIGURED)
 
-    if TIME_SERVER is None and options.conf_ntp:
-        raise ScriptError(
-            "NTP client/server was not found in your system. "
-            "Please, install one of supported NTP client/server ({}) "
-            "and try again or use --no-ntp flag.".format(
-                ", ".join(
-                    [
-                        ntp["package_name"]
-                        for ntp in constants.TIME_SERVER_STRUCTURE.values()
-                    ]
-                )
-            )
-        )
-
     check_ldap_conf()
 
     if options.conf_ntp:
         try:
-            ntpmethods.check_timedate_services()
-        except ntpmethods.NTPConflictingService as e:
-            print("WARNING: conflicting time&date synchronization service '{}'"
-                  " will be disabled".format(e.conflicting_service))
-            print("in favor of {}".format(TIME_SERVER))
-            print("")
-        except ntpmethods.NTPConfigurationError:
+            timeconf.check_timedate_services()
+        except timeconf.NTPConflictingService as e:
+            print(
+                "WARNING: conflicting time&date synchronization service "
+                "'{}' will be disabled in favor of chronyd\n".format(
+                    e.conflicting_service
+                )
+            )
+
+        except timeconf.NTPConfigurationError:
             pass
 
     if options.unattended and (
@@ -2368,6 +2514,16 @@ def install_check(options):
 
     if not check_ip_addresses(options):
         raise ScriptError(rval=CLIENT_INSTALL_ERROR)
+
+    if options.dns_over_tls \
+       and not services.knownservices["unbound"].is_installed():
+        raise ScriptError(
+            "To enable DNS over TLS, package ipa-client-encrypted-dns must "
+            "be installed.")
+    if options.no_dnssec_validation and not options.dns_over_tls:
+        raise ScriptError(
+            "You can not specify --no-dnssec-validation option without the"
+            "--dns-over-tls option.")
 
     # Create the discovery instance
     ds = discovery.IPADiscovery()
@@ -2559,8 +2715,7 @@ def install_check(options):
     if options.conf_ntp:
         if not options.on_master and not options.unattended and not (
                 options.ntp_servers or options.ntp_pool):
-            options.ntp_servers, options.ntp_pool = \
-                ntpmethods.get_time_source(logger)
+            options.ntp_servers, options.ntp_pool = timeconf.get_time_source()
 
     cli_realm = ds.realm
     cli_realm_source = ds.realm_source
@@ -2662,6 +2817,73 @@ def update_ipa_nssdb():
                                    (nickname, sys_db.secdir, e))
 
 
+def sync_time(ntp_servers, ntp_pool, fstore, statestore):
+    """
+    Will disable any other time synchronization service and configure chrony
+    with given ntp(chrony) server and/or pool using Augeas.
+    If there is no option --ntp-server set IPADiscovery will try to find ntp
+    server in DNS records.
+    """
+    # We assume that NTP servers are discoverable through SRV records in DNS.
+
+    # disable other time&date services first
+    timeconf.force_chrony(statestore)
+
+    if not ntp_servers and not ntp_pool:
+        # autodiscovery happens in case that NTP configuration isn't explicitly
+        # disabled and user did not provide any NTP server addresses or
+        # NTP pool address to the installer interactively or as an cli argument
+        ds = discovery.IPADiscovery()
+        ntp_servers = ds.ipadns_search_srv(
+            cli_domain, '_ntp._udp', None, break_on_first=False
+        )
+        if ntp_servers:
+            for server in ntp_servers:
+                # when autodiscovery found server records
+                logger.debug("Found DNS record for NTP server: \t%s", server)
+
+    logger.info('Synchronizing time')
+
+    configured = False
+    if ntp_servers or ntp_pool:
+        configured = timeconf.configure_chrony(ntp_servers, ntp_pool,
+                                               fstore, statestore)
+    else:
+        logger.warning("No SRV records of NTP servers found and no NTP server "
+                       "or pool address was provided.")
+
+    if not configured:
+        print("Using default chrony configuration.")
+
+    return timeconf.sync_chrony()
+
+
+def restore_time_sync(statestore, fstore):
+    if statestore.has_state('chrony'):
+        chrony_enabled = statestore.restore_state('chrony', 'enabled')
+        restored = False
+
+        try:
+            # Restore might fail due to missing file(s) in backup.
+            # One example is if the client was updated from a previous version
+            # not configured with chrony. In such a cast it is OK to fail.
+            restored = fstore.restore_file(paths.CHRONY_CONF)
+        except ValueError:  # this will not handle possivble IOError
+            logger.debug("Configuration file %s was not restored.",
+                         paths.CHRONY_CONF)
+
+        if not chrony_enabled:
+            services.knownservices.chronyd.stop()
+            services.knownservices.chronyd.disable()
+        elif restored:
+            services.knownservices.chronyd.restart()
+
+    try:
+        timeconf.restore_forced_timeservices(statestore)
+    except CalledProcessError as e:
+        logger.error('Failed to restore time synchronization service: %s', e)
+
+
 def configure_selinux_for_client(statestore):
     def backup_state(key, value):
         statestore.backup_state('selinux', key, value)
@@ -2728,24 +2950,15 @@ def _install(options, tdict):
         tasks.set_hostname(options.hostname)
 
     if options.conf_ntp:
-        # Attempt to configure and sync time with NTP server.
-        if not createntp.sync_time_client(
-                fstore, statestore, cli_domain,
-                options.ntp_servers, options.ntp_pool):
-            print("Warning: IPA client was unable to sync time "
-                  "with IPA server!")
-            print("         Time synchronization is required for IPA "
-                  "to work correctly!")
-        else:
-            print("Time successfully synchronized with IPA server")
+        # Attempt to configure and sync time with NTP server (chrony).
+        sync_time(options.ntp_servers, options.ntp_pool, fstore, statestore)
     elif options.on_master:
         # If we're on master skipping the time sync here because it was done
         # in ipa-server-install
         logger.debug("Skipping attempt to configure and synchronize time with"
-                     " %s server as it has been already done on master.",
-                     TIME_SERVER)
+                     " chrony server as it has been already done on master.")
     else:
-        logger.info("Skipping time synchronization")
+        logger.info("Skipping chrony configuration")
 
     if not options.unattended:
         if (options.principal is None and options.password is None and
@@ -2769,7 +2982,8 @@ def _install(options, tdict):
             client_domain=client_domain,
             client_hostname=hostname,
             configure_sssd=options.sssd,
-            force=options.force)
+            force=options.force,
+            fstore=fstore)
         env['KRB5_CONFIG'] = krb_name
         ccache_name = os.path.join(ccache_dir, 'ccache')
         join_args = [
@@ -3093,15 +3307,15 @@ def _install(options, tdict):
         ca_certs = certstore.make_compat_ca_certs(ca_certs, cli_realm,
                                                   ca_subject)
     ca_certs_trust = [(c, n, certstore.key_policy_to_trust_flags(t, True, u))
-                      for (c, n, t, u) in ca_certs]
+                      for (c, n, t, u, s) in ca_certs]
 
     x509.write_certificate_list(
-        [c for c, n, t, u in ca_certs if t is not False],
+        [c for c, n, t, u, s in ca_certs if t is not False],
         paths.KDC_CA_BUNDLE_PEM,
         mode=0o644
     )
     x509.write_certificate_list(
-        [c for c, n, t, u in ca_certs if t is not False],
+        [c for c, n, t, u, s in ca_certs if t is not False],
         paths.CA_BUNDLE_PEM,
         mode=0o644
     )
@@ -3121,9 +3335,9 @@ def _install(options, tdict):
     tasks.insert_ca_certs_into_systemwide_ca_store(ca_certs)
 
     if not options.on_master:
-        client_dns(cli_server[0], hostname, options)
+        client_dns(cli_server[0], hostname, options, statestore)
 
-    update_ssh_keys(hostname, paths.SSH_CONFIG_DIR, options.create_sshfp)
+    update_ssh_keys(hostname, paths.SSH_CONFIG_DIR, options, cli_server[0])
 
     try:
         os.remove(CCACHE_FILE)
@@ -3187,7 +3401,6 @@ def _install(options, tdict):
         tasks.modify_nsswitch_pam_stack(
             sssd=options.sssd,
             mkhomedir=options.mkhomedir,
-            fstore=fstore,
             statestore=statestore,
             sudo=options.conf_sudo,
             subid=options.subid
@@ -3326,7 +3539,8 @@ def _install(options, tdict):
             client_domain=client_domain,
             client_hostname=hostname,
             configure_sssd=options.sssd,
-            force=options.force)
+            force=options.force,
+            fstore=fstore)
 
         logger.info("Configured /etc/krb5.conf for IPA realm %s", cli_realm)
 
@@ -3374,9 +3588,6 @@ def uninstall(options):
         if e.returncode != CLIENT_NOT_CONFIGURED:
             logger.error(
                 "Unconfigured automount client failed: %s", str(e))
-    except FileNotFoundError:
-        # ALT: IPA_CLIENT_AUTOMOUNT script is packaged in its own RPM subpackage
-        pass
     finally:
         statestore.delete_state('installation', 'automount')
 
@@ -3514,6 +3725,25 @@ def uninstall(options):
             oddjobd.disable()
         except Exception:
             pass
+
+    # Restore unbound and dnsconfd to their original status
+    if statestore.restore_state("dns_over_tls", "enabled"):
+        unbound = services.knownservices['unbound']
+        dnsconfd = services.knownservices['dnsconfd']
+        if not statestore.restore_state('unbound', 'running'):
+            unbound.stop()
+        if not statestore.restore_state('unbound', 'enabled'):
+            unbound.disable()
+        if statestore.restore_state('dnsconfd', 'running'):
+            dnsconfd.start()
+        if statestore.restore_state('dnsconfd', 'enabled'):
+            dnsconfd.enable()
+        # restore unbound config files that were removed during IPA install
+        remove_file(paths.UNBOUND_CONF)
+        for filename, fileinfo in fstore.files.items():
+            if paths.UNBOUND_CONFIG_DIR in fileinfo:
+                fstore.restore_file(
+                    os.path.join(paths.UNBOUND_CONFIG_DIR, filename))
 
     logger.info("Disabling client Kerberos and LDAP configurations")
     was_sssd_installed = False
@@ -3687,10 +3917,7 @@ def uninstall(options):
                 service.service_name
             )
 
-    createntp.uninstall_client(fstore, statestore)
-    # restore ntp state
-    if TIME_SERVER is not None:
-        restore_state(ntpmethods.SERVICE_API, statestore)
+    restore_time_sync(statestore, fstore)
 
     if was_sshd_configured and services.knownservices.sshd.is_running():
         remove_file(paths.SSHD_IPA_CONFIG)
@@ -3755,6 +3982,8 @@ def uninstall(options):
     remove_file(paths.IPA_CA_CRT)
     remove_file(paths.KDC_CA_BUNDLE_PEM)
     remove_file(paths.CA_BUNDLE_PEM)
+    remove_file(paths.KRB5_FREEIPA)
+    remove_file(paths.KRB5_FREEIPA_DEFAULTS)
 
     logger.info("Client uninstall complete.")
 
@@ -3954,6 +4183,18 @@ class ClientInstallInterface(hostname_.HostNameInstallInterface,
     def kinit_attempts(self, value):
         if value < 1:
             raise ValueError("expects an integer greater than 0.")
+
+    dns_over_tls = knob(
+        None,
+        description="Configure DNS over TLS",
+    )
+    dns_over_tls = enroll_only(dns_over_tls)
+
+    no_dnssec_validation = knob(
+        None,
+        description="Disable DNSSEC validation for DNS over TLS",
+    )
+    no_dnssec_validation = enroll_only(no_dnssec_validation)
 
     request_cert = knob(
         None,

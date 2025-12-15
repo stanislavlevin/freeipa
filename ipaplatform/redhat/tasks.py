@@ -222,7 +222,7 @@ class RedHatTaskNamespace(BaseTaskNamespace):
         with open(paths.SYSCONF_NETWORK, 'w') as f:
             f.writelines(content)
 
-    def modify_nsswitch_pam_stack(self, sssd, mkhomedir, fstore, statestore,
+    def modify_nsswitch_pam_stack(self, sssd, mkhomedir, statestore,
                                   sudo=True, subid=False):
         auth_config = get_auth_tool()
         auth_config.configure(sssd, mkhomedir, statestore, sudo, subid)
@@ -307,7 +307,7 @@ class RedHatTaskNamespace(BaseTaskNamespace):
                 raise
 
             has_eku = set()
-            for cert, nickname, trusted, _ext_key_usage in ca_certs:
+            for cert, nickname, trusted, _ext_key_usage, _serial in ca_certs:
                 try:
                     subject = cert.subject_bytes
                     issuer = cert.issuer_bytes
@@ -504,28 +504,8 @@ class RedHatTaskNamespace(BaseTaskNamespace):
             )
         )
 
-        if constants.GSSPROXY_USER.uid == 0:
-            # by default gssproxy user is root
-            mod = 0o600
-        else:
-            # gssproxy user is non-privileged
-            mod = 0o640
-        os.chmod(paths.GSSPROXY_CONF, mod)
-        os.chown(paths.GSSPROXY_CONF, 0, constants.GSSPROXY_USER.pgid)
+        os.chmod(paths.GSSPROXY_CONF, 0o600)
         self.restore_context(paths.GSSPROXY_CONF)
-
-    def configure_ipa_gssproxy_dir(self):
-        ipa_gssproxy_dir = os.path.dirname(paths.HTTP_KEYTAB)
-        if constants.GSSPROXY_USER.uid == 0:
-            # by default gssproxy user is root
-            mod = 0o700
-        else:
-            # gssproxy user is non-privileged
-            mod = 0o770
-        if not os.path.isdir(ipa_gssproxy_dir):
-            os.mkdir(ipa_gssproxy_dir)
-        os.chmod(ipa_gssproxy_dir, mod)
-        os.chown(ipa_gssproxy_dir, 0, constants.GSSPROXY_USER.pgid)
 
     def configure_httpd_wsgi_conf(self):
         """Configure WSGI for correct Python version (Fedora)
@@ -770,6 +750,14 @@ class RedHatTaskNamespace(BaseTaskNamespace):
             logger.info("Unable to disable with-custom-automount feature")
             logger.info("It may happen if the configuration was done "
                         "using authconfig instead of authselect")
+
+    def get_supported_enctypes(self):
+        enctypes = super().get_supported_enctypes()
+
+        if not self.is_fips_enabled():
+            return enctypes
+
+        return tuple(e for e in enctypes if not e.startswith('camellia'))
 
 
 tasks = RedHatTaskNamespace()

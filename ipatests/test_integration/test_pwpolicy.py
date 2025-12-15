@@ -7,7 +7,6 @@ from __future__ import absolute_import
 
 import pytest
 
-from ipaplatform.constants import constants
 from ipatests.test_integration.base import IntegrationTest
 
 from ipatests.pytest_ipa.integration import tasks
@@ -15,10 +14,6 @@ from ipatests.pytest_ipa.integration import tasks
 USER = 'tuser'
 PASSWORD = 'Secret123'
 POLICY = 'test'
-
-
-def has_pw_quality_lib():
-    return constants.PASSWORD_QUALITY_LIB is not None
 
 
 class TestPWPolicy(IntegrationTest):
@@ -60,15 +55,20 @@ class TestPWPolicy(IntegrationTest):
             ),
         )
 
-    def reset_password(self, host, user=USER, password=PASSWORD):
+    def reset_password(self, host, user=USER, password=PASSWORD,
+                       unlock=False):
         tasks.kinit_admin(host)
         host.run_command(
             ['ipa', 'passwd', user],
             stdin_text='{password}\n{password}\n'.format(password=password),
         )
+        if unlock:
+            host.run_command(['ipa', 'user-unlock', user])
+        tasks.kdestroy_all(host)
 
     def set_pwpolicy(self, minlength=None, maxrepeat=None, maxsequence=None,
-                     dictcheck=None, usercheck=None, minclasses=None):
+                     dictcheck=None, usercheck=None, minclasses=None,
+                     dcredit=None, ucredit=None, lcredit=None, ocredit=None):
         tasks.kinit_admin(self.master)
         args = ["ipa", "pwpolicy-mod", POLICY]
         if minlength is not None:
@@ -83,28 +83,34 @@ class TestPWPolicy(IntegrationTest):
             args.append("--usercheck={}".format(usercheck))
         if minclasses is not None:
             args.append("--minclasses={}".format(minclasses))
+        if dcredit is not None:
+            args.append("--dcredit={}".format(dcredit))
+        if ucredit is not None:
+            args.append("--ucredit={}".format(ucredit))
+        if lcredit is not None:
+            args.append("--lcredit={}".format(lcredit))
+        if ocredit is not None:
+            args.append("--ocredit={}".format(ocredit))
         self.master.run_command(args)
 
         self.reset_password(self.master)
 
     def clean_pwpolicy(self):
         """Set all policy values we care about to zero/false"""
-        cmd = [
-            "ipa", "pwpolicy-mod", POLICY,
-            "--minlife", "0",
-            "--minlength", "0",
-            "--minclasses", "0",
-        ]
-        if has_pw_quality_lib():
-            cmd.extend(
-                [
-                    "--maxrepeat", "0",
-                    "--maxsequence", "0",
-                    "--usercheck", "false",
-                    "--dictcheck" ,"false",
-                ]
-            )
-        self.master.run_command(cmd)
+        self.master.run_command(
+            ["ipa", "pwpolicy-mod", POLICY,
+             "--maxrepeat", "0",
+             "--maxsequence", "0",
+             "--usercheck", "false",
+             "--dictcheck" ,"false",
+             "--minlife", "0",
+             "--minlength", "0",
+             "--minclasses", "0",
+             "--dcredit", "0",
+             "--ucredit", "0",
+             "--lcredit", "0",
+             "--ocredit", "0",],
+        )
         # minlength => 6 is required for any of the libpwquality settings
         self.master.run_command(
             ["ipa", "pwpolicy-mod", POLICY,
@@ -119,10 +125,6 @@ class TestPWPolicy(IntegrationTest):
         tasks.kinit_admin(self.master)
         self.clean_pwpolicy()
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_maxrepeat(self, reset_pwpolicy):
         self.set_pwpolicy(maxrepeat=2)
         # good passwords
@@ -146,10 +148,6 @@ class TestPWPolicy(IntegrationTest):
             assert 'Password has too many consecutive characters' in \
                 result.stdout_text
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_maxsequence(self, reset_pwpolicy):
         self.set_pwpolicy(maxsequence=3)
         # good passwords
@@ -173,10 +171,6 @@ class TestPWPolicy(IntegrationTest):
             assert 'Password contains a monotonic sequence' in \
                 result.stdout_text
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_usercheck(self, reset_pwpolicy):
         self.set_pwpolicy(usercheck=True)
         for password in ('tuserpass', 'passoftuser'):
@@ -193,10 +187,6 @@ class TestPWPolicy(IntegrationTest):
         # test with valid password
         self.kinit_as_user(self.master, PASSWORD, 'bamOncyftAv0')
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_dictcheck(self, reset_pwpolicy):
         self.set_pwpolicy(dictcheck=True)
         for password in ('password', 'bookends', 'BaLtim0re'):
@@ -253,10 +243,89 @@ class TestPWPolicy(IntegrationTest):
             self.kinit_as_user(self.master, PASSWORD, valid)
             self.reset_password(self.master)
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
+    def test_credits(self, reset_pwpolicy):
+        """Test each credit individually. This would be all copy/paste
+           if done individually so provide a config and set of good
+           and bad passwords to test.
+
+           Reminder: a positive credit reduces minlength
+                     a zero credit is a no-op
+                     a negative credit is the minimum required
+        """
+        def test_policy(good, bad, msg, **options):
+            """Validate the configuration.
+
+               Given the options in **options, the other arguments are:
+               good: tuple of valid passwords
+               bad: tuple of invalid passwords
+               msg: tuple of expected messages. LDAP may return a different
+                    one than kinit.
+            """
+
+            tasks.kinit_admin(self.master)
+            self.clean_pwpolicy()
+            self.set_pwpolicy(**options)
+
+            for password in good:
+                self.kinit_as_user(self.master, PASSWORD, password)
+                self.reset_password(self.master)
+
+            for password in bad:
+                result = self.kinit_as_user(self.master, PASSWORD, password,
+                                            raiseonerr=False)
+                assert result.returncode == 1
+                for message in msg:
+                    if message in result.stdout_text:
+                        break
+                else:
+                    assert False, "%s not in %s" % (
+                        result.stdout_text, ', '.join(msg)
+                    )
+                result = tasks.ldappasswd_user_change(USER, PASSWORD, password,
+                                                      self.master,
+                                                      raiseonerr=False)
+                assert result.returncode == 1
+                for message in msg:
+                    if message in result.stdout_text:
+                        break
+                else:
+                    assert False, "%s not in %s" % (
+                        result.stdout_text, ', '.join(msg)
+                    )
+
+        # hint: minlength == 6
+        # dcredit
+        test_policy(('Pass12', 'password1'), ('123', 'passw'),
+                    ('Password is too short',), **{'dcredit': 1})
+        test_policy(('Passw0rd1', 'password12'), ('Passwd1', 'password1'),
+                    ('Password does not contain enough character',
+                     'Password contains too few digits',),
+                    **{'dcredit': -2})
+
+        # ucredit
+        test_policy(('Passw', 'PASSWORD'), ('PAS', 'passw'),
+                    ('Password is too short',), **{'ucredit': 1})
+        test_policy(('Passw0rD1', 'PasswordS'), ('Passwd1', 'password1'),
+                    ('Password does not contain enough character',
+                     'Password contains too few upper characters',),
+                    **{'ucredit': -2})
+
+        # lcredit
+        test_policy(('PASSw', 'password'), ('pas', 'PASSW'),
+                    ('Password is too short',), **{'lcredit': 1})
+        test_policy(('Passw0rD1', 'PasswordS'), ('PASSWd1', 'PASSWoRD1'),
+                    ('Password does not contain enough character',
+                     'Password contains too few lower characters',),
+                    **{'lcredit': -2})
+
+        # ocredit
+        test_policy(('passw!', 'password#'), ('pas#', 'PAS$'),
+                    ('Password is too short',), **{'ocredit': 1})
+        test_policy(('Passw@rD1$', 'P&sswordS%'), ('passwd*', 'password^'),
+                    ('Password does not contain enough character',
+                     'Password contains too few special characters',),
+                    **{'ocredit': -2})
+
     def test_minlength_mod(self, reset_pwpolicy):
         """Test that the pwpolicy minlength overrides our policy
         """
@@ -276,7 +345,7 @@ class TestPWPolicy(IntegrationTest):
             assert result.returncode != 0
             assert 'minlength' in result.stderr_text
 
-        # With any pwq value set, setting minlife < 6 should fail
+        # With any pwq value set, setting minlength < 6 should fail
         for values in (('--maxrepeat', '4'),
                        ('--maxsequence', '4'),
                        ('--dictcheck', 'true'),
@@ -292,10 +361,6 @@ class TestPWPolicy(IntegrationTest):
             assert result.returncode != 0
             assert 'minlength' in result.stderr_text
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_minlength_empty(self, reset_pwpolicy):
         """Test that the pwpolicy minlength can be blank
         """
@@ -330,10 +395,6 @@ class TestPWPolicy(IntegrationTest):
         assert result.returncode == 0
         assert 'minlength' not in result.stderr_text
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_minlength_add(self):
         """Test that adding a new policy with minlength is caught.
         """
@@ -427,6 +488,7 @@ class TestPWPolicy(IntegrationTest):
         dn = "uid={user},cn=users,cn=accounts,{base_dn}".format(
              user=USER, base_dn=str(self.master.domain.basedn))
 
+        tasks.kinit_admin(self.master)
         self.master.run_command(
             ["ipa", "pwpolicy-mod", POLICY, "--gracelimit", "0", ],
         )
@@ -472,20 +534,3 @@ class TestPWPolicy(IntegrationTest):
             self.master, dn, ['passwordgraceusertime',],
         )
         assert 'passwordgraceusertime: 0' in result.stdout_text.lower()
-
-    @pytest.mark.skipif(
-        has_pw_quality_lib(),
-        reason="Requires missing support for password quality lib",
-    )
-    def test_wrong_option(self):
-        for values in (
-            ("--maxrepeat", "4"),
-            ("--maxsequence", "4"),
-            ("--dictcheck", "true"),
-            ("--usercheck", "true"),
-        ):
-            args = ["ipa", "pwpolicy-mod", POLICY]
-            args.extend(values)
-            result = self.master.run_command(args, raiseonerr=False)
-            assert result.returncode != 0
-            assert f"error: no such option: {values[0]}" in result.stderr_text

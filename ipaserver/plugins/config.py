@@ -33,11 +33,13 @@ from .baseldap import (
     LDAPUpdate,
     LDAPRetrieve)
 from .selinuxusermap import validate_selinuxuser
-from ipalib import _
+from ipalib import _, messages
 from ipapython.admintool import ScriptError
 from ipapython.dn import DN
+from ipapython.ipavalidate import Email
 from ipaserver.plugins.privilege import principal_has_privilege
 from ipaserver.install.adtrust import set_and_check_netbios_name
+from ipaserver.install.installutils import validate_key_type_size
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +118,23 @@ def validate_search_records_limit(ugettext, value):
         return _('must be at least 10')
     return None
 
+
+def validate_emaildomain(ugettext, value):
+    """Do some basic e-mail domain validation.
+
+       Test using a sample user@domain.
+    """
+    test = "test@{}".format(value)
+    if not Email(test):
+        return _('Invalid e-mail domain')
+    return None
+
+
+def validate_key_type_size_wrapper(ugettext, value):
+    """Do some basic validation of key type and size.
+    """
+    return validate_key_type_size(value)
+
 @register()
 class config(LDAPObject):
     """
@@ -130,7 +149,7 @@ class config(LDAPObject):
         'ipapwdexpadvnotify', 'ipaselinuxusermaporder',
         'ipaselinuxusermapdefault', 'ipaconfigstring', 'ipakrbauthzdata',
         'ipauserauthtype', 'ipadomainresolutionorder', 'ipamaxhostnamelength',
-        'ipauserdefaultsubordinateid',
+        'ipauserdefaultsubordinateid', 'ipaservicekeytypesize',
     ]
     container_dn = DN(('cn', 'ipaconfig'), ('cn', 'etc'))
     permission_filter_objectclasses = ['ipaguiconfig']
@@ -153,6 +172,7 @@ class config(LDAPObject):
                 'ipauserauthtype', 'ipauserobjectclasses',
                 'ipausersearchfields', 'ipacustomfields',
                 'ipamaxhostnamelength', 'ipauserdefaultsubordinateid',
+                'ipaservicekeytypesize',
             },
         },
     }
@@ -188,6 +208,7 @@ class config(LDAPObject):
             doc=_('Default group for new users'),
         ),
         Str('ipadefaultemaildomain?',
+            validate_emaildomain,
             cli_name='emaildomain',
             label=_('Default e-mail domain'),
             doc=_('Default e-mail domain'),
@@ -248,7 +269,7 @@ class config(LDAPObject):
             values=(u'AllowNThash',
                     u'KDC:Disable Last Success', u'KDC:Disable Lockout',
                     u'KDC:Disable Default Preauth for SPNs',
-                    u'EnforceLDAPOTP'),
+                    u'EnforceLDAPOTP', u'SubID:Disable'),
         ),
         Str('ipaselinuxusermaporder',
             label=_('SELinux user map order'),
@@ -373,6 +394,13 @@ class config(LDAPObject):
             label=_('HSM token name'),
             doc=_('The HSM token name storing the CA private keys'),
             flags={'virtual_attribute', 'no_create', 'no_update'}
+        ),
+        Str(
+            'ipaservicekeytypesize?',
+            validate_key_type_size_wrapper,
+            cli_name='key_type_size',
+            label=_('IPA Service key type:size'),
+            doc=_('IPA Service key type:size'),
         ),
     )
 
@@ -507,6 +535,12 @@ class config(LDAPObject):
 
         for domain in submitted_domains:
             self._validate_single_domain(attr_name, domain, known_domains)
+
+    def is_config_option_present(self, option):
+        dn = DN(('cn', 'ipaconfig'), ('cn', 'etc'), self.api.env.basedn)
+        configentry = self.api.Backend.ldap2.get_entry(dn, ['ipaconfigstring'])
+        configstring = configentry.get('ipaconfigstring') or []
+        return (option.lower() in map(str.lower, configstring))
 
 
 @register()
@@ -681,6 +715,30 @@ class config_mod(LDAPUpdate):
             if defaultuser and defaultuser not in userlist:
                 raise errors.ValidationError(name=failedattr,
                     error=_('SELinux user map default user not in order list'))
+
+        if 'ipaconfigstring' in entry_attrs:
+            configstring = entry_attrs['ipaconfigstring'] or []
+            if 'SubID:Disable'.lower() in map(str.lower, configstring):
+                # Check if SubIDs already allocated
+                try:
+                    result = self.api.Command.subid_stats()
+                    stats = result['result']
+                except errors.PublicError:
+                    stats = {'assigned_subids': 0}
+                if stats["assigned_subids"] > 0:
+                    error_message = _("Subordinate ID feature can not be "
+                                      "disabled when there are subIDs "
+                                      "already in use.")
+                    raise errors.ValidationError(name='configuration state',
+                                                 error=error_message)
+                # SubID:Disable enforces disabling default subid generation
+                entry_attrs['ipauserdefaultsubordinateid'] = False
+                self.add_message(
+                    messages.ServerUpgradeRequired(
+                        feature='Subordinate ID',
+                        server=_('<all IPA servers>')
+                    )
+                )
 
         if 'ca_renewal_master_server' in options:
             new_master = options['ca_renewal_master_server']
