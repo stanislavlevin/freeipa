@@ -1067,6 +1067,7 @@ fi
 %_libexecdir/ipa/ipa-ods-exporter
 %_man1dir/ipa-dns-install.1*
 %_sbindir/ipa-dns-install
+%_datadir/ipa/ipa-dnssec.conf
 %attr(644,root,root) %_unitdir/ipa-dnskeysyncd.service
 %attr(644,root,root) %_unitdir/ipa-ods-exporter.socket
 %attr(644,root,root) %_unitdir/ipa-ods-exporter.service
