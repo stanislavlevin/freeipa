@@ -649,7 +649,7 @@ rm %buildroot/%_libdir/samba/pdb/ipasam.la
 mkdir -p %buildroot%apache2_confdir/{sites-available,extra-available,extra-enabled}
 /bin/touch %buildroot%apache2_sites_available/ipa.conf
 /bin/touch %buildroot%apache2_extra_enabled/{ipa-kdc-proxy.conf,ipa-pki-proxy.conf,ipa-rewrite.conf}
-/bin/touch %buildroot%_datadir/ipa/html/{ca.crt,krb.con,krb5.ini,krbrealm.con}
+/bin/touch %buildroot%_datadir/ipa/html/ca.crt
 
 mkdir -p %buildroot%etc_systemd_dir/httpd2.service.d
 touch %buildroot%etc_systemd_dir/httpd2.service.d/ipa.conf
@@ -1031,9 +1031,6 @@ fi
 %ghost %attr(0640,root,root) %config(noreplace) %apache2_extra_enabled/ipa-pki-proxy.conf
 %ghost %attr(0644,root,root) %config(noreplace) %_sysconfdir/ipa/kdcproxy/ipa-kdc-proxy.conf
 %ghost %attr(0644,root,root) %config(noreplace) %_datadir/ipa/html/ca.crt
-%ghost %attr(0644,root,root) %_datadir/ipa/html/krb.con
-%ghost %attr(0644,root,root) %_datadir/ipa/html/krb5.ini
-%ghost %attr(0644,root,root) %_datadir/ipa/html/krbrealm.con
 %dir %_datadir/ipa/updates/
 %_datadir/ipa/updates/*
 %dir %_sharedstatedir/ipa
