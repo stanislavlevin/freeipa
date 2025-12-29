@@ -1,0 +1,82 @@
+---
+name: Gating tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  GITHUB_CI: true
+
+jobs:
+  audit-and-build:
+    name: Audit and build
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Audit dependencies
+        run: npx audit-ci --config audit-ci.json --skip-dev
+
+      - name: Cache dependencies
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: npm-
+
+      - name: Install project
+        run: npm clean-install
+
+      - name: Prettier
+        run: npm run prettier
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Knip
+        run: npm run knip
+
+      - name: Build project
+        run: npm run build
+
+  unit-tests:
+    name: Unit tests
+    needs: audit-and-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install project
+        run: npm clean-install
+
+      - name: Run vitest
+        run: npm test
+
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38
+        env:
+          SHELLCHECK_OPTS: -x -a -o all -e SC2292 -e SC2310 -e SC2311 -P "./developer"

@@ -1,0 +1,44 @@
+body {
+  margin: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
+    "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family:
+    source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+:root {
+  --masthead-height: 53px;
+  --settings-main-title-height: 89.2px;
+  --settings-tabs-height: 45px;
+  --footer-buttons-height: 53px;
+  --tab-layout-calc: calc(
+    100vh - var(--masthead-height) - (var(--settings-main-title-height) * 2) -
+      var(--settings-tabs-height) - var(--footer-buttons-height) - 24px
+  );
+  --memberof-calc: calc(
+    100vh - var(--masthead-height) - var(--settings-main-title-height) -
+      var(--settings-tabs-height) - 64px
+  );
+  --subsettings-calc: calc(
+    100vh - var(--masthead-height) - var(--settings-main-title-height) -
+      var(--settings-tabs-height) - 72px
+  );
+  --idview-appliedto-toolbar-height: 53px;
+}
+
+.pf-v6-c-background-image {
+  --pf-v6-c-background-image--BackgroundSize: cover;
+  --pf-v6-c-background-image--BackgroundPosition: center;
+}
+
+code {
+  font-size: 0.8em;
+  background-color: rgb(222, 243, 255);
+  padding: 0.2em;
+}

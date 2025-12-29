@@ -1,0 +1,206 @@
+{
+  "active-users": [
+    {
+      "name": "User life cycle",
+      "url": "https://red.ht/user-life-cycle"
+    },
+    {
+      "name": "Adding users in the Web UI",
+      "url": "https://red.ht/webui-adding-users"
+    },
+    {
+      "name": "Disabling user accounts in the Web UI",
+      "url": "https://red.ht/webui-disabling-user-accounts"
+    },
+    {
+      "name": "Enabling user accounts in the Web UI",
+      "url": "https://red.ht/webui-enabling-user-accounts"
+    },
+    {
+      "name": "Deleting users in the IdM Web UI",
+      "url": "https://red.ht/webui-deleting-users"
+    },
+    {
+      "name": "Rebuilding automatic membership",
+      "url": "https://red.ht/rebuilding-automatic-membership"
+    }
+  ],
+  "active-users-settings": [
+    {
+      "name": "Resetting another user’s password",
+      "url": "https://red.ht/resetting-user-password"
+    },
+    {
+      "name": "Requesting new certificates for a user, host, or service",
+      "url": "https://red.ht/requesting-new-certificates"
+    },
+    {
+      "name": "Adding a certificate issued by an external CA to an IdM user, host, or service",
+      "url": "https://red.ht/adding-issued-certificate"
+    },
+    {
+      "name": "Removing a certificate issued by an external CA from an IdM user, host, or service account",
+      "url": "https://red.ht/removing-issued-certificate"
+    },
+    {
+      "name": "Converting an external certificate for loading into an IdM user account",
+      "url": "https://red.ht/converting-external-certificate"
+    },
+    {
+      "name": "Viewing the expiry date of a certificate",
+      "url": "https://red.ht/viewing-expiry-date-certificate"
+    },
+    {
+      "name": "Adding a certificate mapping rule",
+      "url": "https://red.ht/adding-certificate-mapping-rule"
+    },
+    {
+      "name": "Adding certificate mapping data to a user entry",
+      "url": "https://red.ht/adding-certificate-mapping-data-to-user"
+    },
+    {
+      "name": "Adding a certificate to an AD user’s ID override",
+      "url": "https://red.ht/adding-certificate-id-override"
+    },
+    {
+      "name": "Logging in to the Identity Management Web UI using one time passwords",
+      "url": "https://red.ht/webui-login-one-time-passwords"
+    },
+    {
+      "name": "Managing user accounts",
+      "url": "https://red.ht/managing-user-accounts"
+    }
+  ],
+  "stage-users": [
+    {
+      "name": "Adding new users",
+      "url": "https://red.ht/adding-stage-users"
+    },
+    {
+      "name": "Activating stage users",
+      "url": "https://red.ht/activating-stage-users"
+    },
+    {
+      "name": "Deleting users",
+      "url": "https://red.ht/webui-deleting-users"
+    }
+  ],
+  "stage-users-settings": [
+    {
+      "name": "Managing user accounts",
+      "url": "https://red.ht/managing-user-accounts"
+    },
+    {
+      "name": "Adding a certificate mapping rule",
+      "url": "https://red.ht/adding-certificate-mapping-rule"
+    },
+    {
+      "name": "Adding certificate mapping data to a user entry",
+      "url": "https://red.ht/adding-certificate-mapping-data-to-user"
+    }
+  ],
+  "preserved-users": [
+    {
+      "name": "Deleting users",
+      "url": "https://red.ht/webui-deleting-users"
+    },
+    {
+      "name": "Restoring users",
+      "url": "https://red.ht/restoring-users"
+    }
+  ],
+  "preserved-users-settings": [
+    {
+      "name": "Managing user accounts",
+      "url": "https://red.ht/managing-user-accounts"
+    },
+    {
+      "name": "Adding a certificate mapping rule",
+      "url": "https://red.ht/adding-certificate-mapping-rule"
+    },
+    {
+      "name": "Adding certificate mapping data to a user entry",
+      "url": "https://red.ht/adding-certificate-mapping-data-to-user"
+    },
+    {
+      "name": "Adding a certificate issued by an external CA to an IdM user, host, or service",
+      "url": "https://red.ht/adding-issued-certificate"
+    },
+    {
+      "name": "Removing a certificate issued by an external CA from an IdM user, host, or service account",
+      "url": "https://red.ht/removing-issued-certificate"
+    },
+    {
+      "name": "Converting an external certificate for loading into an IdM user account",
+      "url": "https://red.ht/converting-external-certificate"
+    },
+    {
+      "name": "Viewing the expiry date of a certificate",
+      "url": "https://red.ht/viewing-expiry-date-certificate"
+    }
+  ],
+  "hosts": [
+    {
+      "name": "Adding host entries from IdM Web UI",
+      "url": "https://red.ht/webui-adding-hosts"
+    },
+    {
+      "name": "Rebuilding automatic membership for all users or hosts",
+      "url": "https://red.ht/rebuilding-automatic-membership-users-hosts"
+    },
+    {
+      "name": "Rebuilding automatic membership for a single user or host only",
+      "url": "https://red.ht/rebuilding-automatic-membership-single-host-user"
+    }
+  ],
+  "hosts-settings": [
+    {
+      "name": "Hosts in IdM",
+      "url": "https://red.ht/hosts-idm"
+    },
+    {
+      "name": "Host enrollment",
+      "url": "https://red.ht/host-enrollment"
+    },
+    {
+      "name": "User privileges required for host enrollment",
+      "url": "https://red.ht/privileges-required-host-enrollment"
+    },
+    {
+      "name": "Enrollment and authentication of IdM hosts and users: comparison",
+      "url": "https://red.ht/enrollment-auth-hosts-users"
+    },
+    {
+      "name": "Host entry in IdM LDAP",
+      "url": "https://red.ht/host-entry-idm-ldap"
+    },
+    {
+      "name": "Adding Host Entries from the Web UI",
+      "url": "https://red.ht/webui-adding-hosts-entries"
+    }
+  ],
+  "services": [
+    {
+      "name": "Associating authentication indicators with an IdM service using IdM Web UI",
+      "url": "https://red.ht/associating-auth-indicators-with-service"
+    },
+    {
+      "name": "The IdM services",
+      "url": "https://red.ht/idm-services"
+    }
+  ],
+  "services-settings": [
+    {
+      "name": "Kerberos authentication indicators",
+      "url": "https://red.ht/kerberos-authentication-indicators"
+    },
+    {
+      "name": "Enforcing authentication indicators for an IdM service",
+      "url": "https://red.ht/enforcing-auth-indicators-service"
+    },
+    {
+      "name": "Associating authentication indicators with an IdM service using IdM Web UI",
+      "url": "https://red.ht/associating-auth-indicators-service"
+    }
+  ]
+}

@@ -1,0 +1,553 @@
+import React, { useEffect, useState } from "react";
+// PatternFly
+import {
+  Flex,
+  FlexItem,
+  PageSection,
+  PaginationVariant,
+  ToolbarItemVariant,
+} from "@patternfly/react-core";
+import {
+  InnerScrollContainer,
+  OuterScrollContainer,
+} from "@patternfly/react-table";
+// Layouts
+import TitleLayout from "src/components/layouts/TitleLayout";
+import ToolbarLayout, {
+  ToolbarItem,
+} from "src/components/layouts/ToolbarLayout";
+import SearchInputLayout from "src/components/layouts/SearchInputLayout";
+import SecondaryButton from "src/components/layouts/SecondaryButton";
+import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+// Components
+import BulkSelectorPrep from "src/components/BulkSelectorPrep";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
+// Tables
+import NetgroupsTable from "src/pages/Netgroups/NetgroupsTable";
+// Modal
+import AddNetgroup from "src/components/modals/AddNetgroup";
+import DeleteNetgroups from "src/components/modals/DeleteNetgroups";
+// Redux
+import { useAppSelector } from "src/store/hooks";
+// Data types
+import { Netgroup } from "src/utils/datatypes/globalDataTypes";
+// Utils
+import { API_VERSION_BACKUP, isNetgroupSelectable } from "src/utils/utils";
+// Hooks
+import useAlerts from "src/hooks/useAlerts";
+import useUpdateRoute from "src/hooks/useUpdateRoute";
+import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+// Errors
+import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+import { SerializedError } from "@reduxjs/toolkit";
+import useApiError from "src/hooks/useApiError";
+import GlobalErrors from "src/components/errors/GlobalErrors";
+import ModalErrors from "src/components/errors/ModalErrors";
+// RPC client
+import { GenericPayload, useSearchEntriesMutation } from "../../services/rpc";
+import { useGettingNetgroupsQuery } from "../../services/rpcNetgroups";
+
+const Netgroups = () => {
+  // Update current route data to Redux and highlight the current page in the Nav bar
+  const { browserTitle } = useUpdateRoute({ pathname: "netgroups" });
+
+  // Set the page title to be shown in the browser tab
+  React.useEffect(() => {
+    document.title = browserTitle;
+  }, [browserTitle]);
+
+  // Retrieve API version from environment data
+  const apiVersion = useAppSelector(
+    (state) => state.global.environment.api_version
+  ) as string;
+
+  // Initialize groups list (Redux)
+  const [groupsList, setGroupsList] = useState<Netgroup[]>([]);
+
+  // Alerts to show in the UI
+  const alerts = useAlerts();
+
+  // URL parameters: page number, page size, search value
+  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
+    useListPageSearchParams();
+
+  // Handle API calls errors
+  const globalErrors = useApiError([]);
+  const modalErrors = useApiError([]);
+
+  // Table comps
+  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
+  const [totalCount, setGroupsTotalCount] = useState<number>(0);
+  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
+
+  const updateSelectedPerPage = (selected: number) => {
+    setSelectedPerPage(selected);
+  };
+  const updatePage = (newPage: number) => {
+    setPage(newPage);
+  };
+  const updatePerPage = (newSetPerPage: number) => {
+    setPerPage(newSetPerPage);
+  };
+
+  // 'Delete' button state
+  const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
+    useState<boolean>(true);
+
+  const updateIsDeleteButtonDisabled = (value: boolean) => {
+    setIsDeleteButtonDisabled(value);
+  };
+
+  // If some entries have been deleted, restore the selectedGroups list
+  const [isDeletion, setIsDeletion] = useState(false);
+
+  const updateIsDeletion = (value: boolean) => {
+    setIsDeletion(value);
+  };
+
+  const updateShownGroupsList = (newShownGroupsList: Netgroup[]) => {
+    setGroupsList(newShownGroupsList);
+  };
+
+  // Page indexes
+  const firstIdx = (page - 1) * perPage;
+  const lastIdx = page * perPage;
+
+  // Derived states - what we get from API
+  const groupDataResponse = useGettingNetgroupsQuery({
+    searchValue: searchValue,
+    sizeLimit: 0,
+    apiVersion: apiVersion || API_VERSION_BACKUP,
+    startIdx: firstIdx,
+    stopIdx: lastIdx,
+  } as GenericPayload);
+
+  const {
+    data: batchResponse,
+    isLoading: isBatchLoading,
+    error: batchError,
+  } = groupDataResponse;
+
+  // Handle data when the API call is finished
+  useEffect(() => {
+    if (groupDataResponse.isFetching) {
+      setShowTableRows(false);
+      // Reset selected user groups on refresh
+      setGroupsTotalCount(0);
+      globalErrors.clear();
+      return;
+    }
+
+    // API response: Success
+    if (
+      groupDataResponse.isSuccess &&
+      groupDataResponse.data &&
+      batchResponse !== undefined
+    ) {
+      const groupsListResult = batchResponse.result.results;
+      const totalCount = batchResponse.result.totalCount;
+      const groupsListSize = batchResponse.result.count;
+      const groupsList: Netgroup[] = [];
+
+      for (let i = 0; i < groupsListSize; i++) {
+        groupsList.push(groupsListResult[i].result);
+      }
+
+      setGroupsList(groupsList);
+      setGroupsTotalCount(totalCount);
+      // Show table elements
+      setShowTableRows(true);
+    }
+
+    // API response: Error
+    if (
+      !groupDataResponse.isLoading &&
+      groupDataResponse.isError &&
+      groupDataResponse.error !== undefined
+    ) {
+      // This normally happens when the user is not authorized to view the data
+      // So instead of adding an error, refresh page
+      window.location.reload();
+    }
+  }, [groupDataResponse]);
+
+  // Always refetch data when the component is loaded.
+  // This ensures the data is always up-to-date.
+  useEffect(() => {
+    groupDataResponse.refetch();
+  }, [page, perPage]);
+
+  // Refresh button handling
+  const refreshGroupsData = () => {
+    // Hide table
+    setShowTableRows(false);
+
+    // Reset selected netgroups on refresh
+    setGroupsTotalCount(0);
+    clearSelectedGroups();
+    setPage(1);
+    groupDataResponse.refetch();
+  };
+
+  const updateSearchValue = (value: string) => {
+    setSearchValue(value);
+  };
+
+  const [selectedGroups, setSelectedGroupsList] = useState<Netgroup[]>([]);
+  const clearSelectedGroups = () => {
+    const emptyList: Netgroup[] = [];
+    setSelectedGroupsList(emptyList);
+  };
+
+  const [retrieveGroup] = useSearchEntriesMutation({});
+
+  // Issue a search using a specific search value
+  const submitSearchValue = () => {
+    setShowTableRows(false);
+    setGroupsTotalCount(0);
+    setSearchIsDisabled(true);
+    retrieveGroup({
+      searchValue: searchValue,
+      sizeLimit: 0,
+      apiVersion: apiVersion || API_VERSION_BACKUP,
+      startIdx: firstIdx,
+      stopIdx: lastIdx,
+      entryType: "netgroup",
+    } as GenericPayload).then((result) => {
+      // Manage new response here
+      if ("data" in result) {
+        const searchError = result.data?.error as
+          | FetchBaseQueryError
+          | SerializedError;
+
+        if (searchError) {
+          // Error
+          let error: string | undefined = "";
+          if ("error" in searchError) {
+            error = searchError.error;
+          } else if ("message" in searchError) {
+            error = searchError.message;
+          }
+          alerts.addAlert(
+            "submit-search-value-error",
+            error || "Error when searching for netgroups",
+            "danger"
+          );
+        } else {
+          // Success
+          const groupsListResult = result.data?.result.results || [];
+          const groupsListSize = result.data?.result.count || 0;
+          const totalCount = result.data?.result.totalCount || 0;
+          const groupsList: Netgroup[] = [];
+
+          for (let i = 0; i < groupsListSize; i++) {
+            groupsList.push(groupsListResult[i].result);
+          }
+
+          setPage(1);
+          setGroupsList(groupsList);
+          setGroupsTotalCount(totalCount);
+          // Show table elements
+          setShowTableRows(true);
+        }
+        setSearchIsDisabled(false);
+      }
+    });
+  };
+
+  // Show table rows
+  const [showTableRows, setShowTableRows] = useState(!isBatchLoading);
+
+  const updateSelectedGroups = (groups: Netgroup[], isSelected: boolean) => {
+    let newSelectedGroups: Netgroup[] = [];
+    if (isSelected) {
+      newSelectedGroups = JSON.parse(JSON.stringify(selectedGroups));
+      for (let i = 0; i < groups.length; i++) {
+        if (
+          selectedGroups.find(
+            (selectedGroup) => selectedGroup.cn[0] === groups[i].cn[0]
+          )
+        ) {
+          // Already in the list
+          continue;
+        }
+        // Add group to list
+        newSelectedGroups.push(groups[i]);
+      }
+    } else {
+      // Remove group
+      for (let i = 0; i < selectedGroups.length; i++) {
+        let found = false;
+        for (let ii = 0; ii < groups.length; ii++) {
+          if (selectedGroups[i].cn[0] === groups[ii].cn[0]) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          // Keep this valid selected entry
+          newSelectedGroups.push(selectedGroups[i]);
+        }
+      }
+    }
+    setSelectedGroupsList(newSelectedGroups);
+    setIsDeleteButtonDisabled(newSelectedGroups.length === 0);
+  };
+
+  // - Helper method to set the selected groups from the table
+  const setGroupSelected = (group: Netgroup, isSelecting = true) => {
+    if (isNetgroupSelectable(group)) {
+      updateSelectedGroups([group], isSelecting);
+    }
+  };
+
+  // Show table rows only when data is fully retrieved
+  useEffect(() => {
+    if (showTableRows !== !isBatchLoading) {
+      setShowTableRows(!isBatchLoading);
+    }
+  }, [isBatchLoading]);
+
+  // Modals functionality
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const onAddClickHandler = () => {
+    setShowAddModal(true);
+  };
+  const onCloseAddModal = () => {
+    setShowAddModal(false);
+  };
+  const onAddModalToggle = () => {
+    setShowAddModal(!showAddModal);
+  };
+
+  const onDeleteHandler = () => {
+    setShowDeleteModal(true);
+  };
+  const onDeleteModalToggle = () => {
+    setShowDeleteModal(!showDeleteModal);
+  };
+
+  // Table-related shared functionality
+  // - Selectable checkboxes on table
+  const selectableGroupsTable = groupsList.filter(isNetgroupSelectable); // elements per Table
+
+  // Data wrappers
+  // - 'PaginationLayout'
+  const paginationData = {
+    page,
+    perPage,
+    updatePage,
+    updatePerPage,
+    updateSelectedPerPage,
+    updateShownElementsList: updateShownGroupsList,
+    totalCount,
+  };
+
+  // - 'BulkSelectorPrep'
+  const groupsBulkSelectorData = {
+    selected: selectedGroups,
+    updateSelected: updateSelectedGroups,
+    selectableTable: selectableGroupsTable,
+    nameAttr: "cn",
+  };
+
+  const buttonsData = {
+    updateIsDeleteButtonDisabled,
+  };
+
+  const selectedPerPageData = {
+    selectedPerPage,
+    updateSelectedPerPage,
+  };
+
+  // - 'DeleteGroups'
+  const deleteGroupsButtonsData = {
+    updateIsDeleteButtonDisabled,
+    updateIsDeletion,
+  };
+
+  const selectedGroupsData = {
+    selectedGroups,
+    clearSelectedGroups,
+  };
+
+  // - 'NetroupsTable'
+  const groupsTableData = {
+    isNetgroupSelectable,
+    selectedGroups,
+    selectableGroupsTable,
+    setGroupSelected,
+    clearSelectedGroups,
+  };
+
+  const groupsTableButtonsData = {
+    updateIsDeleteButtonDisabled,
+    isDeletion,
+    updateIsDeletion,
+  };
+
+  // - 'SearchInputLayout'
+  const searchValueData = {
+    searchValue,
+    updateSearchValue,
+    submitSearchValue,
+  };
+
+  // List of toolbar items
+  const toolbarItems: ToolbarItem[] = [
+    {
+      key: 0,
+      element: (
+        <BulkSelectorPrep
+          list={groupsList}
+          shownElementsList={groupsList}
+          elementData={groupsBulkSelectorData}
+          buttonsData={buttonsData}
+          selectedPerPageData={selectedPerPageData}
+        />
+      ),
+    },
+    {
+      key: 1,
+      element: (
+        <SearchInputLayout
+          dataCy="search"
+          name="search"
+          ariaLabel="Search netgroups"
+          placeholder="Search"
+          searchValueData={searchValueData}
+          isDisabled={searchDisabled}
+        />
+      ),
+      toolbarItemVariant: ToolbarItemVariant.label,
+      toolbarItemGap: { default: "gapMd" },
+    },
+    {
+      key: 2,
+      toolbarItemVariant: ToolbarItemVariant.separator,
+    },
+    {
+      key: 3,
+      element: (
+        <SecondaryButton
+          onClickHandler={refreshGroupsData}
+          isDisabled={!showTableRows}
+          dataCy="netgroups-button-refresh"
+        >
+          Refresh
+        </SecondaryButton>
+      ),
+    },
+    {
+      key: 4,
+      element: (
+        <SecondaryButton
+          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          onClickHandler={onDeleteHandler}
+          dataCy="netgroups-button-delete"
+        >
+          Delete
+        </SecondaryButton>
+      ),
+    },
+    {
+      key: 5,
+      element: (
+        <SecondaryButton
+          onClickHandler={onAddClickHandler}
+          isDisabled={!showTableRows}
+          dataCy="netgroups-button-add"
+        >
+          Add
+        </SecondaryButton>
+      ),
+    },
+    {
+      key: 6,
+      toolbarItemVariant: ToolbarItemVariant.separator,
+    },
+    {
+      key: 7,
+      element: <HelpTextWithIconLayout textContent="Help" />,
+    },
+    {
+      key: 8,
+      element: (
+        <PaginationLayout
+          list={groupsList}
+          paginationData={paginationData}
+          widgetId="pagination-options-menu-top"
+          isCompact={true}
+        />
+      ),
+      toolbarItemAlignment: { default: "alignEnd" },
+    },
+  ];
+
+  return (
+    <div>
+      <alerts.ManagedAlerts />
+      <PageSection hasBodyWrapper={false}>
+        <TitleLayout id="Netgroups title" headingLevel="h1" text="Netgroups" />
+      </PageSection>
+      <PageSection hasBodyWrapper={false} isFilled={false}>
+        <Flex direction={{ default: "column" }}>
+          <FlexItem>
+            <ToolbarLayout toolbarItems={toolbarItems} />
+          </FlexItem>
+          <FlexItem style={{ flex: "0 0 auto" }}>
+            <OuterScrollContainer>
+              <InnerScrollContainer
+                style={{ height: "60vh", overflow: "auto" }}
+              >
+                {batchError !== undefined && batchError ? (
+                  <GlobalErrors errors={globalErrors.getAll()} />
+                ) : (
+                  <NetgroupsTable
+                    elementsList={groupsList}
+                    shownElementsList={groupsList}
+                    showTableRows={showTableRows}
+                    groupsData={groupsTableData}
+                    buttonsData={groupsTableButtonsData}
+                    paginationData={selectedPerPageData}
+                    searchValue={searchValue}
+                  />
+                )}
+              </InnerScrollContainer>
+            </OuterScrollContainer>
+          </FlexItem>
+          <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
+            <PaginationLayout
+              list={groupsList}
+              paginationData={paginationData}
+              variant={PaginationVariant.bottom}
+              widgetId="pagination-options-menu-bottom"
+            />
+          </FlexItem>
+        </Flex>
+      </PageSection>
+      <ModalErrors
+        errors={modalErrors.getAll()}
+        dataCy="netgroups-modal-error"
+      />
+      <AddNetgroup
+        show={showAddModal}
+        handleModalToggle={onAddModalToggle}
+        onOpenAddModal={onAddClickHandler}
+        onCloseAddModal={onCloseAddModal}
+        onRefresh={refreshGroupsData}
+      />
+      <DeleteNetgroups
+        show={showDeleteModal}
+        handleModalToggle={onDeleteModalToggle}
+        selectedGroupsData={selectedGroupsData}
+        buttonsData={deleteGroupsButtonsData}
+        onRefresh={refreshGroupsData}
+      />
+    </div>
+  );
+};
+
+export default Netgroups;
