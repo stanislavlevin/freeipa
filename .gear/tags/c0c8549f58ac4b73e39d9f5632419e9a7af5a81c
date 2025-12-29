@@ -1,0 +1,22 @@
+object dd8ba50929e861563a3c0d57d6172a36ba2011ad
+type commit
+tag release-4-13-0
+tagger Antonio Torres <antorres@redhat.com> 1764844396 +0100
+
+tagging IPAv4 4.13.0
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCgAdFiEEtAp4+6V2xKP8fXu8NZ+vd3KW9lMFAmkxY2wACgkQNZ+vd3KW
+9lObfg//ZIyX3UJt+gQDfQdcbqpFRdWKq35Y6A2zOoV3obXJA0qmKXeN1qtFsjQW
+9IKMNhS3Vjz1UPkwrGYM5BlfEd+04bV4SnKU6DHHbvjjpkaT58kpPtJAq4xZxLb/
+zyfq5LGxTcMRDTiRHv/Hbp58/uvYH5lnPN59hCt7Jv4HL/NWGPbPJwJAjkmg5BCu
+cBjGPmdRqas+a/xpdtWmzzkdqOgoIyOwOK/FrwgTwcEYsy9CseeKFXVB99u/WGf+
+4H5TS6fdgylEakRZ+J4KhMXggQN8h6AI1qrCs4i8Thzknea6iBPzXgNZFkLzkFyX
+d+H1kUwYucvC5uurupcOktD4J/HvIKVYZaDyt/Zok1t63s0hvbtilB28K3JkKdOD
+ddJMLDhmmI7adzXIRV4DxwQirbF8xFZcoTMKRyQGuheAfHOUACOHw4xZf357KSDV
+pVld55aHu6vcqM8/GVg5925DvsV0BLOr17AZ3ObteivWoOed7KjT/lFZCdjmZjqM
+tWtJ/C17cDpAmeYAep+qMgnPXI5Wh+3g/dwhfTOPREeRF+2Ck/pKzcuRIdAFAM9k
+i27nnLg7s4bp+GIZotplAa+sR7tBkBN+/Eet4yNJzXatAZOqDTBJ0ha9jZbr92Fg
+BJAgPLWaTYJUKSV4C6tj+E1xJTeJPvp+oNHXOUfqa3L81V+0vos=
+=puV0
+-----END PGP SIGNATURE-----
