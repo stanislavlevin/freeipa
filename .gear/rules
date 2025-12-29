@@ -1,4 +1,6 @@
 spec: .gear/freeipa.spec
 tar: release-4-12-5:.
+tar: alt_submodules:modules name=modules base=.
+tar: alt_vendor_nodejs:. name=vendor_nodejs base=install/freeipa-webui
 diff: release-4-12-5:. . name=@name@-@version@-alt.patch exclude=.gear/**
 copy: .gear/freeipa-server.filetrigger

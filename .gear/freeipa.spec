@@ -4,8 +4,15 @@
 
 %ifarch %ix86 armh
 %def_with only_client
+%def_without modern_ui
 %else
 %def_without only_client
+# fails: Cannot find module '@rollup/rollup-linux-arm64-gnu'
+%ifarch aarch64
+%def_without modern_ui
+%else
+%def_with modern_ui
+%endif
 %endif
 
 %def_without docs
@@ -66,6 +73,11 @@ Group: System/Base
 Url: http://www.freeipa.org/
 Source0: %name-%version.tar
 Source1: freeipa-server.filetrigger
+# https://git.altlinux.org/people/slev/public/updater_submodules.git
+%if_with modern_ui
+Source2: modules.tar
+Source3: vendor_nodejs.tar
+%endif
 Patch: %name-%version-alt.patch
 
 BuildRequires(pre): rpm-build-python3
@@ -92,7 +104,7 @@ BuildRequires: libunistring-devel
 
 BuildRequires: 389-ds-base-devel >= %ds_version
 BuildRequires: samba-devel >= %samba_version
-BuildRequires: nodejs
+BuildRequires: /usr/bin/npm
 BuildRequires: python3(rjsmin)
 BuildRequires: python3-module-argcomplete
 %endif # only_client
@@ -561,7 +573,7 @@ This package contains tests that verify IPA functionality under Python 3.
 ###############################################################################
 
 %prep
-%setup -n %name-%version
+%setup %{?_with_modern_ui:-a2 -a3}
 %if_with lint
 # we need it to generate cumulative patch without context
 git init
@@ -579,15 +591,25 @@ git add .
 git commit -am 'with our changes'
 %endif
 
+%if_without modern_ui
+touch install/freeipa-webui/Makefile.am
+%endif
+
 # Port 8080 is used by alterator-ahttpd-server
-if grep -rE --exclude-dir=.gear '(\W|^)8080(\W|$)' ; then
-    printf '%%s\n' 'Please change port 8080 to 8090 and commit'
-    exit 1
+if grep -rE --exclude-dir=.gear --exclude-dir=node_modules '(\W|^)8080(\W|$)' ; then
+    printf 'Warning: %%s\n' 'probably wrong port 8080, change to 8090'
 else
     [ "$?" -ne 1 ] && exit 1
 fi
 
 %build
+%if_with modern_ui
+# prebuild modern webui otherwise it will try `npm clean-install`
+# which requires internet.
+pushd install/freeipa-webui
+npm run build
+popd
+%endif
 
 export PYTHON=%__python3
 %autoreconf
@@ -694,6 +716,11 @@ do
     register-python-argcomplete "$clitool" > "$clitool"
     install -p -m 0644 -D -t '%buildroot%bash_completions_dir' "$clitool"
 done
+
+%if_with modern_ui
+# deduplicate licenses
+rm %buildroot%_datadir/licenses/freeipa-server-common/modern-ui/COPYING
+%endif
 
 %endif # only_client
 
@@ -1021,6 +1048,9 @@ fi
 %_datadir/ipa/html/*.html
 %dir %_datadir/ipa/migration/
 %_datadir/ipa/migration/index.html
+%if_with modern_ui
+%_datadir/ipa/modern-ui/
+%endif
 %_datadir/ipa/ui/
 %dir %_datadir/ipa/wsgi/
 %dir %_sysconfdir/ipa
