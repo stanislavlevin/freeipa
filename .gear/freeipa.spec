@@ -1118,6 +1118,7 @@ fi
 %files -n python3-module-ipatests
 %python3_sitelibdir/ipatests/
 %python3_sitelibdir/ipatests-%version-py%_python3_version.egg-info/
+%python3_sitelibdir/ipaplatform/test_fedora_legacy/
 %_bindir/ipa-run-tests
 %_bindir/ipa-test-config
 %_bindir/ipa-test-task
@@ -1198,6 +1199,7 @@ fi
 %python3_sitelibdir/ipapython/
 %python3_sitelibdir/ipalib/
 %python3_sitelibdir/ipaplatform/
+%exclude %python3_sitelibdir/ipaplatform/test_fedora_legacy/
 %python3_sitelibdir/ipapython-%version-py%_python3_version.egg-info/
 %python3_sitelibdir/ipalib-%version-py%_python3_version.egg-info/
 %python3_sitelibdir/ipaplatform-%version-py%_python3_version.egg-info/
