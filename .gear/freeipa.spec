@@ -15,7 +15,9 @@
 %endif
 %endif
 
+# skip packaging of
 %def_without docs
+%def_without ipatests
 
 %if_without only_client
 %def_with fasttest
@@ -545,6 +547,8 @@ If you are using IPA, you need to install this package.
 
 ###############################################################################
 
+%if_with ipatests
+
 %package -n python3-module-ipatests
 Summary: IPA tests and test tools
 Group: System/Base
@@ -571,6 +575,8 @@ and integration with Active Directory based infrastructures (Trusts).
 This package contains tests that verify IPA functionality under Python 3.
 
 ###############################################################################
+
+%endif  # ipatests
 
 %prep
 %setup %{?_with_modern_ui:-a2 -a3}
@@ -617,7 +623,11 @@ export PYTHON=%__python3
 %if_without only_client
            --enable-server \
            --with-password-quality-lib=no \
+%if_with ipatests
            --with-ipatests \
+%else
+           --without-ipatests \
+%endif  # ipatests
 %else
            --disable-server \
            --without-ipatests \
@@ -1115,6 +1125,8 @@ fi
 %_libexecdir/ipa/oddjob/com.redhat.idm.trust-fetch-domains
 %_altdir/winbind_krb5_locator.so
 
+%if_with ipatests
+
 %files -n python3-module-ipatests
 %python3_sitelibdir/ipatests/
 %python3_sitelibdir/ipatests-%version-py%_python3_version.egg-info/
@@ -1126,7 +1138,8 @@ fi
 %_man1dir/ipa-test-config.1*
 %_man1dir/ipa-test-task.1*
 
-%endif # only_client
+%endif  # ipatests
+%endif  # only_client
 
 %files client
 %_sbindir/ipa-client-install
