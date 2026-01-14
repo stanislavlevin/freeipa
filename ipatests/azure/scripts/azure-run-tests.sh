@@ -7,8 +7,6 @@ if [ $# -ne 1 ]; then
     exit 1
 fi
 
-# docker uses - but podman uses _ as separator when building scaled container names
-CONTAINER_SEP="_"
 PROJECT_ID="$1"
 BUILD_REPOSITORY_LOCALPATH="${BUILD_REPOSITORY_LOCALPATH:-$(realpath .)}"
 
@@ -43,7 +41,7 @@ IPA_TESTS_CLIENTS="${!IPA_TESTS_CLIENTS_VARNAME:-0}"
 IPA_TESTS_REPLICAS_VARNAME="IPA_TESTS_REPLICAS_${PROJECT_ID}"
 IPA_TESTS_REPLICAS="${!IPA_TESTS_REPLICAS_VARNAME:-0}"
 
-IPA_TESTS_CONTROLLER="${PROJECT_ID}${CONTAINER_SEP}master${CONTAINER_SEP}1"
+IPA_TESTS_CONTROLLER="${PROJECT_ID}-master-1"
 IPA_TESTS_LOGSDIR="${IPA_TESTS_REPO_PATH}/ipa_envs/${IPA_TESTS_ENV_NAME}/${CI_RUNNER_LOGS_DIR}"
 
 # path to azure scripts inside container
@@ -51,8 +49,6 @@ IPA_TESTS_SCRIPTS_IN="${IPA_TESTS_REPO_PATH}/${IPA_TESTS_SCRIPTS}"
 # path to azure scripts outside of container
 IPA_TESTS_SCRIPTS_OUT="${BUILD_REPOSITORY_LOCALPATH}/${IPA_TESTS_SCRIPTS}"
 
-IPA_TESTS_NETWORK_VARNAME="IPA_TESTS_NETWORK_${PROJECT_ID}"
-IPA_NETWORK=${!IPA_TESTS_NETWORK_VARNAME:-default}
 IPA_TESTS_NETWORK_INTERNAL_VARNAME="IPA_TESTS_NETWORK_INTERNAL_${PROJECT_ID}"
 IPA_NETWORK_INTERNAL="${!IPA_TESTS_NETWORK_INTERNAL_VARNAME:-false}"
 
@@ -81,7 +77,7 @@ IPA_TESTS_CLIENT_MEMSWAP_LIMIT="${!IPA_TESTS_CLIENT_MEMSWAP_LIMIT_VARNAME:-768m}
 IPA_TESTS_DOMAIN="${IPA_TESTS_DOMAIN:-ipa.test}"
 # bash4
 IPA_TESTS_REALM="${IPA_TESTS_DOMAIN^^}"
-DOCKER_HOST=$(eval "echo unix://${XDG_RUNTIME_DIR}/podman/podman.sock")
+
 
 # for base tests only 1 master is needed even if another was specified
 if [ "$IPA_TESTS_TYPE" == "base" ]; then
@@ -101,14 +97,14 @@ IPA_INSTALLED_PKGS_DIR="${project_dir}/installed_packages"
 BASH_CMD="/bin/bash --noprofile --norc"
 
 function containers() {
-    local _containers="${PROJECT_ID}${CONTAINER_SEP}master${CONTAINER_SEP}1"
+    local _containers="${PROJECT_ID}-master-1"
     # build list of replicas
     for i in $(seq 1 1 "$IPA_TESTS_REPLICAS"); do
-        _containers+=" ${PROJECT_ID}${CONTAINER_SEP}replica${CONTAINER_SEP}${i}"
+        _containers+=" ${PROJECT_ID}-replica-${i}"
     done
     # build list of clients
     for i in $(seq 1 1 "$IPA_TESTS_CLIENTS"); do
-        _containers+=" ${PROJECT_ID}${CONTAINER_SEP}client${CONTAINER_SEP}${i}"
+        _containers+=" ${PROJECT_ID}-client-${i}"
     done
     printf "$_containers"
 }
@@ -116,7 +112,7 @@ function containers() {
 function compose_execute() {
     # execute given command within every container of compose
     for container in $(containers); do
-        podman exec -t \
+        docker exec -t \
             "$container" \
             "$@" \
         2>&1 | \
@@ -148,14 +144,10 @@ IPA_TESTS_CLIENT_MEM_LIMIT="$IPA_TESTS_CLIENT_MEM_LIMIT" \
 IPA_TESTS_SERVER_MEMSWAP_LIMIT="$IPA_TESTS_SERVER_MEMSWAP_LIMIT" \
 IPA_TESTS_REPLICA_MEMSWAP_LIMIT="$IPA_TESTS_REPLICA_MEMSWAP_LIMIT" \
 IPA_TESTS_CLIENT_MEMSWAP_LIMIT="$IPA_TESTS_CLIENT_MEMSWAP_LIMIT" \
-COMPOSE_PROJECT_NAME="$PROJECT_ID" \
-PROJECT_DIR="$project_dir" \
-podman-compose up \
+docker compose -p "$PROJECT_ID" up \
     --scale replica="$IPA_TESTS_REPLICAS" \
     --scale client="$IPA_TESTS_CLIENTS" \
     --force-recreate --remove-orphans -d
-
-podman network inspect ${PROJECT_ID}_${IPA_NETWORK}
 
 popd
 
@@ -167,12 +159,10 @@ IPA_TESTS_ENV_NAME="$IPA_TESTS_ENV_NAME" \
 IPA_TEST_CONFIG_TEMPLATE="${BUILD_REPOSITORY_LOCALPATH}/ipatests/azure/templates/ipa-test-config-template.yaml" \
 IPA_TESTS_REPO_PATH="$IPA_TESTS_REPO_PATH" \
 IPA_TESTS_DOMAIN="$IPA_TESTS_DOMAIN" \
-DOCKER_HOST="$DOCKER_HOST" \
-IPA_NETWORK="${IPA_NETWORK:-ipanet}" \
 python3 setup_containers.py || \
     { mkdir -p "$SYSTEMD_BOOT_LOG";
       for container in $(containers); do
-          podman exec -t "$container" \
+          docker exec -t "$container" \
               $BASH_CMD -eu \
               -c 'journalctl -b --no-pager' > "${SYSTEMD_BOOT_LOG}/systemd_boot_${container}.log";
       done
@@ -188,7 +178,7 @@ compose_execute $BASH_CMD \
 mkdir -p "$IPA_INSTALLED_PKGS_DIR"
 
 # controller
-podman exec -t \
+docker exec -t \
     --env IPA_TESTS_SCRIPTS="${IPA_TESTS_SCRIPTS_IN}" \
     --env IPA_PLATFORM="$IPA_PLATFORM" \
     "$IPA_TESTS_CONTROLLER" \
@@ -200,30 +190,9 @@ podman exec -t \
      installed_packages \
      " > "${IPA_INSTALLED_PKGS_DIR}/packages_controller_${IPA_TESTS_CONTROLLER}.log"
 
-# display user namespace
-podman exec -t \
-    --env IPA_TESTS_SCRIPTS="${IPA_TESTS_SCRIPTS_IN}" \
-    --env IPA_PLATFORM="$IPA_PLATFORM" \
-    "$IPA_TESTS_CONTROLLER" \
-    $BASH_CMD -eu \
-    -c \
-    "cat /proc/self/uid_map /proc/self/gid_map"
-
-# workaround for /etc/shadow missing read permissions
 # workers
 for container in $(containers); do
-    podman exec -t \
-        --env IPA_TESTS_SCRIPTS="${IPA_TESTS_SCRIPTS_IN}" \
-        --env IPA_PLATFORM="$IPA_PLATFORM" \
-        "$container" \
-        $BASH_CMD -eu \
-        -c \
-        "chmod a+r /etc/shadow"
-done
-
-# workers
-for container in $(containers); do
-    podman exec -t \
+    docker exec -t \
         --env IPA_TESTS_SCRIPTS="${IPA_TESTS_SCRIPTS_IN}" \
         --env IPA_PLATFORM="$IPA_PLATFORM" \
         "$container" \
@@ -240,7 +209,7 @@ done
 tests_runner="${IPA_TESTS_SCRIPTS_IN}/azure-run-${IPA_TESTS_TYPE}-tests.sh"
 
 tests_result=1
-{ podman exec -t \
+{ docker exec -t \
     --env IPA_TESTS_SCRIPTS="${IPA_TESTS_SCRIPTS_IN}" \
     --env IPA_PLATFORM="$IPA_PLATFORM" \
     --env IPA_TESTS_DOMAIN="$IPA_TESTS_DOMAIN" \
@@ -282,9 +251,7 @@ IPA_TESTS_CLIENT_MEM_LIMIT="$IPA_TESTS_CLIENT_MEM_LIMIT" \
 IPA_TESTS_SERVER_MEMSWAP_LIMIT="$IPA_TESTS_SERVER_MEMSWAP_LIMIT" \
 IPA_TESTS_REPLICA_MEMSWAP_LIMIT="$IPA_TESTS_REPLICA_MEMSWAP_LIMIT" \
 IPA_TESTS_CLIENT_MEMSWAP_LIMIT="$IPA_TESTS_CLIENT_MEMSWAP_LIMIT" \
-COMPOSE_PROJECT_NAME="$PROJECT_ID" \
-PROJECT_DIR="$project_dir" \
-podman-compose down
+docker compose -p "$PROJECT_ID" down
 popd
 
 exit $tests_result
