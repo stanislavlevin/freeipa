@@ -86,6 +86,7 @@ jobs:
 - job: Lint
   dependsOn:
     - Precheck
+  condition: and(succeeded(), eq(variables.RUN_LINT, true))
   pool:
     vmImage: $(VM_IMAGE)
   container:
@@ -115,6 +116,7 @@ jobs:
 - job: Docs
   dependsOn:
     - Precheck
+  condition: and(succeeded(), eq(variables.RUN_DOCS, true))
   pool:
     vmImage: $(VM_IMAGE)
   container:
@@ -133,6 +135,7 @@ jobs:
 - job: Tox
   dependsOn:
     - Precheck
+  condition: and(succeeded(), eq(variables.RUN_TOX, true))
   pool:
     vmImage: $(VM_IMAGE)
   container:
@@ -158,6 +161,7 @@ jobs:
 - job: WebUI_Unit_Tests
   dependsOn:
     - Precheck
+  condition: and(succeeded(), eq(variables.RUN_WEBUI_TESTS, true))
   pool:
     vmImage: $(VM_IMAGE)
   container:
@@ -187,10 +191,10 @@ jobs:
   dependsOn:
     - Build
     - Lint
+  condition: and(succeeded(), eq(variables.RUN_BASE_TESTS, true))
   variables:
     IPA_IMAGE_ARTIFACT: $[ dependencies.Build.outputs['artifacts_image.image'] ]
     IPA_PACKAGES_ARTIFACT: $[ dependencies.Build.outputs['artifacts_packages.packages'] ]
-  condition: succeeded()
   strategy:
     matrix: $[ dependencies.Build.outputs['base_matrix.matrix'] ]
   steps:
@@ -203,10 +207,10 @@ jobs:
   dependsOn:
     - Build
     - Lint
+  condition: and(succeeded(), eq(variables.RUN_GATING_TESTS, true))
   variables:
     IPA_IMAGE_ARTIFACT: $[ dependencies.Build.outputs['artifacts_image.image'] ]
     IPA_PACKAGES_ARTIFACT: $[ dependencies.Build.outputs['artifacts_packages.packages'] ]
-  condition: succeeded()
   strategy:
     matrix: $[ dependencies.Build.outputs['gating_matrix.matrix'] ]
   timeoutInMinutes: 90
@@ -220,10 +224,10 @@ jobs:
   dependsOn:
     - Build
     - Lint
+  condition: and(succeeded(), eq(variables.RUN_NIGHTLY_TESTS, true))
   variables:
     IPA_IMAGE_ARTIFACT: $[ dependencies.Build.outputs['artifacts_image.image'] ]
     IPA_PACKAGES_ARTIFACT: $[ dependencies.Build.outputs['artifacts_packages.packages'] ]
-  condition: succeeded()
   strategy:
     matrix: $[ dependencies.Build.outputs['nightly_matrix.matrix'] ]
   timeoutInMinutes: 90
