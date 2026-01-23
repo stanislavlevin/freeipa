@@ -26,3 +26,8 @@ variables:
   BUILD_DOCS_TEMPLATE: ${{ format('build-docs-{0}.yml', variables.IPA_PLATFORM) }}
 
   TOX_COMMAND: tox.py3
+
+  # skip some jobs in downstream
+  RUN_DOCS: false
+  RUN_TOX: false
+  RUN_WEBUI_TESTS: false
