@@ -12,3 +12,11 @@ variables:
   IPA_TESTS_SCRIPTS: 'ipatests/azure/scripts'
   IPA_TESTS_DOCKERFILES: $(Build.Repository.LocalPath)/ipatests/azure/Dockerfiles
   IPA_TESTS_REPO_PATH: '/freeipa'
+  # jobs vars, set true to run job, false to not
+  RUN_LINT: true
+  RUN_DOCS: true
+  RUN_TOX: true
+  RUN_WEBUI_TESTS: true
+  RUN_BASE_TESTS: true
+  RUN_GATING_TESTS: true
+  RUN_NIGHTLY_TESTS: true
