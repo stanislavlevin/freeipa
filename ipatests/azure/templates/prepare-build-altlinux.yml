@@ -1,4 +1,8 @@
 steps:
+- checkout: self
+  submodules: true
+  displayName: Checkout source code
+
 - script: |
     set -e
     sudo apt-get update
