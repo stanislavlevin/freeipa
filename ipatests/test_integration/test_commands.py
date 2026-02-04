@@ -2049,6 +2049,11 @@ class TestIPACommand(IntegrationTest):
             ["systemctl", "start", "ipa"]
         )
 
+    @pytest.mark.skip_if_hostcontainer(
+        "master",
+        container="any",
+        reason="Containers don't support time namespaces yet",
+    )
     def test_expiration_date_post_2038(self, expire_password):
         """Test that expiration dates after 2038 function without
            overflow.
