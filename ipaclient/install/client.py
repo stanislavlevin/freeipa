@@ -3145,6 +3145,7 @@ def _install(options, tdict):
                 raise ScriptError(rval=CLIENT_INSTALL_ERROR)
             logger.info("Configured /etc/sssd/sssd.conf")
 
+        time.sleep(20)
         if options.on_master:
             # If on master assume kerberos is already configured properly.
             # Get the host TGT.
@@ -3156,11 +3157,15 @@ def _install(options, tdict):
                 logger.error("Failed to obtain host TGT: %s", e)
                 raise ScriptError(rval=CLIENT_INSTALL_ERROR)
 
+        import subprocess
+        logger.debug(
+            subprocess.run(("klist", "-A"), check=False, capture_output=True)
+        )
         # Clear out any current session keyring information
         try:
             delete_persistent_client_session_data(host_principal)
-        except ValueError:
-            pass
+        except ValueError as e:
+            logger.debug(e)
 
         # Add CA certs to a temporary NSS database
         ca_certs = x509.load_certificate_list_from_file(paths.IPA_CA_CRT)
