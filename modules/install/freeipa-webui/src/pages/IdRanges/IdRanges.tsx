@@ -12,11 +12,11 @@ import {
   OuterScrollContainer,
 } from "@patternfly/react-table";
 // Hooks
-import useAlerts from "src/hooks/useAlerts";
+import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useApiError from "src/hooks/useApiError";
 // Redux
-import { useAppSelector } from "src/store/hooks";
+import { useAppSelector, useAppDispatch } from "src/store/hooks";
 // RPC
 import {
   useGetIdRangeEntriesQuery,
@@ -41,8 +41,11 @@ import MainTable from "src/components/tables/MainTable";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
 import BulkSelectorPrep from "src/components/BulkSelectorPrep";
 import { isIdRangeSelectable } from "src/utils/utils";
+import AddIdRangeModal from "src/components/modals/IdRanges/AddIdRangeModal";
+import DeleteModal from "src/components/modals/IdRanges/DeleteModal";
 
 const IdRanges = () => {
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
   // Update current route data to Redux and highlight the current page in the Nav bar
@@ -58,14 +61,12 @@ const IdRanges = () => {
     (state) => state.global.environment.api_version
   ) as string;
 
-  // Alerts to show in the UI
-  const alerts = useAlerts();
-
   // URL parameters: page number, page size, search value
   const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
     useListPageSearchParams();
 
   const [selectedPerPage, setSelectedPerPage] = React.useState<number>(0);
+  const [showAddModal, setShowAddModal] = React.useState<boolean>(false);
 
   // Handle API calls errors
   const globalErrors = useApiError([]);
@@ -81,6 +82,10 @@ const IdRanges = () => {
 
   // Selection state for checkboxes
   const [selectedElements, setSelectedElements] = React.useState<IdRange[]>([]);
+  const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
+    React.useState<boolean>(true);
+  const [isDeletion, setIsDeletion] = React.useState(false);
+  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
 
   const updateSelectedIdRanges = (idRange: IdRange[], isSelected: boolean) => {
     let newSelectedIdRanges: IdRange[] = [...selectedElements];
@@ -102,6 +107,7 @@ const IdRanges = () => {
     }
 
     setSelectedElements(newSelectedIdRanges);
+    setIsDeleteButtonDisabled(newSelectedIdRanges.length === 0);
   };
 
   // API calls (batch detailed list)
@@ -194,10 +200,12 @@ const IdRanges = () => {
           if ("error" in searchError) {
             errMsg = searchError.error;
           }
-          alerts.addAlert(
-            "submit-search-value-error",
-            errMsg || "Error when searching for elements",
-            "danger"
+          dispatch(
+            addAlert({
+              name: "submit-search-value-error",
+              title: errMsg || "Error when searching for elements",
+              variant: "danger",
+            })
           );
         } else {
           // Success
@@ -310,8 +318,9 @@ const IdRanges = () => {
       key: 4,
       element: (
         <SecondaryButton
-          isDisabled={selectedElements.length === 0 || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || !showTableRows}
           dataCy="id-ranges-button-delete"
+          onClickHandler={() => setShowDeleteModal(true)}
         >
           Delete
         </SecondaryButton>
@@ -323,6 +332,7 @@ const IdRanges = () => {
         <SecondaryButton
           isDisabled={!showTableRows}
           dataCy="id-ranges-button-add"
+          onClickHandler={() => setShowAddModal(true)}
         >
           Add
         </SecondaryButton>
@@ -353,7 +363,6 @@ const IdRanges = () => {
   // Render component
   return (
     <div>
-      <alerts.ManagedAlerts />
       <PageSection hasBodyWrapper={false}>
         <TitleLayout id="ID ranges page" headingLevel="h1" text="ID ranges" />
       </PageSection>
@@ -400,6 +409,11 @@ const IdRanges = () => {
                       setElementsSelected: setIdRangesSelected,
                       clearSelectedElements: () => setSelectedElements([]),
                     }}
+                    buttonsData={{
+                      updateIsDeleteButtonDisabled: setIsDeleteButtonDisabled,
+                      isDeletion,
+                      updateIsDeletion: setIsDeletion,
+                    }}
                     paginationData={{
                       selectedPerPage,
                       updateSelectedPerPage: setSelectedPerPage,
@@ -419,6 +433,32 @@ const IdRanges = () => {
           </FlexItem>
         </Flex>
       </PageSection>
+      <AddIdRangeModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Add ID range"
+        onRefresh={refreshData}
+      />
+      <DeleteModal
+        show={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        selectedData={{
+          selectedElements,
+          clearSelectedElements: () => setSelectedElements([]),
+        }}
+        buttonsData={{
+          updateIsDeleteButtonDisabled: setIsDeleteButtonDisabled,
+          updateIsDeletion: setIsDeletion,
+        }}
+        columnNames={[
+          "Range name",
+          "First Posix ID of the range",
+          "Number of IDs in the range",
+          "Range type",
+        ]}
+        keyNames={["cn", "ipabaseid", "ipaidrangesize", "iparangetype"]}
+        onRefresh={refreshData}
+      />
     </div>
   );
 };

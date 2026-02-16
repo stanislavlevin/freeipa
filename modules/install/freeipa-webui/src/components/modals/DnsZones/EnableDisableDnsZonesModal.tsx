@@ -1,8 +1,10 @@
 import React from "react";
 // PatternFly
 import { Button } from "@patternfly/react-core";
+// Redux
+import { useAppDispatch } from "src/store/hooks";
 // Hooks
-import useAlerts from "src/hooks/useAlerts";
+import { addAlert } from "src/store/Global/alerts-slice";
 // RPC
 import {
   useDnsZoneDisableMutation,
@@ -12,20 +14,21 @@ import {
 import ConfirmationModal from "../ConfirmationModal";
 // Utils
 import capitalizeFirstLetter from "src/utils/utils";
+// Data types
+import { DNSZone } from "src/utils/datatypes/globalDataTypes";
 
 interface EnableDisableDnsZonesModalProps {
   isOpen: boolean;
   onClose: () => void;
   elementsList: string[];
-  setElementsList: (elementsList: string[]) => void;
+  setElementsList: (elementsList: DNSZone[]) => void;
   operation: "enable" | "disable";
   setShowTableRows: (value: boolean) => void;
   onRefresh: () => void;
 }
 
 const EnableDisableDnsZonesModal = (props: EnableDisableDnsZonesModalProps) => {
-  // Alerts to show in the UI
-  const alerts = useAlerts();
+  const dispatch = useAppDispatch();
 
   // RPC calls
   const [disableRule] = useDnsZoneDisableMutation();
@@ -35,34 +38,38 @@ const EnableDisableDnsZonesModal = (props: EnableDisableDnsZonesModalProps) => {
   const onEnableDisable = () => {
     const operation = props.operation === "enable" ? enableRule : disableRule;
 
-    props.setShowTableRows(false);
     operation(props.elementsList).then((response) => {
       if ("data" in response) {
         const { data } = response;
         if (data?.error) {
-          alerts.addAlert("error", data.error, "danger");
+          dispatch(
+            addAlert({ name: "error", title: data.error, variant: "danger" })
+          );
         }
         if (data?.result) {
-          alerts.addAlert("success", "DNS zone status changed", "success");
+          dispatch(
+            addAlert({
+              name: "success",
+              title: "DNS zone status changed",
+              variant: "success",
+            })
+          );
           // Clear selected elements
           props.setElementsList([]);
           // Refresh data
           props.onRefresh();
           onClose();
         }
-        props.setShowTableRows(true);
       }
     });
   };
 
   const onClose = () => {
-    props.setShowTableRows(true);
     props.setElementsList([]);
     props.onClose();
   };
 
   const onCloseWithoutClearingElements = () => {
-    props.setShowTableRows(true);
     props.onClose();
   };
 
@@ -88,7 +95,6 @@ const EnableDisableDnsZonesModal = (props: EnableDisableDnsZonesModalProps) => {
   // Render component
   return (
     <>
-      <alerts.ManagedAlerts />
       <ConfirmationModal
         dataCy="dns-zones-enable-disable-modal"
         title={capitalizeFirstLetter(props.operation) + " confirmation"}

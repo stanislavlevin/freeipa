@@ -23,7 +23,6 @@ import {
 } from "@patternfly/react-core";
 import React from "react";
 // Icons
-
 import { UserIcon } from "@patternfly/react-icons";
 import { KeyIcon } from "@patternfly/react-icons";
 import { CogIcon } from "@patternfly/react-icons";
@@ -32,8 +31,8 @@ import { ShareSquareIcon } from "@patternfly/react-icons";
 // Navigation
 import Navigation from "./navigation/Nav";
 // Images
-import headerLogo from "src/assets/images/header-logo-black.png";
-import avatarImg from "src/assets/images/avatarImg.svg";
+import headerLogo from "/assets/images/header-logo.png";
+import avatarImg from "/assets/images/avatarImg.svg";
 // Redux
 import { useAppDispatch } from "./store/hooks";
 import { setIsLogout } from "./store/Global/auth-slice";
@@ -182,12 +181,12 @@ const AppLayout = (props: PropsToAppLayout) => {
           />
         </MastheadToggle>
         <MastheadBrand>
-          <MastheadLogo className="pf-v6-u-mt-sm">
-            <MastheadBrand>
-              <MastheadLogo>
-                <Brand src={headerLogo} alt="FreeIPA Logo" />
-              </MastheadLogo>
-            </MastheadBrand>
+          <MastheadLogo className="pf-v6-u-display-flex">
+            <Brand
+              src={headerLogo}
+              alt="IPA Logo"
+              className="pf-v6-u-my-auto"
+            />
           </MastheadLogo>
         </MastheadBrand>
       </MastheadMain>

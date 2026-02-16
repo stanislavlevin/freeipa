@@ -1,12 +1,7 @@
 import React from "react";
 // PatternFly
-import {
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  TextInput,
-  ValidatedOptions,
-} from "@patternfly/react-core";
+import HelperTextWithIcon from "./HelperTextWithIcon";
+import { TextInput, TextInputProps } from "@patternfly/react-core";
 
 interface InputRequiredTextProps {
   dataCy: string;
@@ -16,6 +11,7 @@ interface InputRequiredTextProps {
   onChange: (value: string) => void;
   requiredHelperText?: string;
   isDisabled?: boolean;
+  type?: TextInputProps["type"];
 }
 
 const InputRequiredText = (props: InputRequiredTextProps) => {
@@ -28,21 +24,17 @@ const InputRequiredText = (props: InputRequiredTextProps) => {
         id={props.id}
         name={props.name}
         value={props.value}
-        type="text"
+        type={props.type || "text"}
         isRequired={true}
         aria-label={props.name}
         aria-describedby={helperTextId}
         onChange={(_event, value) => props.onChange(value)}
         isDisabled={props.isDisabled}
       />
-      {props.value === "" && (
-        <FormHelperText>
-          <HelperText id={helperTextId} aria-live="polite">
-            <HelperTextItem variant={ValidatedOptions.default}>
-              {props.requiredHelperText || "This field is required"}
-            </HelperTextItem>
-          </HelperText>
-        </FormHelperText>
+      {props.value === "" && !props.isDisabled && (
+        <HelperTextWithIcon
+          message={props.requiredHelperText || "This field is required"}
+        />
       )}
     </>
   );

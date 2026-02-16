@@ -16,12 +16,12 @@ import {
   ModalFooter,
 } from "@patternfly/react-core";
 // Hooks
-import useAlerts from "src/hooks/useAlerts";
+import { addAlert } from "src/store/Global/alerts-slice";
 // Icons
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
 // Images
-import BrandImg from "src/assets/images/product-name.png";
-import BackgroundImg from "src/assets/images/login-screen-background.jpg";
+import BrandImg from "/assets/images/product-name.png";
+import BackgroundImg from "/assets/images/login-screen-background.jpg";
 // RPC
 import {
   MetaResponse,
@@ -49,16 +49,19 @@ const LoginMainPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Alerts to show in the UI
-  const alerts = useAlerts();
-
   // There are some cases (e.g., sync OTP token) that the
   //   login page can receive a given state from navigate.
   //   This message must be shown as an alert.
   React.useEffect(() => {
     if (location.state) {
       const { alertMessage } = location.state as StateFromSyncOtpPage;
-      alerts.addAlert("sync-otp-message", alertMessage, "success");
+      dispatch(
+        addAlert({
+          name: "sync-otp-message",
+          title: alertMessage,
+          variant: "success",
+        })
+      );
     }
   }, [location.state]);
 
@@ -375,7 +378,6 @@ const LoginMainPage = () => {
 
   return (
     <>
-      <alerts.ManagedAlerts />
       <LoginPage
         style={{ whiteSpace: "pre-line" }}
         footerListVariants={ListVariant.inline}

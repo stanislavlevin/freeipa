@@ -14,7 +14,15 @@
   gather_facts: false
   become: true
   tasks:
+    - name: Modify original modern-ui to point to development version
+      ansible.builtin.replace:
+        path: /etc/httpd/conf.d/ipa.conf
+        regexp: "/usr/share/ipa/modern-ui"
+        replace: "/webui/dist"
+      register: modify_ipa_conf
+
     - name: Ensure webui is configured in ipa.conf
+      when: not modify_ipa_conf.changed
       ansible.builtin.blockinfile:
         path: /etc/httpd/conf.d/ipa.conf
         insertafter: "EOF"

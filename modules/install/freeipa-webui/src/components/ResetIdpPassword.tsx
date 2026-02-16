@@ -1,24 +1,18 @@
 import React from "react";
 // PatternFly
-import {
-  Button,
-  HelperText,
-  HelperTextItem,
-  ValidatedOptions,
-} from "@patternfly/react-core";
+import { Button } from "@patternfly/react-core";
 // Data types
-import {
-  IDPServer,
-  PasswordValidationType,
-} from "src/utils/datatypes/globalDataTypes";
+import { IDPServer } from "src/utils/datatypes/globalDataTypes";
 // Modals
 import ModalWithFormLayout from "src/components/layouts/ModalWithFormLayout";
 // Components
 import PasswordInput from "src/components/layouts/PasswordInput";
 // RPC
 import { IdpModPayload, useIdpModMutation } from "src/services/rpcIdp";
+// Redux
+import { useAppDispatch } from "src/store/hooks";
 // Hooks
-import useAlerts from "src/hooks/useAlerts";
+import { addAlert } from "src/store/Global/alerts-slice";
 
 interface PropsToResetIdpPassword {
   idpId: string;
@@ -29,8 +23,7 @@ interface PropsToResetIdpPassword {
 }
 
 const ResetIdpPassword = (props: PropsToResetIdpPassword) => {
-  // Alerts to show in the UI
-  const alerts = useAlerts();
+  const dispatch = useAppDispatch();
 
   // RPC
   const [resetPassword] = useIdpModMutation();
@@ -40,37 +33,6 @@ const ResetIdpPassword = (props: PropsToResetIdpPassword) => {
   const [verifyPassword, setVerifyPassword] = React.useState("");
   const [passwordHidden, setPasswordHidden] = React.useState(true);
   const [verifyPasswordHidden, setVerifyPasswordHidden] = React.useState(true);
-
-  // Verify password
-  const [passwordValidationResult, setPasswordValidationResult] =
-    React.useState<PasswordValidationType>({
-      isError: false,
-      message: "",
-      pfError: ValidatedOptions.default,
-    });
-
-  // Reset the verify password field
-  const resetVerifyPassword = () => {
-    setPasswordValidationResult({
-      isError: false,
-      message: "",
-      pfError: ValidatedOptions.default,
-    });
-  };
-
-  // Checks that the passwords are the same
-  const validatePasswords = () => {
-    if (newPassword !== verifyPassword) {
-      setPasswordValidationResult({
-        isError: true,
-        message: "Passwords must match",
-        pfError: ValidatedOptions.error,
-      });
-      return true; // is error
-    }
-    resetVerifyPassword();
-    return false;
-  };
 
   // Fields
   const fields = [
@@ -83,7 +45,6 @@ const ResetIdpPassword = (props: PropsToResetIdpPassword) => {
           name="password"
           value={newPassword}
           aria-label="new password text input"
-          onFocus={resetVerifyPassword}
           onChange={setNewPassword}
           onRevealHandler={setPasswordHidden}
           passwordHidden={passwordHidden}
@@ -101,27 +62,22 @@ const ResetIdpPassword = (props: PropsToResetIdpPassword) => {
             name="password2"
             value={verifyPassword}
             aria-label="verify password text input"
-            onFocus={resetVerifyPassword}
             onChange={setVerifyPassword}
             onRevealHandler={setVerifyPasswordHidden}
             passwordHidden={verifyPasswordHidden}
-            validated={passwordValidationResult.pfError}
             dataCy="modal-textbox-verify-password"
+            rules={[
+              {
+                id: "verify-match",
+                message: "Passwords must match",
+                validate: (v: string) => v === newPassword,
+              },
+            ]}
           />
-          <HelperText>
-            <HelperTextItem variant="error">
-              {passwordValidationResult.message}
-            </HelperTextItem>
-          </HelperText>
         </>
       ),
     },
   ];
-
-  // Verify the passwords are the same when we update a password value
-  React.useEffect(() => {
-    validatePasswords();
-  }, [newPassword, verifyPassword]);
 
   // Reset fields and close modal
   const resetFieldsAndCloseModal = () => {
@@ -145,14 +101,22 @@ const ResetIdpPassword = (props: PropsToResetIdpPassword) => {
       if ("data" in response) {
         const data = response.data;
         if (data?.error) {
-          alerts.addAlert("error", (data.error as Error).message, "danger");
+          dispatch(
+            addAlert({
+              name: "error",
+              title: (data.error as Error).message,
+              variant: "danger",
+            })
+          );
         }
         if (data?.result) {
           props.onIdpRefChange(data.result.result);
-          alerts.addAlert(
-            "success",
-            "Identity Provider password successfully updated",
-            "success"
+          dispatch(
+            addAlert({
+              name: "success",
+              title: "Identity Provider password successfully updated",
+              variant: "success",
+            })
           );
           // Refresh the data
           props.onRefresh();
@@ -171,9 +135,9 @@ const ResetIdpPassword = (props: PropsToResetIdpPassword) => {
       type="submit"
       form="reset-password-form"
       isDisabled={
-        passwordValidationResult.isError ||
         newPassword === "" ||
-        verifyPassword === ""
+        verifyPassword === "" ||
+        newPassword !== verifyPassword
       }
     >
       Reset password
@@ -190,21 +154,18 @@ const ResetIdpPassword = (props: PropsToResetIdpPassword) => {
 
   // Return component
   return (
-    <>
-      <alerts.ManagedAlerts />
-      <ModalWithFormLayout
-        dataCy="reset-password-modal"
-        variantType="small"
-        modalPosition="top"
-        title="Reset password"
-        formId="reset-password-form"
-        fields={fields}
-        show={props.isOpen}
-        onSubmit={onResetPassword}
-        onClose={resetFieldsAndCloseModal}
-        actions={actions}
-      />
-    </>
+    <ModalWithFormLayout
+      dataCy="reset-password-modal"
+      variantType="small"
+      modalPosition="top"
+      title="Reset password"
+      formId="reset-password-form"
+      fields={fields}
+      show={props.isOpen}
+      onSubmit={onResetPassword}
+      onClose={resetFieldsAndCloseModal}
+      actions={actions}
+    />
   );
 };
 

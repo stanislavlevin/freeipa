@@ -1,11 +1,6 @@
 import React from "react";
 // PatternFly
-import {
-  Button,
-  HelperText,
-  HelperTextItem,
-  ValidatedOptions,
-} from "@patternfly/react-core";
+import { Button } from "@patternfly/react-core";
 // Modals
 import ModalWithFormLayout from "src/components/layouts/ModalWithFormLayout";
 // Components
@@ -14,7 +9,9 @@ import PasswordInput from "src/components/layouts/PasswordInput";
 import { ErrorResult } from "src/services/rpc";
 import { useSetHostPasswordMutation } from "src/services/rpcHosts";
 // Hooks
-import useAlerts from "src/hooks/useAlerts";
+import { addAlert } from "src/store/Global/alerts-slice";
+// Redux
+import { useAppDispatch } from "src/store/hooks";
 
 interface PropsToResetPassword {
   host: string;
@@ -24,8 +21,7 @@ interface PropsToResetPassword {
 }
 
 const HostSetPassword = (props: PropsToResetPassword) => {
-  // Alerts to show in the UI
-  const alerts = useAlerts();
+  const dispatch = useAppDispatch();
 
   // RPC hooks
   const [setPassword] = useSetHostPasswordMutation();
@@ -35,22 +31,6 @@ const HostSetPassword = (props: PropsToResetPassword) => {
   const [verifyPassword, setVerifyPassword] = React.useState("");
   const [passwordHidden, setPasswordHidden] = React.useState(true);
   const [verifyPasswordHidden, setVerifyPasswordHidden] = React.useState(true);
-
-  // Verify password
-  const [passwordValidationResult, setPasswordValidationResult] =
-    React.useState({
-      isError: false,
-      message: "",
-      pfError: ValidatedOptions.default,
-    });
-
-  const resetVerifyPassword = () => {
-    setPasswordValidationResult({
-      isError: false,
-      message: "",
-      pfError: ValidatedOptions.default,
-    });
-  };
 
   // Fields
   const fields = [
@@ -64,7 +44,6 @@ const HostSetPassword = (props: PropsToResetPassword) => {
           name="password"
           value={newPassword}
           aria-label="new password text input"
-          onFocus={resetVerifyPassword}
           onChange={setNewPassword}
           onRevealHandler={setPasswordHidden}
           passwordHidden={passwordHidden}
@@ -82,41 +61,21 @@ const HostSetPassword = (props: PropsToResetPassword) => {
             name="password2"
             value={verifyPassword}
             aria-label="verify password text input"
-            onFocus={resetVerifyPassword}
             onChange={setVerifyPassword}
             onRevealHandler={setVerifyPasswordHidden}
             passwordHidden={verifyPasswordHidden}
-            validated={passwordValidationResult.pfError}
+            rules={[
+              {
+                id: "verify-match",
+                message: "Passwords must match",
+                validate: (v: string) => v === newPassword,
+              },
+            ]}
           />
-          <HelperText>
-            <HelperTextItem variant="error">
-              {passwordValidationResult.message}
-            </HelperTextItem>
-          </HelperText>
         </>
       ),
     },
   ];
-
-  // Checks that the passwords are the same
-  const validatePasswords = () => {
-    if (newPassword !== verifyPassword) {
-      const verifyPassVal = {
-        isError: true,
-        message: "Passwords must match",
-        pfError: ValidatedOptions.error,
-      };
-      setPasswordValidationResult(verifyPassVal);
-      return true; // is error
-    }
-    resetVerifyPassword();
-    return false;
-  };
-
-  // Verify the passwords are the same when we update a password value
-  React.useEffect(() => {
-    validatePasswords();
-  }, [newPassword, verifyPassword]);
 
   // Reset fields and close modal
   const resetFieldsAndCloseModal = () => {
@@ -139,15 +98,23 @@ const HostSetPassword = (props: PropsToResetPassword) => {
           // Refresh data
           props.onRefresh();
           // Set alert: success
-          alerts.addAlert(
-            "set-password-success",
-            "Set one-time password for host '" + props.host + "'",
-            "success"
+          dispatch(
+            addAlert({
+              name: "set-password-success",
+              title: "Set one-time password for host '" + props.host + "'",
+              variant: "success",
+            })
           );
         } else if (response.data?.error) {
           // Set alert: error
           const errorMessage = response.data.error as ErrorResult;
-          alerts.addAlert("set-password-error", errorMessage.message, "danger");
+          dispatch(
+            addAlert({
+              name: "set-password-error",
+              title: errorMessage.message,
+              variant: "danger",
+            })
+          );
         }
       }
     });
@@ -161,9 +128,9 @@ const HostSetPassword = (props: PropsToResetPassword) => {
       type="submit"
       form="reset-password-form"
       isDisabled={
-        passwordValidationResult.isError ||
         newPassword === "" ||
-        verifyPassword === ""
+        verifyPassword === "" ||
+        newPassword !== verifyPassword
       }
     >
       Reset password
@@ -179,7 +146,6 @@ const HostSetPassword = (props: PropsToResetPassword) => {
   ];
   return (
     <>
-      <alerts.ManagedAlerts />
       <ModalWithFormLayout
         dataCy="host-set-password-modal"
         variantType="small"

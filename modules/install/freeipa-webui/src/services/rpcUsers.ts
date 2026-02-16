@@ -87,6 +87,17 @@ interface UserFindPayload {
   noMembers?: boolean;
 }
 
+export interface AddUserPayload {
+  type: "user" | "stageuser";
+  givenname: string;
+  sn: string;
+  uid?: string;
+  userclass?: string;
+  noprivate?: boolean;
+  gidnumber?: string;
+  userpassword?: string;
+}
+
 const extendedApi = api.injectEndpoints({
   endpoints: (build) => ({
     getGenericUsersFullData: build.query<UserFullData, object>({
@@ -269,20 +280,16 @@ const extendedApi = api.injectEndpoints({
         response.result.result as unknown as User[],
       providesTags: ["ActiveUsers"],
     }),
-    // Autommeber Users
-    autoMemberRebuildUsers: build.mutation<FindRPCResponse, any[]>({
+    // Automember Users
+    autoMemberRebuildUsers: build.mutation<FindRPCResponse, string[]>({
       query: (users) => {
-        let user_list = users.map((user) => user.uid);
-        // user.uid might be an array
-        if (users.length > 0 && Array.isArray(users[0].uid)) {
-          user_list = users.map((user) => user.uid[0]);
-        }
-
         const paramArgs =
           users.length === 0
-            ? { type: "group", version: API_VERSION_BACKUP }
-            : {
-                users: user_list,
+            ? // from user's main page
+              { type: "group", version: API_VERSION_BACKUP }
+            : // from user's settings page
+              {
+                users: users,
                 version: API_VERSION_BACKUP,
               };
 
@@ -536,6 +543,21 @@ const extendedApi = api.injectEndpoints({
         }
       },
     }),
+    /**
+     * Add new user
+     * @param {AddUserPayload} payload - Add user payload
+     * @returns {FindRPCResponse} - Find response
+     */
+    addUser: build.mutation<FindRPCResponse, AddUserPayload>({
+      query: (payload) => {
+        const { type, ...params } = payload;
+
+        return getCommand({
+          method: type === "user" ? "user_add" : "stageuser_add",
+          params: [[], params],
+        });
+      },
+    }),
   }),
   overrideExisting: false,
 });
@@ -604,4 +626,5 @@ export const {
   useGetUsersInfoByUidQuery,
   useGetUserDetailsByUidMutation,
   useUserFindQuery,
+  useAddUserMutation,
 } = extendedApi;

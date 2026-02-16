@@ -5,8 +5,10 @@ import { Content, ContentVariants, Button } from "@patternfly/react-core";
 import ModalWithFormLayout from "src/components/layouts/ModalWithFormLayout";
 // Tables
 import DeletedElementsTable from "src/components/tables/DeletedElementsTable";
+// Redux
+import { useAppDispatch } from "src/store/hooks";
 // Hooks
-import useAlerts from "src/hooks/useAlerts";
+import { addAlert } from "src/store/Global/alerts-slice";
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { SerializedError } from "@reduxjs/toolkit";
 // Data types
@@ -15,6 +17,8 @@ import { ErrorData, SudoRule } from "src/utils/datatypes/globalDataTypes";
 import ErrorModal from "src/components/modals/ErrorModal";
 import { BatchRPCResponse } from "src/services/rpc";
 import { useRemoveSudoRulesMutation } from "src/services/rpcSudoRules";
+// React Router
+import { useNavigate } from "react-router";
 
 interface ButtonsData {
   updateIsDeleteButtonDisabled: (value: boolean) => void;
@@ -32,11 +36,12 @@ interface PropsToDeleteRules {
   selectedRulesData: SelectedRulesData;
   buttonsData: ButtonsData;
   onRefresh?: () => void;
+  from?: "main" | "settings";
 }
 
 const DeleteSudoRule = (props: PropsToDeleteRules) => {
-  // Alerts
-  const alerts = useAlerts();
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
 
   // Define the column names that will be displayed on the confirmation table.
   // - NOTE: Camel-case should match with the property to show as it is defined in the data.
@@ -151,10 +156,12 @@ const DeleteSudoRule = (props: PropsToDeleteRules) => {
               props.buttonsData.updateIsDeleteButtonDisabled(true);
               props.buttonsData.updateIsDeletion(true);
 
-              alerts.addAlert(
-                "remove-sudorules-success",
-                "Sudo rules removed",
-                "success"
+              dispatch(
+                addAlert({
+                  name: "remove-sudorules-success",
+                  title: "Sudo rules removed",
+                  variant: "success",
+                })
               );
 
               setBtnSpinning(false);
@@ -162,6 +169,9 @@ const DeleteSudoRule = (props: PropsToDeleteRules) => {
               // Refresh data
               if (props.onRefresh !== undefined) {
                 props.onRefresh();
+              }
+              if (props.from === "settings") {
+                navigate("/sudo-rules");
               }
             }
           }
@@ -197,7 +207,6 @@ const DeleteSudoRule = (props: PropsToDeleteRules) => {
 
   const modalDelete: JSX.Element = (
     <>
-      <alerts.ManagedAlerts />
       <ModalWithFormLayout
         dataCy="delete-sudo-rules-modal"
         variantType="medium"

@@ -6,7 +6,10 @@ import {
   HelperTextItem,
   TextInput,
 } from "@patternfly/react-core";
-import type { HelperTextItemProps } from "@patternfly/react-core";
+import type {
+  HelperTextItemProps,
+  TextInputProps,
+} from "@patternfly/react-core";
 
 type HelperTextVariant = NonNullable<HelperTextItemProps["variant"]>;
 type RuleState = {
@@ -14,7 +17,7 @@ type RuleState = {
   state: HelperTextVariant;
   message: string;
 };
-type RuleProps = {
+export type RuleProps = {
   id: string;
   message: string;
   validate: (value: string) => boolean;
@@ -28,14 +31,17 @@ interface InputWithValidationProps {
   onChange: (value: string) => void;
   isRequired?: boolean;
   isDisabled?: boolean;
+  placeholder?: string;
   rules: Array<RuleProps>;
+  showAlways?: boolean; // if true, show helper text even if value is empty
+  type?: TextInputProps["type"];
 }
 
 const InputWithValidation = (props: InputWithValidationProps) => {
   const hasRules = props.rules.length > 0;
 
   const ruleStates = React.useMemo<RuleState[]>(() => {
-    if (!hasRules) return [];
+    if (!hasRules || props.isDisabled) return [];
     if (props.value === "") {
       return props.rules.map((r) => ({
         id: r.id,
@@ -71,15 +77,16 @@ const InputWithValidation = (props: InputWithValidationProps) => {
         id={props.id}
         name={props.name}
         value={props.value}
-        type="text"
+        type={props.type || "text"}
         isRequired={props.isRequired}
         isDisabled={props.isDisabled}
         aria-label={props.name}
+        placeholder={props.placeholder}
         aria-describedby={nonSuccessRuleIds.join(" ")}
         aria-invalid={ariaInvalid}
         onChange={(_event, value) => props.onChange(value)}
       />
-      {props.value && (
+      {(props.value || props.showAlways) && (
         <FormHelperText>
           <HelperText component="ul">
             {ruleStates.map((r) => (

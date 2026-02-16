@@ -64,6 +64,7 @@ import CertificateMappingTabs from "src/pages/CertificateMapping/CertificateMapp
 import DnsZones from "src/pages/DNSZones/DnsZones";
 import DnsZonesTabs from "src/pages/DNSZones/DnsZonesTabs";
 import DnsForwardZones from "src/pages/DNSZones/DnsForwardZones";
+import DnsForwardZonesTabs from "src/pages/DNSZones/DnsForwardZonesTabs";
 import DnsResourceRecordsPreSettings from "src/pages/DNSZones/DnsResourceRecordsPreSettings";
 import DnsServers from "src/pages/DNSZones/DnsServers";
 import DnsServersTabs from "src/pages/DNSZones/DnsServersTabs";
@@ -71,6 +72,7 @@ import DnsGlobalConfig from "src/pages/DNSZones/DnsGlobalConfig";
 import IdRanges from "src/pages/IdRanges/IdRanges";
 import { useConfigurationSettings } from "src/utils/configurationSettings";
 import Trusts from "src/pages/Trusts/Trusts";
+import TrustsTabs from "src/pages/Trusts/TrustsTabs";
 
 // Renders routes (React)
 export const AppRoutes = ({ isInitialDataLoaded }): React.ReactElement => {
@@ -494,6 +496,12 @@ export const AppRoutes = ({ isInitialDataLoaded }): React.ReactElement => {
               )}
               <Route path="dns-forward-zones">
                 <Route path="" element={<DnsForwardZones />} />
+                <Route path=":idnsname">
+                  <Route
+                    path=""
+                    element={<DnsForwardZonesTabs section="settings" />}
+                  />
+                </Route>
               </Route>
               <Route path="dns-servers">
                 <Route path="" element={<DnsServers />} />
@@ -512,6 +520,9 @@ export const AppRoutes = ({ isInitialDataLoaded }): React.ReactElement => {
               </Route>
               <Route path="trusts">
                 <Route path="" element={<Trusts />} />
+                <Route path=":cn">
+                  <Route path="" element={<TrustsTabs section="settings" />} />
+                </Route>
               </Route>
               <Route path="configuration" element={<Configuration />} />
               {/* Redirect to Active users page if user is logged in and navigates to the root page */}

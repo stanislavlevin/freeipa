@@ -5,11 +5,8 @@ import {
   Checkbox,
   Flex,
   FormGroup,
-  HelperTextItem,
-  HelperText,
   Radio,
   TextInput,
-  ValidatedOptions,
 } from "@patternfly/react-core";
 // Components
 import ModalWithFormLayout, {
@@ -19,20 +16,17 @@ import CustomTooltip from "src/components/layouts/CustomTooltip";
 import InputRequiredText from "src/components/layouts/InputRequiredText";
 import NumberSelector from "src/components/Form/NumberInput";
 import PasswordInput from "src/components/layouts/PasswordInput";
+// Redux
+import { useAppDispatch } from "src/store/hooks";
 // RPC
+import { addAlert } from "src/store/Global/alerts-slice";
 import { TrustAddPayload, useAddTrustMutation } from "src/services/rpcTrusts";
-// Hooks
-import useAlerts from "src/hooks/useAlerts";
 // Errors
 import { SerializedError } from "@reduxjs/toolkit";
 // Icons
 import { InfoCircleIcon } from "@patternfly/react-icons";
 // Data types
-import {
-  DEFAULT_ERROR_VALIDATION_DATA,
-  ErrorValidationData,
-  RangeType,
-} from "src/utils/datatypes/globalDataTypes";
+import { RangeType } from "src/utils/datatypes/globalDataTypes";
 
 interface PropsToAddTrustModal {
   isOpen: boolean;
@@ -48,8 +42,7 @@ const externalTrustCheckboxMessage =
   "Establish external trust to a domain in another forest. The trust is not transitive beyond the domain.";
 
 const AddTrustModal = (props: PropsToAddTrustModal) => {
-  // Alerts to show in the UI
-  const alerts = useAlerts();
+  const dispatch = useAppDispatch();
 
   // API calls
   const [addTrust] = useAddTrustMutation();
@@ -85,36 +78,15 @@ const AddTrustModal = (props: PropsToAddTrustModal) => {
   const [preSharedPwdVerifyHidden, setPreSharedPwdVerifyHidden] =
     React.useState<boolean>(true);
 
-  React.useEffect(() => {
-    verifyPreSharedPwdVerifyValidationHandler();
-  }, [preSharedPwd, preSharedPwdVerify]);
-
-  // Pre-shared password verify validation
-  const [preSharedPwdVerifyValidation, setPreSharedPwdVerifyValidation] =
-    React.useState<ErrorValidationData>(DEFAULT_ERROR_VALIDATION_DATA);
-
-  const resetPreSharedPwdVerifyValidation = () => {
-    setPreSharedPwdVerifyValidation(DEFAULT_ERROR_VALIDATION_DATA);
-  };
-
-  const verifyPreSharedPwdVerifyValidationHandler = () => {
-    if (preSharedPwd !== preSharedPwdVerify) {
-      const verifyPassVal = {
-        isError: true,
-        message: "Passwords must match",
-        pfError: ValidatedOptions.error,
-      };
-      setPreSharedPwdVerifyValidation(verifyPassVal);
-      return true; // is error
-    }
-    resetPreSharedPwdVerifyValidation();
-    return false;
-  };
-
   const validateFields = () => {
-    resetPreSharedPwdVerifyValidation();
-    const validation = verifyPreSharedPwdVerifyValidationHandler();
-    return !validation;
+    if (authMethod === "pre-shared-pwd") {
+      if (preSharedPwd === "" || preSharedPwdVerify === "") return false;
+      if (preSharedPwd !== preSharedPwdVerify) return false;
+    }
+    if (authMethod === "admin") {
+      if (adminAccount === "" || adminAccounPwd === "") return false;
+    }
+    return domainName !== "";
   };
 
   const clearFields = () => {
@@ -172,11 +144,23 @@ const AddTrustModal = (props: PropsToAddTrustModal) => {
             const error = response.data?.error as SerializedError;
 
             if (error) {
-              alerts.addAlert("add-trust-error", error.message, "danger");
+              dispatch(
+                addAlert({
+                  name: "add-trust-error",
+                  title: error.message!,
+                  variant: "danger",
+                })
+              );
             }
 
             if (data) {
-              alerts.addAlert("add-trust-success", data.summary, "success");
+              dispatch(
+                addAlert({
+                  name: "add-trust-success",
+                  title: data.summary,
+                  variant: "success",
+                })
+              );
               // Reset selected item
               clearFields();
               // Update data
@@ -352,7 +336,6 @@ const AddTrustModal = (props: PropsToAddTrustModal) => {
                 onRevealHandler={() =>
                   setPreSharedPwdHidden(!preSharedPwdHidden)
                 }
-                onFocus={resetPreSharedPwdVerifyValidation}
                 passwordHidden={preSharedPwdHidden}
               />
             </FormGroup>
@@ -374,18 +357,15 @@ const AddTrustModal = (props: PropsToAddTrustModal) => {
                   onRevealHandler={() =>
                     setPreSharedPwdVerifyHidden(!preSharedPwdVerifyHidden)
                   }
-                  onFocus={resetPreSharedPwdVerifyValidation}
                   passwordHidden={preSharedPwdVerifyHidden}
-                  validated={preSharedPwdVerifyValidation.pfError}
+                  rules={[
+                    {
+                      id: "verify-match",
+                      message: "Passwords must match",
+                      validate: (v: string) => v === preSharedPwd,
+                    },
+                  ]}
                 />
-                {preSharedPwdVerifyValidation.isError &&
-                  preSharedPwdVerifyValidation.message !== "" && (
-                    <HelperText>
-                      <HelperTextItem variant="error">
-                        {preSharedPwdVerifyValidation.message}
-                      </HelperTextItem>
-                    </HelperText>
-                  )}
               </>
             </FormGroup>
           </div>
@@ -480,7 +460,6 @@ const AddTrustModal = (props: PropsToAddTrustModal) => {
 
   const isButtonDisabled =
     isAddButtonSpinning ||
-    preSharedPwdVerifyValidation.isError ||
     domainName.length === 0 ||
     isAdminAccountDisabled ||
     isPreSharedPwdDisabled;
@@ -510,7 +489,6 @@ const AddTrustModal = (props: PropsToAddTrustModal) => {
 
   return (
     <>
-      <alerts.ManagedAlerts />
       <ModalWithFormLayout
         dataCy={"add-trust-modal"}
         variantType={"small"}

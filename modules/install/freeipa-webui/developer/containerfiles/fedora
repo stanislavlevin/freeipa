@@ -34,7 +34,7 @@ RUN  dnf clean all && rm -rf "/var/cache/dnf/"
 
 STOPSIGNAL RTMIN+3
 
-VOLUME [/webui]
+VOLUME /webui
 
 WORKDIR /webui
 
