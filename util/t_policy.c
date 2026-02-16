@@ -54,7 +54,6 @@ int main(int argc, const char *argv[]) {
     /* Check that with no policy the IPA minimum is in force */
     assert(ipapwd_check_policy(&policy, "abc", NULL, 3, 0, 0, 0, NULL) == IPAPWD_POLICY_OK);
 
-#if defined(USE_PWQUALITY)
     /* Max repeats of 1 */
     set_policy(&policy, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
     assert(ipapwd_check_policy(&policy, "password", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_PWD_CONSECUTIVE);
@@ -79,12 +78,10 @@ int main(int argc, const char *argv[]) {
     assert(ipapwd_check_policy(&policy, "AbacAb", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_OK);
     assert(ipapwd_check_policy(&policy, "abacabc", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_PWD_SEQUENCE);
 
-#endif /* USE_PWQUALITY */
     /* Palindrone */
     set_policy(&policy, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);  /* Note there is no policy */
     assert(ipapwd_check_policy(&policy, "password", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_OK);
     assert(ipapwd_check_policy(&policy, "abccba", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_OK);
-#if defined(USE_PWQUALITY)
     set_policy(&policy, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0);  /* Set anything */
     assert(ipapwd_check_policy(&policy, "abccba", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_PWD_PALINDROME);
 
@@ -117,7 +114,6 @@ int main(int argc, const char *argv[]) {
     assert(ipapwd_check_policy(&policy, "abcd1", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_OK);
     set_policy(&policy, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0);
     assert(ipapwd_check_policy(&policy, "ab21", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_OK);
-#endif /* USE_PWQUALITY */
 
     /* Verify that no credits are added automatically. We need to set some
      * pwquality option in order to validate it, so set length.
@@ -125,7 +121,6 @@ int main(int argc, const char *argv[]) {
     set_policy(&policy, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     assert(ipapwd_check_policy(&policy, "abcd1", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_PWD_TOO_SHORT);
 
-#if defined(USE_PWQUALITY)
     /* Upper check.
      * Negative == minimum # of uppers required
      * Zero == skip check
@@ -172,14 +167,12 @@ int main(int argc, const char *argv[]) {
     set_policy(&policy, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0);
     assert(ipapwd_check_policy(&policy, "ABcd", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_OK);
 
-#endif /* USE_PWQUALITY */
     /* Verify that no credits are added automatically. We need to set some
      * pwquality option in order to validate it, so set length.
      */
     set_policy(&policy, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     assert(ipapwd_check_policy(&policy, "ABCDE", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_PWD_TOO_SHORT);
 
-#if defined(USE_PWQUALITY)
     /* Mixed credit checks */
     set_policy(&policy, 0, 0, 0, 0, 0, 0, 0, -2, -2, -2, 0);
     assert(ipapwd_check_policy(&policy, "SecreT123", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_OK);
@@ -189,7 +182,6 @@ int main(int argc, const char *argv[]) {
     assert(ipapwd_check_policy(&policy, "Secret123", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_PWD_MIN_UPPERS);
     set_policy(&policy, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1);
     assert(ipapwd_check_policy(&policy, "SecreT123", NULL, 0, 0, 0, 0, NULL) == IPAPWD_POLICY_PWD_MIN_OTHERS);
-#endif /* USE_PWQUALITY */
 
     return 0;
 }

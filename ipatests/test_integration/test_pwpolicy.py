@@ -7,7 +7,6 @@ from __future__ import absolute_import
 
 import pytest
 
-from ipaplatform.constants import constants
 from ipatests.test_integration.base import IntegrationTest
 
 from ipatests.pytest_ipa.integration import tasks
@@ -15,10 +14,6 @@ from ipatests.pytest_ipa.integration import tasks
 USER = 'tuser'
 PASSWORD = 'Secret123'
 POLICY = 'test'
-
-
-def has_pw_quality_lib():
-    return constants.PASSWORD_QUALITY_LIB is not None
 
 
 class TestPWPolicy(IntegrationTest):
@@ -102,27 +97,20 @@ class TestPWPolicy(IntegrationTest):
 
     def clean_pwpolicy(self):
         """Set all policy values we care about to zero/false"""
-        cmd = [
-            "ipa", "pwpolicy-mod", POLICY,
-            "--minlife", "0",
-            "--minlength", "0",
-            "--minclasses", "0",
-        ]
-        if has_pw_quality_lib():
-            cmd = [
-                *cmd,
-                *(
-                     "--maxrepeat", "0",
-                     "--maxsequence", "0",
-                     "--usercheck", "false",
-                     "--dictcheck" ,"false",
-                     "--dcredit", "0",
-                     "--ucredit", "0",
-                     "--lcredit", "0",
-                     "--ocredit", "0",
-                ),
-            ]
-        self.master.run_command(cmd)
+        self.master.run_command(
+            ["ipa", "pwpolicy-mod", POLICY,
+             "--maxrepeat", "0",
+             "--maxsequence", "0",
+             "--usercheck", "false",
+             "--dictcheck" ,"false",
+             "--minlife", "0",
+             "--minlength", "0",
+             "--minclasses", "0",
+             "--dcredit", "0",
+             "--ucredit", "0",
+             "--lcredit", "0",
+             "--ocredit", "0",],
+        )
         # minlength => 6 is required for any of the libpwquality settings
         self.master.run_command(
             ["ipa", "pwpolicy-mod", POLICY,
@@ -137,10 +125,6 @@ class TestPWPolicy(IntegrationTest):
         tasks.kinit_admin(self.master)
         self.clean_pwpolicy()
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_maxrepeat(self, reset_pwpolicy):
         self.set_pwpolicy(maxrepeat=2)
         # good passwords
@@ -164,10 +148,6 @@ class TestPWPolicy(IntegrationTest):
             assert 'Password has too many consecutive characters' in \
                 result.stdout_text
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_maxsequence(self, reset_pwpolicy):
         self.set_pwpolicy(maxsequence=3)
         # good passwords
@@ -191,10 +171,6 @@ class TestPWPolicy(IntegrationTest):
             assert 'Password contains a monotonic sequence' in \
                 result.stdout_text
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_usercheck(self, reset_pwpolicy):
         self.set_pwpolicy(usercheck=True)
         for password in ('tuserpass', 'passoftuser'):
@@ -211,10 +187,6 @@ class TestPWPolicy(IntegrationTest):
         # test with valid password
         self.kinit_as_user(self.master, PASSWORD, 'bamOncyftAv0')
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_dictcheck(self, reset_pwpolicy):
         self.set_pwpolicy(dictcheck=True)
         for password in ('password', 'bookends', 'BaLtim0re'):
@@ -271,10 +243,6 @@ class TestPWPolicy(IntegrationTest):
             self.kinit_as_user(self.master, PASSWORD, valid)
             self.reset_password(self.master)
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_credits(self, reset_pwpolicy):
         """Test each credit individually. This would be all copy/paste
            if done individually so provide a config and set of good
@@ -358,10 +326,6 @@ class TestPWPolicy(IntegrationTest):
                      'Password contains too few special characters',),
                     **{'ocredit': -2})
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_minlength_mod(self, reset_pwpolicy):
         """Test that the pwpolicy minlength overrides our policy
         """
@@ -397,10 +361,6 @@ class TestPWPolicy(IntegrationTest):
             assert result.returncode != 0
             assert 'minlength' in result.stderr_text
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_minlength_empty(self, reset_pwpolicy):
         """Test that the pwpolicy minlength can be blank
         """
@@ -435,10 +395,6 @@ class TestPWPolicy(IntegrationTest):
         assert result.returncode == 0
         assert 'minlength' not in result.stderr_text
 
-    @pytest.mark.skipif(
-        not has_pw_quality_lib(),
-        reason="Requires support for password quality lib",
-    )
     def test_minlength_add(self):
         """Test that adding a new policy with minlength is caught.
         """
@@ -578,23 +534,3 @@ class TestPWPolicy(IntegrationTest):
             self.master, dn, ['passwordgraceusertime',],
         )
         assert 'passwordgraceusertime: 0' in result.stdout_text.lower()
-
-    @pytest.mark.skipif(
-        has_pw_quality_lib(),
-        reason="Requires missing support for password quality lib",
-    )
-    def test_wrong_option(self):
-        for values in (
-            ("--maxrepeat", "0"),
-            ("--maxsequence", "0"),
-            ("--dictcheck", "false"),
-            ("--usercheck", "false"),
-            ("--dcredit", "0"),
-            ("--ucredit", "0"),
-            ("--lcredit", "0"),
-            ("--ocredit", "0"),
-        ):
-            args = ["ipa", "pwpolicy-mod", POLICY, *values]
-            result = self.master.run_command(args, raiseonerr=False)
-            assert result.returncode != 0
-            assert f"error: no such option: {values[0]}" in result.stderr_text

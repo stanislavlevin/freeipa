@@ -291,6 +291,7 @@ static int ipapwd_pre_add(Slapi_PBlock *pb)
                                   slapi_sdn_get_dn(sdn), errMesg);
                     goto done;
                 }
+                slapi_ch_free_string(&userpw);
                 userpw = slapi_ch_strdup(userpw_clear);
             }
 
@@ -302,8 +303,11 @@ static int ipapwd_pre_add(Slapi_PBlock *pb)
                 if (NULL == enabled) {
                     LOG("no ipaMigrationEnabled in config, assuming FALSE\n");
                 } else if (0 == strcmp(enabled, "TRUE")) {
-                    return 0;
+                    slapi_ch_free_string(&enabled);
+                    rc = LDAP_SUCCESS;
+                    goto done;
                 }
+                slapi_ch_free_string(&enabled);
 
                 /* With User Life Cycle, it could be a stage user that is activated.
                  * The userPassword and krb keys were set while the user was a stage user.
@@ -315,7 +319,8 @@ static int ipapwd_pre_add(Slapi_PBlock *pb)
                     LOG("User Life Cycle: %s is a activated stage user "
                         "(with prehashed password and krb keys)\n",
                         sdn ? slapi_sdn_get_dn(sdn) : "unknown");
-                    return 0;
+                    rc = LDAP_SUCCESS;
+                    goto done;
                 }
 
                 LOG("pre-hashed passwords are not valid\n");
@@ -376,6 +381,7 @@ static int ipapwd_pre_add(Slapi_PBlock *pb)
                 pwdop->pwdata.changetype = IPA_CHANGETYPE_SYSACCT;
             }
         }
+        slapi_ch_free_string(&binddn);
     }
 
     pwdop->pwdata.dn = slapi_ch_strdup(slapi_sdn_get_dn(sdn));
@@ -416,22 +422,23 @@ static int ipapwd_pre_add(Slapi_PBlock *pb)
                 LOG_FATAL("failed to set encoded values in entry\n");
                 rc = LDAP_OPERATIONS_ERROR;
                 ipapwd_free_slapi_value_array(&svals);
+                slapi_ch_free_string(&nt);
+                ipapwd_free_slapi_value_array(&ntvals);
                 goto done;
             }
-
-            ipapwd_free_slapi_value_array(&svals);
         }
+        ipapwd_free_slapi_value_array(&svals);
 
         if (nt && is_smb) {
             /* set value */
             slapi_entry_attr_set_charptr(e, "sambaNTPassword", nt);
-            slapi_ch_free_string(&nt);
         }
+        slapi_ch_free_string(&nt);
 
         if (ntvals && is_ipant) {
             slapi_entry_attr_replace_sv(e, "ipaNTHash", ntvals);
-            ipapwd_free_slapi_value_array(&ntvals);
         }
+        ipapwd_free_slapi_value_array(&ntvals);
 
         if (is_smb) {
             /* with samba integration we need to also set sambaPwdLastSet or
@@ -875,6 +882,7 @@ static int ipapwd_pre_mod(Slapi_PBlock *pb)
 
         slapi_sdn_free(&bdn);
         slapi_sdn_free(&tdn);
+        slapi_ch_free_string(&binddn);
     }
 
     pwdop->pwdata.dn = slapi_ch_strdup(slapi_sdn_get_dn(sdn));
@@ -914,21 +922,21 @@ static int ipapwd_pre_mod(Slapi_PBlock *pb)
             /* replace values */
             slapi_mods_add_mod_values(smods, LDAP_MOD_REPLACE,
                                       "krbPrincipalKey", svals);
-            ipapwd_free_slapi_value_array(&svals);
         }
+        ipapwd_free_slapi_value_array(&svals);
 
         if (nt && is_smb) {
             /* replace value */
             slapi_mods_add_string(smods, LDAP_MOD_REPLACE,
                                   "sambaNTPassword", nt);
-            slapi_ch_free_string(&nt);
         }
+        slapi_ch_free_string(&nt);
 
         if (ntvals && is_ipant) {
             slapi_mods_add_mod_values(smods, LDAP_MOD_REPLACE,
                                       "ipaNTHash", ntvals);
-            ipapwd_free_slapi_value_array(&ntvals);
         }
+        ipapwd_free_slapi_value_array(&ntvals);
 
         if (is_smb) {
             /* with samba integration we need to also set sambaPwdLastSet or
@@ -1072,7 +1080,7 @@ static int ipapwd_post_modadd(Slapi_PBlock *pb)
     void *op;
     struct ipapwd_operation *pwdop = NULL;
     Slapi_Mods *smods;
-    Slapi_Value **pwvals;
+    Slapi_Value **pwvals = NULL;
     int ret;
     char *errMsg = "Internal operations error\n";
     struct ipapwd_krbcfg *krbcfg = NULL;
@@ -1202,6 +1210,7 @@ done:
     slapi_mods_free(&smods);
     slapi_ch_free_string(&principal);
     free_ipapwd_krbcfg(&krbcfg);
+    ipapwd_free_slapi_value_array(&pwvals);
     return 0;
 }
 
@@ -1516,6 +1525,7 @@ static int ipapwd_pre_bind(Slapi_PBlock *pb)
 
             if (current_time > expire_time && expire_time > 0) {
                 LOG_FATAL("kerberos principal in %s is expired\n", dn);
+                slapi_ch_free_string(&principal_expire);
                 slapi_entry_free(entry);
                 slapi_sdn_free(&sdn);
                 slapi_send_ldap_result(pb, LDAP_UNWILLING_TO_PERFORM, NULL,
@@ -1535,6 +1545,8 @@ static int ipapwd_pre_bind(Slapi_PBlock *pb)
         if (ret != 0) {
             LOG_FATAL("ipapwd_gen_checks failed for '%s': %s\n",
                       slapi_sdn_get_dn(sdn), errMesg);
+            free_ipapwd_krbcfg(&krbcfg);
+            slapi_ch_free_string(&principal_expire);
             slapi_entry_free(entry);
             slapi_sdn_free(&sdn);
             return 0;
@@ -1591,6 +1603,8 @@ static int ipapwd_pre_bind(Slapi_PBlock *pb)
     /* Authenticate the user. */
     ret = ipapwd_authenticate(dn, entry, credentials);
     if (ret) {
+        free_ipapwd_krbcfg(&krbcfg);
+        slapi_ch_free_string(&principal_expire);
         slapi_entry_free(entry);
         slapi_sdn_free(&sdn);
         return 0;
@@ -1614,12 +1628,15 @@ static int ipapwd_pre_bind(Slapi_PBlock *pb)
     }
 #endif
 
+    free_ipapwd_krbcfg(&krbcfg);
+    slapi_ch_free_string(&principal_expire);
     slapi_entry_free(entry);
     slapi_sdn_free(&sdn);
     return 0;
 
 invalid_creds:
     free_ipapwd_krbcfg(&krbcfg);
+    slapi_ch_free_string(&principal_expire);
     slapi_entry_free(entry);
     slapi_sdn_free(&sdn);
     slapi_send_ldap_result(pb, rc, NULL, errMesg, 0, NULL);

@@ -643,7 +643,7 @@ class DnsBackup:
 
 
 class BindInstance(service.Service):
-    def __init__(self, fstore=None, api=api, ntp_role=False):
+    def __init__(self, fstore=None, api=api):
         super(BindInstance, self).__init__(
             "named",
             service_desc="DNS",
@@ -664,7 +664,6 @@ class BindInstance(service.Service):
         self.sub_dict = None
         self.reverse_zones = ()
         self.named_conflict = services.service('named-conflict', api)
-        self.ntp_role = ntp_role
 
     suffix = ipautil.dn_attribute_property('_suffix')
 
@@ -786,9 +785,6 @@ class BindInstance(service.Service):
             self.step("setting up records for other masters", self.__add_others)
         # all zones must be created before this step
         self.step("adding NS record to the zones", self.__add_self_ns)
-        if self.ntp_role:
-            self.step("adding dns ntp record", self.__add_ntp_record)
-
         # The service entry is used for LDAPI autobind. The keytab is no
         # longer used to authenticate the server. The server still needs
         # the keytab to handle incoming nsupdate requests with TSIG.
@@ -806,7 +802,6 @@ class BindInstance(service.Service):
             "changing resolv.conf to point to ourselves",
             self.setup_resolv_conf
         )
-        self.step("disable chroot for bind", self.__disable_chroot)
         self.start_creation()
 
     def start_named(self):
@@ -941,8 +936,6 @@ class BindInstance(service.Service):
             NAMED_DNSSEC_VALIDATION=self._get_dnssec_validation(),
             NAMED_DNS_OVER_TLS_OPTIONS_CONF=named_tls_options,
             NAMED_DNS_OVER_TLS_CONF=named_tls_conf,
-            NAMED_RNDC_CONF_COMMENT=constants.NAMED_RNDC_CONF_COMMENT,
-            NAMED_RNDC_CONF=paths.NAMED_RNDC_CONF,
         )
 
     def __setup_dns_container(self):
@@ -994,10 +987,6 @@ class BindInstance(service.Service):
             logger.debug("adding self NS to zone %s apex", zone)
             add_ns_rr(zone, ns_hostname, self.dns_backup, force=True,
                       api=self.api)
-
-    def __add_ntp_record(self):
-        add_rr(self.domain, '_ntp._udp', 'SRV',
-               "0 100 123 {}.".format(self.fqdn))
 
     def __setup_reverse_zone(self):
         # Always use force=True as named is not set up yet
@@ -1211,11 +1200,6 @@ class BindInstance(service.Service):
             # we have to re-initialize it because resolv.conf has changed
             dnsutil.reset_default_resolver()
 
-    def __disable_chroot(self):
-        result = ipautil.run(['control', 'bind-chroot'], capture_output=True)
-        self.sstore.backup_state('control', 'bind-chroot', result.output)
-        ipautil.run(['control', 'bind-chroot', 'disabled'])
-
     def __generate_rndc_key(self):
         installutils.check_entropy()
         ipautil.run([paths.GENERATE_RNDC_KEY])
@@ -1402,10 +1386,6 @@ class BindInstance(service.Service):
 
         self.disable()
         self.stop()
-
-        value = self.sstore.restore_state('control', 'bind-chroot')
-        if value is not None:
-            ipautil.run(['control', 'bind-chroot', value])
 
         self.named_conflict.unmask()
 

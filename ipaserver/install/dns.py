@@ -411,7 +411,7 @@ def install_check(standalone, api, replica, options, hostname):
         print("Using reverse zone(s) %s" % ', '.join(reverse_zones))
 
 
-def install(standalone, replica, options, api=api, ntp_role=False):
+def install(standalone, replica, options, api=api):
     fstore = sysrestore.FileStore(paths.SYSRESTORE)
 
     if standalone:
@@ -450,7 +450,7 @@ def install(standalone, replica, options, api=api, ntp_role=False):
         print("Request certificate for DNS over TLS, using IPA CA")
         _request_cert_for_dns_over_tls(options)
 
-    bind = bindinstance.BindInstance(fstore, api=api, ntp_role=ntp_role)
+    bind = bindinstance.BindInstance(fstore, api=api)
     bind.setup(api.env.host, ip_addresses, api.env.realm, api.env.domain,
                options.forwarders, options.forward_policy,
                reverse_zones, zonemgr=options.zonemgr,

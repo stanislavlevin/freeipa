@@ -223,7 +223,7 @@ def uninstall(fstore, statestore):
         paths.SYSCONFIG_NFS,
         paths.IDMAPD_CONF,
     ]
-    STATES = ['autofs', 'rpcidmapd', 'rpcgssd', 'nfsclient']
+    STATES = ['autofs', 'rpcidmapd', 'rpcgssd']
 
     if not statestore.get_state('autofs', 'sssd'):
         tasks.disable_ldap_automount(statestore)
@@ -236,7 +236,6 @@ def uninstall(fstore, statestore):
 
     print("Restoring configuration")
 
-    tasks.disable_nsswitch_automount(statestore)
     for filepath in RESTORE_FILES:
         if fstore.has_file(filepath):
             fstore.restore_file(filepath)
@@ -284,16 +283,6 @@ def uninstall(fstore, statestore):
     if statestore.has_state('rpcgssd'):
         statestore.delete_state('rpcgssd', 'enabled')
         statestore.delete_state('rpcgssd', 'running')
-
-    # restore nfs-client.target
-    if statestore.has_state('nfsclient'):
-        enabled = statestore.restore_state('nfsclient', 'enabled')
-        running = statestore.restore_state('nfsclient', 'running')
-        nfsclient = services.knownservices.nfs_client
-        if not enabled:
-            nfsclient.disable()
-        if not running:
-            nfsclient.stop()
 
     nfsutils = services.knownservices['nfs-utils']
     try:
@@ -343,19 +332,6 @@ def configure_nfs(fstore, statestore, options):
         conf.changeConf(paths.IDMAPD_CONF, section_with_changes)
         tasks.restore_context(paths.IDMAPD_CONF)
         print("Configured %s" % paths.IDMAPD_CONF)
-
-    # by default nfs-client.target is disabled in ALT
-    nfsclient = services.knownservices.nfs_client
-    statestore.backup_state('nfsclient', 'enabled', nfsclient.is_enabled())
-    statestore.backup_state('nfsclient', 'running', nfsclient.is_running())
-    try:
-        nfsclient.enable()
-    except Exception as e:
-        logger.error("Failed to enable nfs-client.target (%s)", str(e))
-    try:
-        nfsclient.restart()
-    except Exception as e:
-        logger.error("Failed to restart nfs-client.target (%s)", str(e))
 
     rpcgssd = services.knownservices.rpcgssd
     try:
@@ -506,7 +482,6 @@ def configure_automount():
         sys.exit("Installation aborted")
 
     try:
-        tasks.enable_nsswitch_automount(statestore)
         configure_nfs(fstore, statestore, options)
         configure_autofs_sssd(fstore, statestore, autodiscover, options)
         configure_autofs_common(fstore, statestore, options)

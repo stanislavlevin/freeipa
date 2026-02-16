@@ -334,7 +334,7 @@ class TestIpaClientAutomountFileRestore(IntegrationTest):
         after_ipa_client_automount = cmd.stdout_text.split()
         # The default order depends on the authselect version
         # but we only care about the list of sources, not their order
-        assert after_ipa_client_automount == ['sss', 'files']
+        assert sorted(after_ipa_client_automount) == ['files', 'sss']
 
         cmd = self.clients[0].run_command(grep_automount_command)
         assert cmd.stdout_text.split() == after_ipa_client_automount

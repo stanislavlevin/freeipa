@@ -585,6 +585,7 @@ int ipapwd_gen_checks(Slapi_PBlock *pb, char **errMesg,
         LOG_FATAL("Error Retrieving Master Key\n");
         *errMesg = "Fatal Internal Error";
         rc = LDAP_OPERATIONS_ERROR;
+        goto done;
     }
 
     /* do not return the master key if asked */
@@ -786,6 +787,7 @@ next:
         hint = slapi_valueset_next_value(svs, hint, &sv);
     }
 
+    slapi_valueset_free(svs);
     return kvno;
 }
 
@@ -1107,6 +1109,7 @@ int ipapwd_set_extradata(const char *dn,
 
     slapi_value_free(&va[0]);
     slapi_mods_free(&smods);
+    free(xdata);
 
     return ret;
 }
@@ -1121,7 +1124,7 @@ void ipapwd_free_slapi_value_array(Slapi_Value ***svals)
         }
     }
 
-    slapi_ch_free((void **)sv);
+    slapi_ch_free((void **)svals);
 }
 
 void free_ipapwd_krbcfg(struct ipapwd_krbcfg **cfg)

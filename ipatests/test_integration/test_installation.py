@@ -631,7 +631,7 @@ class TestInstallWithCA_DNS4(CALessBase):
         self.prepare_cacert('ca1')
 
         # no zone overlap by default
-        self.install_server()
+        self.install_server(allow_zone_overlap=False)
 
         result = self.master.run_command([
             'ipa', 'dnszone-find'])
@@ -2101,6 +2101,7 @@ class TestHostnameValidator(IntegrationTest):
             '--setup-dns',
             '--forwarder', host.config.dns_forwarder,
             '--auto-reverse',
+            '--allow-zone-overlap',
             '--netbios-name', 'EXAMPLE',
         ]
 
