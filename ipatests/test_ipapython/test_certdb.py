@@ -28,8 +28,9 @@ else:
 
 def nss_3_114_alt1():
     """
-    Return True if nss is 3.114-alt1 or newer:
+    Return True if nss >= 3.114-alt1 (introduced) and < 3.122-alt1 (fixed):
     https://bugzilla.mozilla.org/show_bug.cgi?id=1982807
+    https://bugzilla.mozilla.org/show_bug.cgi?id=2012547
     """
     res=subprocess.run(
         ["rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", "libnss"],
@@ -38,8 +39,9 @@ def nss_3_114_alt1():
         encoding="utf-8",
     )
     installed_version = tasks.parse_ipa_version(res.stdout)
-    target_version = tasks.parse_ipa_version("3.114-alt1")
-    return installed_version >= target_version
+    low_version = tasks.parse_ipa_version("3.114-alt1")
+    up_version = tasks.parse_ipa_version("3.122-alt1")
+    return installed_version >= low_version and installed_version < up_version
 
 
 def create_selfsigned(nssdb):
@@ -126,7 +128,7 @@ def test_sql_tmp():
 @pytest.mark.xfail(
     nss_3_114_alt1(),
     reason=(
-        "fails with nss 3.114 "
+        "fails with nss 3.114 - 3.122 "
         "(https://bugzilla.mozilla.org/show_bug.cgi?id=1982807)"
     ),
     strict=True,
@@ -173,7 +175,7 @@ def test_convert_db():
 @pytest.mark.xfail(
     nss_3_114_alt1(),
     reason=(
-        "fails with nss 3.114 "
+        "fails with nss 3.114 - 3.122 "
         "(https://bugzilla.mozilla.org/show_bug.cgi?id=1982807)"
     ),
     strict=True,
