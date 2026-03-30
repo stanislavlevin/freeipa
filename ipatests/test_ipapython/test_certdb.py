@@ -41,7 +41,7 @@ def nss_3_114_alt1():
     installed_version = tasks.parse_ipa_version(res.stdout)
     low_version = tasks.parse_ipa_version("3.114-alt1")
     up_version = tasks.parse_ipa_version("3.122-alt1")
-    return installed_version >= low_version and installed_version < up_version
+    return low_version <= installed_version < up_version
 
 
 def create_selfsigned(nssdb):
