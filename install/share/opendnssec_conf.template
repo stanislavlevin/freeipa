@@ -16,6 +16,7 @@
 	<Common>
 		<Logging>
 			<Syslog><Facility>local0</Facility></Syslog>
+			<Verbosity>8</Verbosity>
 		</Logging>
 
 		<PolicyFile>/etc/opendnssec/kasp.xml</PolicyFile>
