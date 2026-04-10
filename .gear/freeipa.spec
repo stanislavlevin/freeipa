@@ -318,6 +318,8 @@ Requires: %name-server = %EVR
 Requires: bind-dyndb-ldap >= %bind_dyndb_ldap_version
 Requires: bind >= %bind_version
 Requires: bind-utils >= %bind_version
+# https://bugzilla.altlinux.org/58503
+Requires: libuv >= 1.52.1
 Requires: opendnssec >= %opendnssec_version
 Requires: libp11 >= %libp11_version
 
