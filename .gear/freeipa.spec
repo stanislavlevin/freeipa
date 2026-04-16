@@ -8,12 +8,7 @@
 %def_without modern_ui
 %else
 %def_without only_client
-# fails: Cannot find module '@rollup/rollup-linux-arm64-gnu'
-%ifarch aarch64
-%def_without modern_ui
-%else
 %def_with modern_ui
-%endif
 %endif
 
 # skip packaging of
