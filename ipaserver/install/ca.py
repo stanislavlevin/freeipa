@@ -13,7 +13,10 @@ import logging
 import os.path
 import tempfile
 
-import pki.util
+try:
+    import pki.util
+except ModuleNotFoundError:
+    pass
 
 import six
 

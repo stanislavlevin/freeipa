@@ -264,10 +264,13 @@ import ipapython.cookie
 from ipapython import dogtag, ipautil
 from ipaserver.masters import find_providing_server
 
-import pki
-from pki.client import PKIConnection
-import pki.crypto as cryptoutil
-from pki.kra import KRAClient
+try:
+    import pki
+    from pki.client import PKIConnection
+    import pki.crypto as cryptoutil
+    from pki.kra import KRAClient
+except ModuleNotFoundError:
+    pass
 
 if six.PY3:
     unicode = str

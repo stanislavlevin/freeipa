@@ -20,6 +20,7 @@
 from __future__ import absolute_import
 
 import base64
+import importlib
 import logging
 import time
 import typing
@@ -36,10 +37,13 @@ from configparser import DEFAULTSECT, ConfigParser, RawConfigParser
 
 import six
 
-import pki
-from pki.client import PKIConnection
-import pki.system
-import pki.util
+try:
+    import pki
+    from pki.client import PKIConnection
+    import pki.system
+    import pki.util
+except ModuleNotFoundError:
+    pass
 
 from ipalib import api, errors, x509
 from ipalib.install import certmonger
@@ -200,12 +204,20 @@ class DogtagInstance(service.Service):
         self.subject_base = None
         self.ajp_secret = None
 
+    def is_pki_available(self):
+        """
+        Returns True if pki packages are installed.
+        """
+        return importlib.util.find_spec("pki") is not None
+
     def is_installed(self):
         """
         Determine if subsystem instance has been installed.
 
         Returns True/False
         """
+        if not self.is_pki_available():
+            return False
         try:
             result = ipautil.run(
                 ['pki-server', 'subsystem-show', self.subsystem.lower()],
@@ -328,6 +340,11 @@ class DogtagInstance(service.Service):
                                        'internaldb', None, separator='=')
 
     def uninstall(self):
+        if not self.is_pki_available():
+            self.print_msg(
+                "Skipping uninstallation of unavailable %s" % self.subsystem
+            )
+            return
         if self.is_installed():
             self.print_msg("Unconfiguring %s" % self.subsystem)
 

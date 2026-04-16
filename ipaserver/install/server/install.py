@@ -5,6 +5,7 @@
 from __future__ import print_function, absolute_import
 
 import errno
+import importlib
 import logging
 import os
 import pickle
@@ -417,6 +418,13 @@ def install_check(installer):
     else:
         setup_ca = True
     options.setup_ca = setup_ca
+
+    if any((setup_ca, options.setup_kra)):
+        if importlib.util.find_spec("pki") is None:
+            raise ScriptError(
+                "Dogtag PKI is unavailable on this platform, "
+                "CA-less installation is the only supported."
+            )
 
     if not setup_ca and options.ca_subject:
         raise ScriptError(
