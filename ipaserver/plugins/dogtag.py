@@ -191,19 +191,22 @@ from ipaserver.masters import find_providing_server
 
 import requests.exceptions
 
-import pki
-import pki.authority
-import pki.ca
-import pki.cert
-import pki.client
-import pki.info
-import pki.profile
-import pki.subsystem
-import pki.system
+try:
+    import pki
+    import pki.authority
+    import pki.ca
+    import pki.cert
+    import pki.client
+    import pki.info
+    import pki.profile
+    import pki.subsystem
+    import pki.system
 
-from pki.cert import CertRequestStatus
-import pki.crypto as cryptoutil
-from pki.kra import KRAClient
+    from pki.cert import CertRequestStatus
+    import pki.crypto as cryptoutil
+    from pki.kra import KRAClient
+except ModuleNotFoundError:
+    pass
 
 if six.PY3:
     unicode = str
