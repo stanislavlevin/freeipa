@@ -113,6 +113,7 @@ BuildRequires: python3-module-argcomplete
 %endif # only_client
 
 %if_with modern_ui
+BuildRequires: esbuild
 BuildRequires: rollup-native
 %endif
 
@@ -616,6 +617,11 @@ mv node_modules/rollup node_modules/rollup.bak
 cp -a %_prefix/lib/node_modules/rollup node_modules
 cp -a %_prefix/lib/node_modules/@rollup/rollup-*-gnu node_modules/@rollup
 
+# prepare to use native esbuild
+local_esbuild=$(npm ls -l -p esbuild | cut -d@ -f2 | sed 's/[.]/\\&/g')
+distro_esbuild=%{get_version esbuild}
+find node_modules/esbuild -name '*.js' | xargs sed -i "s,$local_esbuild,$distro_esbuild,g"
+
 popd
 %else
 touch install/freeipa-webui/Makefile.am
@@ -633,7 +639,10 @@ fi
 # prebuild modern webui otherwise it will try `npm clean-install`
 # which requires internet.
 pushd install/freeipa-webui
-npm run build
+
+# Use system esbuild. Note that /usr/bin/esbuild cannot be used
+# because eslint module specifically checks for such path.
+ESBUILD_BINARY_PATH=/bin/esbuild npm run build
 popd
 %endif
 
