@@ -112,6 +112,10 @@ BuildRequires: python3(rjsmin)
 BuildRequires: python3-module-argcomplete
 %endif # only_client
 
+%if_with modern_ui
+BuildRequires: rollup-native
+%endif
+
 # python
 BuildRequires: python3-module-lesscpy
 BuildRequires: python3-module-setuptools
@@ -604,7 +608,16 @@ git add .
 git commit -am 'with our changes'
 %endif
 
-%if_without modern_ui
+%if_with modern_ui
+pushd install/freeipa-webui
+
+# use native rollup
+mv node_modules/rollup node_modules/rollup.bak
+cp -a %_prefix/lib/node_modules/rollup node_modules
+cp -a %_prefix/lib/node_modules/@rollup/rollup-*-gnu node_modules/@rollup
+
+popd
+%else
 touch install/freeipa-webui/Makefile.am
 %endif
 
