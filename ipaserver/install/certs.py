@@ -34,9 +34,12 @@ import fcntl
 import time
 import datetime
 
-import pki.ca
-import pki.cert
-import pki.client
+try:
+    import pki.ca
+    import pki.cert
+    import pki.client
+except ModuleNotFoundError:
+    pass
 
 from ipalib.install import certmonger, sysrestore
 from ipapython import dogtag

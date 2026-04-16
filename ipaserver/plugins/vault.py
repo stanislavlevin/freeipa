@@ -41,11 +41,14 @@ from ipapython.dn import DN
 from ipaserver.masters import is_service_enabled
 
 if api.env.in_server:
-    import pki.account
-    import pki.key
-    from pki.crypto import DES_EDE3_CBC_OID
-    from pki.crypto import AES_128_CBC_OID
-    from pki import PKIException
+    try:
+        import pki.account
+        import pki.key
+        from pki.crypto import DES_EDE3_CBC_OID
+        from pki.crypto import AES_128_CBC_OID
+        from pki import PKIException
+    except ModuleNotFoundError:
+        pass
 
 if six.PY3:
     unicode = str
