@@ -31,3 +31,6 @@ variables:
   RUN_DOCS: false
   RUN_TOX: false
   RUN_WEBUI_TESTS: false
+  RUN_BASE_TESTS: false
+  RUN_GATING_TESTS: true
+  RUN_NIGHTLY_TESTS: false
