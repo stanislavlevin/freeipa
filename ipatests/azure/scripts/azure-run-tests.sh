@@ -184,7 +184,7 @@ python3 setup_containers.py || \
     }
 
 compose_execute $BASH_CMD \
-    -c 'java -XX:+PrintFlagsFinal -version | grep -i HeapSize'
+    -c 'java -XX:+PrintFlagsFinal -version | grep -i HeapSize ||:'
 compose_execute $BASH_CMD \
     -c 'echo -e JAVA_OPTS=\"-Dcom.redhat.fips=false -Xmx64M\"\\nexport JAVA_OPTS >> /etc/pki/pki.conf ||:'
 

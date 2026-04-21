@@ -1,0 +1,48 @@
+default_resources:
+  server:
+    mem_limit: "2000m"
+    memswap_limit: "2700m"
+    mem_reservation: "1600m"
+  replica:
+    mem_limit: "1800m"
+    memswap_limit: "2500m"
+    mem_reservation: "1500m"
+  client:
+    mem_limit: "512m"
+    memswap_limit: "1000m"
+    mem_reservation: "410m"
+
+vms:
+- vm_jobs:
+  - container_job: caless_TestServerInstall
+    tests:
+    - test_integration/test_caless.py::TestServerInstall
+
+- vm_jobs:
+  - container_job: caless_TestReplicaInstall
+    tests:
+    - test_integration/test_caless.py::TestReplicaInstall
+    containers:
+      replicas: 1
+
+  - container_job: caless_TestClientInstall
+    tests:
+    - test_integration/test_caless.py::TestClientInstall
+    containers:
+      clients: 1
+
+- vm_jobs:
+  - container_job: caless_TestIPACommands
+    tests:
+    - test_integration/test_caless.py::TestIPACommands
+
+- vm_jobs:
+  - container_job: caless_TestCertInstall
+    tests:
+    - test_integration/test_caless.py::TestCertInstall
+
+  - container_job: caless_TestPKINIT
+    tests:
+    - test_integration/test_caless.py::TestPKINIT
+    containers:
+      replicas: 1
