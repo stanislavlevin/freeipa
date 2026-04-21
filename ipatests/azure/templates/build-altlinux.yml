@@ -6,6 +6,7 @@ steps:
         --define '_topdir $(builddir)/rpmbuild' \
         --without 'lint' \
         --with ipatests \
+        --without dogtag_pki \
         --without 'fasttest'
     mkdir -p $(builddir)/dist/{,s}rpms
     mkdir -p $(builddir)/dist/rpms_debuginfo
