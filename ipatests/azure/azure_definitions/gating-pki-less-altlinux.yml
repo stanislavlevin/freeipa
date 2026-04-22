@@ -25,6 +25,7 @@ vms:
     containers:
       replicas: 1
 
+- vm_jobs:
   - container_job: caless_TestClientInstall
     tests:
     - test_integration/test_caless.py::TestClientInstall
@@ -41,8 +42,14 @@ vms:
     tests:
     - test_integration/test_caless.py::TestCertInstall
 
+- vm_jobs:
   - container_job: caless_TestPKINIT
     tests:
     - test_integration/test_caless.py::TestPKINIT
     containers:
       replicas: 1
+
+- vm_jobs:
+  - container_job: installation_dogtagless
+    tests:
+    - test_integration/test_installation_dogtagless.py
