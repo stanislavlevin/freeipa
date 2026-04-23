@@ -67,7 +67,7 @@
 Name: freeipa
 # don't forget to update .gear/rules
 Version: 4.13.1
-Release: alt4
+Release: alt5
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1225,6 +1225,9 @@ fi
 %python3_sitelibdir/ipaplatform-%version-py%_python3_version.egg-info/
 
 %changelog
+* Thu Apr 23 2026 Stanislav Levin <slev@altlinux.org> 4.13.1-alt5
+- Added build-time support for Dogtag-less environments (closes: #58740).
+
 * Fri Mar 27 2026 Stanislav Levin <slev@altlinux.org> 4.13.1-alt4
 - Fixed FTBFS (nss 3.122).
 
