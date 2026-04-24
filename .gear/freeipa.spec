@@ -62,7 +62,7 @@
 Name: freeipa
 # don't forget to update .gear/rules
 Version: 4.13.1
-Release: alt5
+Release: alt6
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1242,6 +1242,12 @@ fi
 %python3_sitelibdir/ipaplatform-%version-py%_python3_version.egg-info/
 
 %changelog
+* Fri Apr 24 2026 Ivan A. Melnikov <iv@altlinux.org> 4.13.1-alt6
+- NMU: cross-platform modern UI build
+  + employ rollup-native and esbuild from repository to build freeipa-webui
+    (fixes FTBFS on loongarch64 and riscv64);
+  + enable building the modern UI on aarch64.
+
 * Thu Apr 23 2026 Stanislav Levin <slev@altlinux.org> 4.13.1-alt5
 - Added build-time support for Dogtag-less environments (closes: #58740).
 
