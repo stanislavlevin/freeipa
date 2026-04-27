@@ -422,8 +422,9 @@ def install_check(installer):
     if any((setup_ca, options.setup_kra)):
         if importlib.util.find_spec("pki") is None:
             raise ScriptError(
-                "Dogtag PKI is unavailable on this platform, "
-                "CA-less installation is the only supported."
+                "Dogtag PKI package is not installed, "
+                "please install freeipa-server package (if available) or run "
+                "CA-less installation."
             )
 
     if not setup_ca and options.ca_subject:

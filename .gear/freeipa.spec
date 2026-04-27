@@ -2,7 +2,6 @@
 %define _unpackaged_files_terminate_build 1
 %define bash_completions_dir %_datadir/bash-completion/completions
 
-%def_with dogtag_pki
 %ifarch %ix86 armh
 %def_with only_client
 %def_without modern_ui
@@ -149,9 +148,6 @@ BuildRequires: python3(dbus)
 BuildRequires: python3(gssapi)
 BuildRequires: python3(pysss_murmur)
 BuildRequires: python3(lxml)
-%if_with dogtag_pki
-BuildRequires: python3-module-pki-base >= %pki_version
-%endif
 BuildRequires: python3-module-ldap >= %python_ldap_version
 BuildRequires: python3(polib)
 BuildRequires: python3(pytest)
@@ -201,6 +197,7 @@ BuildRequires: python3(pycodestyle)
 BuildRequires: python3(docker)
 BuildRequires: python3(sphinx)
 BuildRequires: python3-module-paramiko
+BuildRequires: python3-module-pki-base >= %pki_version
 %endif
 
 %global desc_common \
@@ -216,8 +213,8 @@ and integration with Active Directory based infrastructures (Trusts).
 ###############################################################################
 
 %if_without only_client
-%package server
-Summary: The IPA authentication server
+%package server-core
+Summary: The IPA authentication server, core functionality
 Group: System/Base
 Requires: %name-client = %EVR
 Requires: acl
@@ -247,16 +244,12 @@ Requires: python3-module-ldap >= %python_ldap_version
 Requires: python3-module-gssapi
 Requires: python3-module-systemd
 Requires: slapi-nis >= %slapi_nis_version
-%if_with dogtag_pki
-Requires: python3-module-pki-base >= %pki_version
-Requires: pki-ca >= %pki_version
-Requires: pki-kra >= %pki_version
-Requires: pki-acme >= %pki_version
-%endif
 
 # Versions of nss-pam-ldapd < 0.8.4 require a mapping from uniqueMember to
 # member.
 Conflicts: nss-ldapd < 0.8.4
+# handles server split to server + server-core
+Conflicts: freeipa-server <= 4.13.1-alt6
 
 %add_python3_path %_datadir/ipa/
 %add_python3_compile_exclude %_datadir/ipa/
@@ -265,6 +258,25 @@ Conflicts: nss-ldapd < 0.8.4
 %filter_from_provides /python3(migration\(\..*\)\?)/d
 # manually manage dependency on python-pki
 %filter_from_requires /python3(pki\(\..*\)\?)/d
+
+%description server-core
+%desc_common
+If you are installing an IPA server without extra dependencies, you need
+to install this package.
+
+What is NOT installed:
+- Dogtag PKI
+
+###############################################################################
+
+%package server
+Summary: The IPA authentication server
+Group: System/Base
+Requires: %name-server-core
+Requires: python3-module-pki-base >= %pki_version
+Requires: pki-ca >= %pki_version
+Requires: pki-kra >= %pki_version
+Requires: pki-acme >= %pki_version
 
 %description server
 %desc_common
@@ -312,7 +324,7 @@ If you are installing an IPA server, you need to install this package.
 %package server-dns
 Summary: IPA integrated DNS server with support for automatic DNSSEC signing
 Group: System/Base
-Requires: %name-server = %EVR
+Requires: %name-server-core
 Requires: bind-dyndb-ldap >= %bind_dyndb_ldap_version
 Requires: bind >= %bind_version
 Requires: bind-utils >= %bind_version
@@ -338,7 +350,7 @@ Provides support for enabling DNS over TLS in the IPA integrated DNS server.
 %package server-trust-ad
 Summary: Virtual package to install packages required for Active Directory trusts
 Group: System/Base
-Requires: %name-server = %EVR
+Requires: %name-server-core
 Requires: %name-common = %EVR
 # see https://bugzilla.altlinux.org/50444
 # deps: ipaserver/install/adtrustinstance.py:check_inst
@@ -745,7 +757,7 @@ mkdir -p %buildroot%_sharedstatedir/ipa-client/sysrestore
 
 %if_without only_client
 
-%post server
+%post server-core
 /bin/systemctl daemon-reload 2>&1 ||:
 # upgrade
 if [ $1 -gt 1 ] ; then
@@ -757,7 +769,7 @@ fi
 
 systemd-tmpfiles --create ipa.conf >/dev/null 2>&1 ||:
 
-%preun server
+%preun server-core
 # removal
 if [ $1 -eq 0 ]; then
     /bin/systemctl -q --no-reload disable ipa.service ||:
@@ -767,7 +779,7 @@ if [ $1 -eq 0 ]; then
         oddjobd ||:
 fi
 
-%pre server
+%pre server-core
 # Stop ipa_kpasswd if it exists before upgrading so we don't have a
 # zombie process when we're done.
 if [ -e /usr/sbin/ipa_kpasswd ]; then
@@ -914,6 +926,8 @@ fi
 
 %if_without only_client
 %files server
+
+%files server-core
 %_sbindir/ipa-backup
 %_sbindir/ipa-restore
 %_sbindir/ipa-ca-install
