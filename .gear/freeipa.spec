@@ -101,7 +101,7 @@ BuildRequires: libunistring-devel
 
 BuildRequires: 389-ds-base-devel >= %ds_version
 BuildRequires: samba-devel >= %samba_version
-BuildRequires: /usr/bin/npm
+BuildRequires: npm
 BuildRequires: python3(rjsmin)
 BuildRequires: python3-module-argcomplete
 %endif # only_client
