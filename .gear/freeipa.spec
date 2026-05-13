@@ -55,7 +55,7 @@
 Name: freeipa
 # don't forget to update .gear/rules
 Version: 4.12.5
-Release: alt3
+Release: alt4
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1148,6 +1148,9 @@ fi
 %python3_sitelibdir/ipaplatform-%version-py%_python3_version.egg-info/
 
 %changelog
+* Wed May 13 2026 Stanislav Levin <slev@altlinux.org> 4.12.5-alt4
+- Fixed FTBFS (nss 3.122).
+
 * Wed Nov 05 2025 Stanislav Levin <slev@altlinux.org> 4.12.5-alt3
 - Moved dns-related configs to server-dns subpackage (closes: #56645).
 
