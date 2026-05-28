@@ -11,6 +11,7 @@ steps:
     mkdir -p $(builddir)/dist/rpms_debuginfo
     cp -v $(builddir)/rpmbuild/SRPMS/freeipa-*.src.rpm $(builddir)/dist/srpms/
     find $(builddir)/rpmbuild/RPMS/ -type f \( -not -name "*-debuginfo-*" \
+        -a -not -name 'freeipa-server-4.*.rpm' \
         -a -name '*.rpm' \) -exec cp {} $(builddir)/dist/rpms/ \;
     find $(builddir)/rpmbuild/RPMS/ -type f \( -name "*-debuginfo-*" \
         -a -name '*.rpm' \) -exec cp {} $(builddir)/dist/rpms_debuginfo/ \;
