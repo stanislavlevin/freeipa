@@ -74,17 +74,20 @@ jobs:
         docker build --build-context='docker_tests_image=docker-image://$(DOCKER_TESTS_IMAGE)' -t freeipa-azure-builder .
         docker save freeipa-azure-builder | gzip > '$(builddir)/freeipa-azure-builder-container.tar.gz'
       displayName: Create container image for test
+
     - script: |
         set -e
         temp_cont="temp_cont"
         docker create --privileged --name "$temp_cont" freeipa-azure-builder >/dev/null
         docker start "$temp_cont" >/dev/null
-        docker exec "$temp_cont" /bin/bash -c 'rpm -qa | grep -v -q -i pki' || \
-        { echo 'Dogtag PKI packages must not be installed for PKI-less tests' ; \
-          echo 'List of installed PKI packages:' ; \
-          docker exec "$temp_cont" /bin/bash -c 'rpm -qa | grep -i pki' \
-          exit 1 ; }
+        if docker exec "$temp_cont" rpm -qa | grep -q -i pki ; then
+            echo 'Dogtag PKI packages must not be installed for PKI-less tests'
+            echo 'List of installed PKI packages:'
+            docker exec "$temp_cont" rpm -qa | grep -i pki
+            exit 1
+        fi
       displayName: Check if there is installed Dogtag PKI
+
     - template: templates/publish-build.yml
       parameters:
         artifactName: 'image'
