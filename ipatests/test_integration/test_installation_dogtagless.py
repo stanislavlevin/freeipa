@@ -16,7 +16,7 @@ class TestInstallWithCA_DogtagLess(IntegrationTest):
             "print(int(importlib.util.find_spec(\"pki\") is not None))'"
         )
         if result.stdout_text.rstrip() == "1":
-            raise pytest.skip("Requires uninstalled Dogtag PKI")
+            raise pytest.fail("Requires uninstalled Dogtag PKI")
 
     @classmethod
     def uninstall(cls, mh):
