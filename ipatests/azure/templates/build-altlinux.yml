@@ -5,7 +5,6 @@ steps:
     gear-rpm -ba -v \
         --define '_topdir $(builddir)/rpmbuild' \
         --without 'lint' \
-        --without dogtag_pki \
         --without 'fasttest'
     mkdir -p $(builddir)/dist/{,s}rpms
     mkdir -p $(builddir)/dist/rpms_debuginfo
