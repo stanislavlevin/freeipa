@@ -26,8 +26,10 @@ class TestInstallWithCA_DogtagLess(IntegrationTest):
         result = tasks.install_master(self.master, raiseonerr=False)
 
         err_str = (
-            "Dogtag PKI is unavailable on this platform, "
-            "CA-less installation is the only supported."
+            "Dogtag PKI package is not installed, "
+            "please install freeipa-server package (if available) or run "
+            "CA-less installation."
         )
+
         assert result.returncode == 1
         assert err_str in result.stderr_text
