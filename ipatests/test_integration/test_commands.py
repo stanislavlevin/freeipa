@@ -198,35 +198,25 @@ duplicatesubject = (
 )
 duplicate_serial = "4097"
 
-
-@pytest.fixture()
-def expire_password():
-    """
-    Fixture to expire a user's password far into the future past
-    2038, then revert time back.
-    """
-    hosts = dict()
-
-    def _expire_password(host):
-        hosts['host'] = host
-        tasks.move_date(host, 'stop', '+20Years')
-        host.run_command(
-            ['ipactl', 'restart', '--ignore-service-failures']
-        )
-
-    yield _expire_password
-
-    host = hosts.pop('host')
-    # Prior to uninstall remove all the cert tracking to prevent
-    # errors from certmonger trying to check the status of certs
-    # that don't matter because we are uninstalling.
-    host.run_command(['systemctl', 'stop', 'certmonger'])
-    # Important: run_command with a str argument is able to
-    # perform shell expansion but run_command with a list of
-    # arguments is not
-    host.run_command('rm -fv ' + paths.CERTMONGER_REQUESTS_DIR + '*')
-    tasks.uninstall_master(host)
-    tasks.move_date(host, 'start', '-20Years')
+x509_cert = (
+    b'MIIDNjCCAh6gAwIBAgIBDzANBgkqhkiG9w0BAQsFADAsMR0wGwYDVQQKDBRFeGFtcGx'
+    b'lIE9yZ2FuaXphdGlvbjELMAkGA1UEAwwCQ0EwHhcNMjAxMTEzMTQxNzM3WhcNMjExMT'
+    b'EzMTQxNzM3WjA5MR0wGwYDVQQKDBRFeGFtcGxlIE9yZ2FuaXphdGlvbjEYMBYGA1UEA'
+    b'wwPY2xpZW50LmlwYS50ZXN0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA'
+    b'xDbnMaPtDvwi7PRysBExSIIegDeilsUpXNrfRzPnlwFEkQou/fOR8VIHbOFlb4WjShh'
+    b'7bqprsTBTeD3wvdObB3bWAv2GROkmLFWAU1ry7GYObE1dtNvNGp0hYJsgkGoWgy5hO1'
+    b'Zjp67lfkR02TJoSiiciEt4EkvFpKmLmEM5+5ShVm5YMjBIrT4DZsgk0IfUVvu2Ocb3s'
+    b'NaJuUhK7BEF6R8tRFZC+yI/kBCvZESaq69yljVdVI4ky4Zx4NnoQK7PdledIFvRZftZ'
+    b'hKTWohaihj9szaxwfKUT6FMMRGZ+0CehqeLNdDmRK1zz7HQHF3fFYtiGwjKHs3/ogpc'
+    b'J5d7DmQIDAQABo1YwVDBSBgNVHR8ESzBJMEegRaBDhkFmaWxlOi8vL2hvbWUvcmVtb3'
+    b'RlL2ZyZW5hdWQvZnJlZWlwYS9zcmMvZnJlZWlwYS10b29scy9wa2kvY2ExLmNybDANB'
+    b'gkqhkiG9w0BAQsFAAOCAQEAAc7zG0FoL7gYWuKibInAzlCNIWQdDue0ZAslf1z6CNZz'
+    b'B3yN+4JOCQh6D7ostc1Ugo7BA+Mah2EgDvAVE1GgCZfNE0g1XjOaOHCBss7n/XBUS1O'
+    b'C/ktBcbd+dTC8kb9W1cWgQepRxg3WNovpH7LraMrRU4C0j3kfvmw1qh2I7bJaO0bzf7'
+    b'56zAK1F3AlUQuQakN6n7KE7Uo4TSsq3FDAfKua4HUQTMVPVNp/iWXDDfh7IWPVhfcua'
+    b'u2gHbFIrWHYcirbQaPlJG/u9Nelhzl0/Ky5awrbuUwFS8iWz+0BjWjjT8a7eWeI2VXV'
+    b'CkiAKgKpnAlT/DaoYtj0H8WohHi73g=='
+)
 
 
 class TestIPACommand(IntegrationTest):
@@ -238,6 +228,35 @@ class TestIPACommand(IntegrationTest):
     topology = 'line'
     num_replicas = 1
     num_clients = 1
+
+    @pytest.fixture
+    def expire_password(self):
+        """
+        Fixture to expire a user's password far into the future past
+        2038, then revert time back.
+        """
+        hosts = dict()
+
+        def _expire_password(host):
+            hosts['host'] = host
+            tasks.move_date(host, 'stop', '+20Years')
+            host.run_command(
+                ['ipactl', 'restart', '--ignore-service-failures']
+            )
+
+        yield _expire_password
+
+        host = hosts.pop('host')
+        # Prior to uninstall remove all the cert tracking to prevent
+        # errors from certmonger trying to check the status of certs
+        # that don't matter because we are uninstalling.
+        host.run_command(['systemctl', 'stop', 'certmonger'])
+        # Important: run_command with a str argument is able to
+        # perform shell expansion but run_command with a list of
+        # arguments is not
+        host.run_command('rm -fv ' + paths.CERTMONGER_REQUESTS_DIR + '*')
+        tasks.uninstall_master(host)
+        tasks.move_date(host, 'start', '-20Years')
 
     @pytest.fixture
     def pwpolicy_global(self):
@@ -319,6 +338,31 @@ class TestIPACommand(IntegrationTest):
         assert subject in result.stdout_text
         assert '1 certificate matched' in result.stdout_text
 
+    def test_cert_find_issue9837(self):
+        # https://pagure.io/freeipa/issue/9837
+        user = 'testuser'
+        password = 'Secret123'
+        testview = 'testview'
+
+        tasks.create_active_user(self.master, user, password)
+        tasks.kinit_admin(self.master)
+
+        self.master.run_command(
+            ['ipa', 'idview-add', testview]
+        )
+        self.master.run_command(
+            ['ipa', 'idoverrideuser-add', testview, user]
+        )
+        self.master.run_command(
+            ['ipa', 'idoverrideuser-mod', testview, user,
+             '--certificate', x509_cert]
+        )
+        result = self.master.run_command(
+            ['ipa', 'cert-find', '--certificate', x509_cert]
+        )
+        assert '1 certificate matched' in result.stdout_text
+        self.master.run_command(['ipa', 'user-del', user])
+
     def test_add_permission_failure_issue5923(self):
         # https://pagure.io/freeipa/issue/5923
         # error response used to contain bytes instead of text
@@ -346,6 +390,60 @@ class TestIPACommand(IntegrationTest):
         )
         assert result.returncode == 1
         assert "Number of permissions added 0" in result.stdout_text
+
+    def test_selfservice_mod_no_attrs_or_permissions_all(self):
+        """selfservice-mod --all with no --attrs or --permissions fails.
+
+        When selfservice-mod is invoked with only --all and neither --attrs
+        nor --permissions is supplied, the CLI has no modifications to apply
+        and must return a non-zero exit code with an appropriate error message.
+        """
+        entry = 'test_selfservice_mod_all'
+        tasks.kinit_admin(self.master)
+        self.master.run_command(
+            ['ipa', 'selfservice-add', entry,
+             '--attrs=l', '--permissions=write']
+        )
+        try:
+            result = self.master.run_command(
+                ['ipa', 'selfservice-mod', entry, '--all'],
+                stdin_text='\n',
+                raiseonerr=False,
+            )
+            assert result.returncode != 0
+            assert 'no modifications to be performed' in result.stderr_text
+        finally:
+            self.master.run_command(
+                ['ipa', 'selfservice-del', entry],
+                raiseonerr=False,
+            )
+
+    def test_selfservice_mod_no_attrs_or_permissions_raw(self):
+        """selfservice-mod --raw with no --attrs or --permissions fails.
+
+        When selfservice-mod is invoked with only --raw and neither --attrs
+        nor --permissions is supplied, the CLI has no modifications to apply
+        and must return a non-zero exit code with an appropriate error message.
+        """
+        entry = 'test_selfservice_mod_raw'
+        tasks.kinit_admin(self.master)
+        self.master.run_command(
+            ['ipa', 'selfservice-add', entry,
+             '--attrs=l', '--permissions=write']
+        )
+        try:
+            result = self.master.run_command(
+                ['ipa', 'selfservice-mod', entry, '--raw'],
+                stdin_text='\n',
+                raiseonerr=False,
+            )
+            assert result.returncode != 0
+            assert 'no modifications to be performed' in result.stderr_text
+        finally:
+            self.master.run_command(
+                ['ipa', 'selfservice-del', entry],
+                raiseonerr=False,
+            )
 
     def test_change_sysaccount_password_issue7561(self):
         sysuser = 'system'

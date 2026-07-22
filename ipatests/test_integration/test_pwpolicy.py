@@ -21,17 +21,17 @@ def has_pw_quality_lib():
     return constants.PASSWORD_QUALITY_LIB is not None
 
 
-class TestPWPolicy(IntegrationTest):
+class BasePWpolicy(IntegrationTest):
     """
-    Test password policy in action.
+    Base class for testing password policies including libpwquality
     """
-    num_replicas = 1
 
+    num_replicas = 0
     topology = 'line'
 
     @classmethod
     def install(cls, mh):
-        super(TestPWPolicy, cls).install(mh)
+        super(BasePWpolicy, cls).install(mh)
 
         tasks.kinit_admin(cls.master)
         cls.master.run_command(['ipa', 'user-add', USER,
@@ -70,6 +70,15 @@ class TestPWPolicy(IntegrationTest):
         if unlock:
             host.run_command(['ipa', 'user-unlock', user])
         tasks.kdestroy_all(host)
+
+
+class TestPWquality(BasePWpolicy):
+    """
+    libpwquality tests
+    """
+    num_replicas = 1
+
+    topology = 'line'
 
     def set_pwpolicy(self, minlength=None, maxrepeat=None, maxsequence=None,
                      dictcheck=None, usercheck=None, minclasses=None,
@@ -598,3 +607,35 @@ class TestPWPolicy(IntegrationTest):
             result = self.master.run_command(args, raiseonerr=False)
             assert result.returncode != 0
             assert f"error: no such option: {values[0]}" in result.stderr_text
+
+
+class TestPWpolicy(BasePWpolicy):
+    """
+    Tests for original/Kerberos password policies. Excludes libpwquality
+    """
+
+    # NOTE: set/reset/clear methods to be added later once there is more
+    #       than a single test.
+
+    def test_minlife_overflow(self):
+        """Test that a large minlife doesn't overflow an unsigned int."""
+        newpassword = "Secret.1234"
+
+        tasks.kinit_admin(self.master)
+
+        self.master.run_command(
+            ["ipa", "pwpolicy-mod", POLICY, "--minlife", "480000",
+             "--maxlife", "20000",]
+        )
+
+        self.kinit_as_user(self.master, PASSWORD, PASSWORD)
+
+        result = self.master.run_command(
+            ["ipa", "passwd", USER],
+            raiseonerr=False,
+            stdin_text='{password}\n{password}\n{newpassword}'.format(
+                password=PASSWORD, newpassword=newpassword
+            ))
+
+        assert result.returncode == 1
+        assert "Too soon to change password" in result.stderr_text

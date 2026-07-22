@@ -2,13 +2,14 @@
 #
 
 """
-Tests to verify ipa-migrate tool.
+Integration tests to verify ipa-migrate tool
 """
 
 from __future__ import absolute_import
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.pytest_ipa.integration import tasks
 from ipaplatform.paths import paths
+from ipapython.ipaldap import realm_to_serverid
 from collections import Counter
 
 import pytest
@@ -16,12 +17,30 @@ import re
 import textwrap
 
 
+# Test SSH public key used for migration testing
+TEST_SSHKEY = (
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB5PsFqMAqac5uvri73wVp9B8r1oElyVMlBV"
+    "pNdTZgcI test@example.test"
+)
+
+# Expected SSH key fingerprint for TEST_SSHKEY
+TEST_SSHKEY_FP = "SHA256:PSDEIT8MJGMMLpyjFS1oFNcnPNB1cWf10LeJGyI2h7M"
+
+TEST_ZONE_FORWARDER = "10.11.12.13"
+
+# Extdom extop plugin cn=config (TestIPAMigrationPluginsMigrated)
+EXTDOM_EXTOP_PLUGIN_DN = "cn=ipa_extdom_extop,cn=plugins,cn=config"
+EXTDOM_EXTOP_BASEDN_ATTR = "nsslapd-basedn"
+# Bogus suffix on replica only before migration (valid DN syntax).
+EXTDOM_EXTOP_REPLICA_BOGUS_BASEDN = "dc=wrong,dc=value"
+
+
 def prepare_ipa_server(master):
     """
     Setup remote IPA server environment
     """
     # Setup IPA users
-    for i in range(1, 5):
+    for i in range(1, 6):
         master.run_command(
             [
                 "ipa",
@@ -53,6 +72,24 @@ def prepare_ipa_server(master):
             "tuser1",
         ]
     )
+
+    # Add SSH key to normal user
+    master.run_command([
+        "ipa", "user-mod", "testuser1", "--sshpubkey", TEST_SSHKEY
+    ])
+
+    # Add SSH key to staged user
+    master.run_command([
+        "ipa", "stageuser-mod", "tuser1", "--sshpubkey", TEST_SSHKEY
+    ])
+
+    # Add SSH key to testuser5 and preserve it
+    master.run_command([
+        "ipa", "user-mod", "testuser5", "--sshpubkey", TEST_SSHKEY
+    ])
+    master.run_command([
+        "ipa", "user-del", "testuser5", "--preserve"
+    ])
 
     # Add Custom idrange
     master.run_command(
@@ -171,9 +208,17 @@ def prepare_ipa_server(master):
     )
     master.run_command(["ipa", "krbtpolicy-mod", "admin", "--maxlife=9600"])
 
-    # Add IPA location
+    # Modify the default password policy
     master.run_command(
-        ["ipa", "location-add", "location", "--description", "My location"]
+        ["ipa", "pwpolicy-mod", "--minlength=9", "--history=5"]
+    )
+
+    # Add IPA locations
+    master.run_command(
+        ["ipa", "location-add", "brno", "--description", "Brno office"]
+    )
+    master.run_command(
+        ["ipa", "location-add", "raleigh", "--description", "Raleigh office"]
     )
 
     # Add idviews and overrides
@@ -186,6 +231,7 @@ def prepare_ipa_server(master):
             "idview1",
             "testuser1",
             "--shell=/bin/sh",
+            "--sshpubkey", TEST_SSHKEY,
         ]
     )
 
@@ -200,6 +246,12 @@ def prepare_ipa_server(master):
     )
     master.run_command(
         ["ipa", "dnszone-mod", "example.test", "--dynamic-update=TRUE"]
+    )
+    master.run_command(
+        [
+            "ipa", "dnsrecord-add", "example.test", "migratetest",
+            "--a-rec", "192.0.2.100",
+        ]
     )
 
     # Add hbac rule
@@ -221,7 +273,7 @@ def prepare_ipa_server(master):
             "dnsforwardzone-add",
             "forwardzone.test",
             "--forwarder",
-            "10.11.12.13",
+            TEST_ZONE_FORWARDER,
         ]
     )
 
@@ -293,6 +345,31 @@ def prepare_ipa_server(master):
         ]
     )
 
+    master.run_command(
+        [
+            "ipa", "automountkey-add",
+            "baltimore",
+            "auto.share",
+            "--key=export",
+            "--info=-ro,soft,rsize=8192,wsize=8192 "
+            f"{master.hostname}:/shared/export",
+        ]
+    )
+
+    # Add sysaccount
+    master.run_command(
+        ["ipa", "sysaccount-add", "migrate-test-sysaccount", "--random"]
+    )
+
+    # Add custom password policy
+    # Using existing testgroup for the custom password policy
+    master.run_command(
+        [
+            "ipa", "pwpolicy-add", "testgroup",
+            "--maxlife=4", "--minlife=2",
+            "--history=2", "--priority=3"
+        ]
+    )
 
 def run_migrate(
     host, mode, remote_host, bind_dn=None, bind_pwd=None, extra_args=None
@@ -344,7 +421,8 @@ class MigrationTest(IntegrationTest):
     def install(cls, mh):
         tasks.install_master(cls.master, setup_dns=True, setup_kra=True)
         prepare_ipa_server(cls.master)
-        tasks.install_client(cls.master, cls.clients[0], nameservers=None)
+        for client in cls.clients:
+            tasks.install_client(cls.master, client, nameservers=None)
         tasks.install_master(cls.replicas[0], setup_dns=True, setup_kra=True,
                              extra_args=['--allow-zone-overlap'])
 
@@ -664,15 +742,15 @@ class TestIPAMigrateCLIOptions(MigrationTest):
         realm_name = self.master.domain.realm
         base_dn = str(self.master.domain.basedn)
         dse_ldif = textwrap.dedent(
-            f"""
+            """
             dn: cn={realm_name},cn=kerberos,{base_dn}
             cn: {realm_name}
             objectClass: top
             objectClass: krbrealmcontainer
             """
         ).format(
-            realm_name=self.master.domain.realm,
-            base_dn=str(self.master.domain.basedn),
+            realm_name=realm_name,
+            base_dn=base_dn,
         )
         self.replicas[0].put_file_contents(ldif_file_path, dse_ldif)
         result = run_migrate(
@@ -731,7 +809,6 @@ class TestIPAMigrateCLIOptions(MigrationTest):
         base_dn = str(self.master.domain.basedn)
         subtree = 'cn=security,{}'.format(base_dn)
         params = ['-s', subtree, '-n', '-x']
-        base_dn = str(self.master.domain.basedn)
         CUSTOM_SUBTREE_LOG = (
             "Add db entry 'cn=security,{} - custom'"
         ).format(base_dn)
@@ -817,7 +894,7 @@ class TestIPAMigrateCLIOptions(MigrationTest):
         )
         assert 'Zone name: {}'.format(zone_name) in result.stdout_text
         assert 'Active zone: True' in result.stdout_text
-        assert 'Zone forwarders: 10.11.12.13' in result.stdout_text
+        assert f'Zone forwarders: {TEST_ZONE_FORWARDER}' in result.stdout_text
         assert 'Forward policy: first' in result.stdout_text
 
     def test_ipa_migrate_version_option(self):
@@ -853,7 +930,7 @@ class TestIPAMigrateCLIOptions(MigrationTest):
     def test_ipa_migrate_stage_mode_with_cert(self):
         """
         This testcase checks that ipa-migrate command
-        works without the 'ValuerError'
+        works without the 'ValueError'
         when -Z <cert> option is used with valid cert
         """
         cert_file = '/tmp/ipa.crt'
@@ -878,7 +955,7 @@ class TestIPAMigrateCLIOptions(MigrationTest):
         error when invalid cert is specified with
         -Z option
         """
-        cert_file = '/tmp/invaid_cert.crt'
+        cert_file = '/tmp/invalid_cert.crt'
         invalid_cert = (
             b'-----BEGIN CERTIFICATE-----\n'
             b'MIIFazCCDQYJKoZIhvcNAQELBQAw\n'
@@ -985,7 +1062,7 @@ class TestIPAMigrationProdMode(MigrationTest):
             self.master.hostname,
             "cn=Directory Manager",
             self.master.config.admin_password,
-            extra_args=['-n'],
+            extra_args=['-B', '-n'],
         )
         install_msg = self.replicas[0].get_file_contents(
             paths.IPA_MIGRATE_LOG, encoding="utf-8"
@@ -1025,6 +1102,59 @@ class TestIPAMigrationProdMode(MigrationTest):
             ["ipa", "sudocmd-find", sudocmd])
         assert 'Rule name: readfiles\n' in cmd1.stdout_text
         assert 'Sudo Command: /usr/bin/less\n' in cmd2.stdout_text
+
+    def test_ipa_migrate_prod_mode_roles_privileges(self):
+        """
+        Test that IPA roles are migrated from remote to local server
+        """
+        role_name = "junioradmin"
+        privilege_name = "User Administrators"
+        tasks.kinit_admin(self.replicas[0])
+        result = self.replicas[0].run_command(
+            ["ipa", "role-show", role_name]
+        )
+        assert "Role name: {}".format(role_name) in result.stdout_text
+        assert "Privileges: {}".format(privilege_name) in result.stdout_text
+
+    def test_ipa_migrate_prod_mode_permission(self):
+        """
+        Test that PBAC permission is migrated
+        """
+        permission_name = "Add Users"
+        tasks.kinit_admin(self.replicas[0])
+        result = self.replicas[0].run_command(
+            ["ipa", "permission-show", permission_name]
+        )
+        assert (f"Permission name: {permission_name}" in
+                result.stdout_text)
+
+    def test_ipa_migrate_prod_mode_sysaccounts(self):
+        """
+        Test that system accounts (sysaccounts) are migrated
+        from remote server to local server in prod mode.
+        """
+        sysaccount_name = "migrate-test-sysaccount"
+        tasks.kinit_admin(self.replicas[0])
+        result = self.replicas[0].run_command(
+            ["ipa", "sysaccount-show", sysaccount_name]
+        )
+        assert sysaccount_name in result.stdout_text
+        assert (f"System account ID: {sysaccount_name}" in
+                result.stdout_text)
+
+    def test_ipa_migrate_prod_mode_selinuxusermap(self):
+        """
+        Test that SELinux usermap is migrated from remote
+        to local server.
+        """
+        usermap_name = "test1"
+        tasks.kinit_admin(self.replicas[0])
+        result = self.replicas[0].run_command(
+            ["ipa", "selinuxusermap-show", usermap_name]
+        )
+        assert result.returncode == 0
+        assert f"Rule name: {usermap_name}" in result.stdout_text
+        assert "xguest_u:s0" in result.stdout_text
 
     def test_ipa_migrate_prod_mode_new_user_sid(self):
         """
@@ -1107,6 +1237,46 @@ class TestIPAMigrationProdMode(MigrationTest):
         ])
         assert CMD_OUTPUT in result.stdout_text
 
+    def test_ipa_migrate_custom_pwpolicy(self):
+        """
+        This testcase checks that custom password policies
+        are migrated from remote server to local server in prod mode.
+        """
+        policy_name = "testgroup"
+        result = self.replicas[0].run_command([
+            "ipa", "pwpolicy-show", policy_name
+        ])
+        assert result.returncode == 0
+        assert f"Group: {policy_name}" in result.stdout_text
+        assert "Max lifetime (days): 4" in result.stdout_text
+        assert "Min lifetime (hours): 2" in result.stdout_text
+        assert "History size: 2" in result.stdout_text
+        assert "Priority: 3" in result.stdout_text
+
+        # Verify that the corresponding COS template entry was also migrated
+        cosdn = f"cn=costemplates,cn=accounts,{self.replicas[0].domain.basedn}"
+        ldap_result = self.replicas[0].run_command([
+            "ldapsearch", "-Y", "GSSAPI",
+            "-b", cosdn,
+            "(krbPwdPolicyReference=*testgroup*)"
+        ])
+        assert ldap_result.returncode == 0
+        assert "krbPwdPolicyReference:" in ldap_result.stdout_text
+        assert "costemplate" in ldap_result.stdout_text.lower()
+
+    def test_ipa_migrate_default_pwpolicy(self):
+        """
+        This testcase checks that the default (global) password policy
+        modifications are migrated from remote server to local server
+        in prod mode.
+        """
+        result = self.replicas[0].run_command([
+            "ipa", "pwpolicy-show"
+        ])
+        assert result.returncode == 0
+        assert "Min length: 9" in result.stdout_text
+        assert "History size: 5" in result.stdout_text
+
     def test_ipa_migrate_check_service_status(self):
         """
         This testcase checks that ipactl and sssd
@@ -1166,11 +1336,17 @@ class TestIPAMigrationProdMode(MigrationTest):
             "  Map: auto.share\n"
         )
         CMD3_OUTPUT = (
-            "-----------------------\n"
-            "1 automount key matched\n"
-            "-----------------------\n"
+            "------------------------\n"
+            "2 automount keys matched\n"
+            "------------------------\n"
+            "  Key: export\n"
+            "  Mount information: -ro,soft,rsize=8192,wsize=8192 "
+            f"{self.master.hostname}:/shared/export\n\n"
             "  Key: sub\n"
             "  Mount information: -fstype=autofs ldap:auto.man\n"
+            "----------------------------\n"
+            "Number of entries returned 2\n"
+            "----------------------------\n"
         )
         cmd1 = self.replicas[0].run_command(
             ["ipa", "automountlocation-show", loc_name])
@@ -1186,6 +1362,242 @@ class TestIPAMigrationProdMode(MigrationTest):
         assert CMD2_OUTPUT in cmd2.stdout_text
         assert CMD3_OUTPUT in cmd3.stdout_text
         assert DEBUG_LOG in install_msg
+
+    def test_ipa_locations_are_migrated(self):
+        """
+        This testcase checks that IPA locations are migrated
+        from remote server to local server in prod mode.
+        """
+        location1 = 'brno'
+        location2 = 'raleigh'
+        tasks.kinit_admin(self.replicas[0])
+        cmd1 = self.replicas[0].run_command(
+            ["ipa", "location-find", location1])
+        cmd2 = self.replicas[0].run_command(
+            ["ipa", "location-find", location2])
+        assert 'Location name: brno\n' in cmd1.stdout_text
+        assert 'Description: Brno office\n' in cmd1.stdout_text
+        assert 'Location name: raleigh\n' in cmd2.stdout_text
+        assert 'Description: Raleigh office\n' in cmd2.stdout_text
+
+    def test_sshpubkey_migration_for_user(self):
+        """
+        This testcase checks that SSH public key is migrated
+        for a normal user.
+        """
+        username = "testuser1"
+        result = self.replicas[0].run_command(
+            ["ipa", "user-show", username]
+        )
+        # Default output shows fingerprint, not the full key
+        expected_fp = "SSH public key fingerprint: {}".format(
+            TEST_SSHKEY_FP
+        )
+        assert expected_fp in result.stdout_text
+        assert "test@example.test" in result.stdout_text
+        assert "(ssh-ed25519)" in result.stdout_text
+
+    def test_sshpubkey_migration_for_stageuser(self):
+        """
+        This testcase checks that SSH public key is migrated
+        for a staged user.
+        """
+        username = "tuser1"
+        result = self.replicas[0].run_command(
+            ["ipa", "stageuser-show", username]
+        )
+        # Default output shows fingerprint, not the full key
+        expected_fp = "SSH public key fingerprint: {}".format(
+            TEST_SSHKEY_FP
+        )
+        assert expected_fp in result.stdout_text
+        assert "test@example.test" in result.stdout_text
+        assert "(ssh-ed25519)" in result.stdout_text
+
+    def test_sshpubkey_migration_for_preserved_user(self):
+        """
+        This testcase checks that SSH public key is migrated
+        for a preserved user (deleted with --preserve).
+        """
+        username = "testuser5"
+        result = self.replicas[0].run_command(
+            ["ipa", "user-show", username]
+        )
+        # Default output shows fingerprint, not the full key
+        expected_fp = "SSH public key fingerprint: {}".format(
+            TEST_SSHKEY_FP
+        )
+        assert expected_fp in result.stdout_text
+        assert "test@example.test" in result.stdout_text
+        assert "(ssh-ed25519)" in result.stdout_text
+
+    def test_sshpubkey_migration_for_idoverride(self):
+        """
+        This testcase checks that SSH public key is migrated
+        for a user ID override.
+        Note: Outputs are different from user's ones
+        """
+        idview_name = "idview1"
+        username = "testuser1"
+        result = self.replicas[0].run_command(
+            ["ipa", "idoverrideuser-show", idview_name, username]
+        )
+        # Default output shows fingerprint, not the full key
+        expected_fp = "SSH public key: {}".format(TEST_SSHKEY)
+        assert expected_fp in result.stdout_text
+        assert "test@example.test" in result.stdout_text
+        assert "ssh-ed25519" in result.stdout_text
+
+    def test_ipa_migrate_skip_replication_conflicts(self):
+        """
+        Test that ipa-migrate skips replication conflict entries
+        """
+        tasks.kinit_admin(self.master)
+        tasks.kinit_admin(self.replicas[0])
+
+        # Get DS instance name
+        instance_name = realm_to_serverid(self.master.domain.realm)
+
+        # Stop IPA on master to export database
+        self.master.run_command(['ipactl', 'stop'])
+
+        # Export database using dsctl
+        ldif_file = "/tmp/userroot.ldif"
+        self.master.run_command([
+            'dsctl', instance_name, 'db2ldif', 'userroot', ldif_file
+        ])
+
+        # Start IPA back on master
+        self.master.run_command(['ipactl', 'start'])
+
+        # Copy LDIF to replica
+        ldif_content = self.master.get_file_contents(
+            ldif_file, encoding="utf-8"
+        )
+        replica_ldif = "/tmp/userroot_with_conflict.ldif"
+
+        # Add mocked replication conflict entry to the LDIF
+        users_dn = "cn=users,cn=accounts," + str(self.master.domain.basedn)
+        conflict_entry = textwrap.dedent(
+            """
+            # entry-id: 12345678
+            dn: nsuniqueid=12345678-1234+uid=conflictuser,{users_dn}
+            uid: conflictuser
+            cn: Conflict User
+            uidNumber: 1234
+            gidNumber: 1234
+            sn: User
+            objectClass: top
+            objectClass: person
+            objectClass: inetorgperson
+            objectClass: nsds5replconflict
+            nsds5ReplConflict: namingConflict uid=conflictuser,{users_dn}
+
+            """
+        ).format(users_dn=users_dn)
+
+        # Append conflict entry to LDIF
+        modified_ldif = ldif_content + conflict_entry
+        self.replicas[0].put_file_contents(replica_ldif, modified_ldif)
+
+        result = run_migrate(
+            self.replicas[0],
+            "prod-mode",
+            self.master.hostname,
+            "cn=Directory Manager",
+            self.master.config.admin_password,
+            extra_args=["-f", replica_ldif, "-n", "-x"],
+        )
+
+        install_msg = self.replicas[0].get_file_contents(
+            paths.IPA_MIGRATE_LOG, encoding="utf-8"
+        )
+
+        assert result.returncode == 0
+        assert "Skipping replication conflict entry" in install_msg
+
+
+class TestIPAMigrationDNSRecords(MigrationTest):
+    """
+    Tests to verify all DNS zones, forward zones, and DNS records
+    are migrated when ipa-migrate is run with --migrate-dns (-B).
+    "By default all DNS entries are migrated" / -B to migrate DNS.
+    """
+    num_replicas = 1
+    num_clients = 1
+    topology = "line"
+
+    @pytest.fixture(autouse=True)
+    def run_migration_with_dns(self):
+        """
+        Run full prod-mode migration with -B so that DNS is migrated
+        to the local server. All tests in this class assume DNS has
+        been migrated.
+        """
+        tasks.kinit_admin(self.master)
+        tasks.kinit_admin(self.replicas[0])
+        run_migrate(
+            self.replicas[0],
+            "prod-mode",
+            self.master.hostname,
+            "cn=Directory Manager",
+            self.master.config.admin_password,
+            extra_args=["-B", "-n"],
+        )
+
+    def test_dns_zone_example_test_migrated(self):
+        """
+        Check that DNS zone example.test (from prepare_ipa_server)
+        is migrated to the local server.
+        """
+        zone_name = "example.test"
+        result = self.replicas[0].run_command(
+            ["ipa", "dnszone-show", zone_name]
+        )
+        assert result.returncode == 0
+        assert "Zone name: {}".format(zone_name) in result.stdout_text
+
+    def test_dns_zone_dynamic_update_preserved(self):
+        """
+        Check that zone attribute dynamic update is preserved
+        (prepare_ipa_server sets dynamic-update=TRUE for example.test).
+        """
+        zone_name = "example.test"
+        result = self.replicas[0].run_command(
+            ["ipa", "dnszone-show", zone_name]
+        )
+        assert result.returncode == 0
+        assert "Dynamic update: True" in result.stdout_text
+
+    def test_dns_zone_has_system_records(self):
+        """
+        Check that migrated zone has system records (NS/SOA).
+        """
+        zone_name = "example.test"
+        result = self.replicas[0].run_command(
+            ["ipa", "dnsrecord-find", zone_name]
+        )
+        assert result.returncode == 0
+        # Zone should have records (e.g. NS, SOA, or record list)
+        assert (
+            "NS record" in result.stdout_text
+            or "SOA record" in result.stdout_text
+            or "Record name" in result.stdout_text
+        )
+
+    def test_dns_record_a_migrated(self):
+        """
+        Verify that the A record added in prepare_ipa_server is
+        migrated to the local server.
+        """
+        zone_name = "example.test"
+        record_name = "migratetest"
+        record_value = "192.0.2.100"
+        result = self.replicas[0].run_command(
+            ["ipa", "dnsrecord-show", zone_name, record_name]
+        )
+        assert record_name in result.stdout_text
+        assert record_value in result.stdout_text
 
 
 class TestIPAMigrationWithADtrust(IntegrationTest):
@@ -1319,9 +1731,9 @@ class TestIPAMigratewithBackupRestore(IntegrationTest):
         DB_LDIF_FILE = '{}-userRoot.ldif'.format(
             dashed_domain_name
         )
-        SCHEMA_LDIF_FILE = '{}''/config_files/schema/99user.ldif'.format(
+        SCHEMA_LDIF_FILE = "{}/config_files/schema/99user.ldif".format(
             dashed_domain_name)
-        CONFIG_LDIF_FILE = '{}''/config_files/dse.ldif'.format(
+        CONFIG_LDIF_FILE = "{}/config_files/dse.ldif".format(
             dashed_domain_name)
         param = [
             '-n', '-g', CONFIG_LDIF_FILE, '-m', SCHEMA_LDIF_FILE,
@@ -1351,3 +1763,137 @@ class TestIPAMigratewithBackupRestore(IntegrationTest):
         )
         assert result.returncode == 0
         assert ERR_MSG not in result.stderr_text
+
+
+class TestIPAMigrationMixedOnlineOffline(MigrationTest):
+    """
+    Tests for IPA-to-IPA migration with mixed online and offline method:
+    config and schema migrated online, database from remote backup LDIF.
+    """
+    num_replicas = 1
+    num_clients = 0
+    topology = "line"
+
+    def test_ipa_migrate_mixed_online_offline(self):
+        """
+        Run mixed migration (config/schema online, DB from LDIF) and verify
+        success, log phases, and that migrated data is present on local.
+        """
+        dashed_domain_name = (
+            self.master.domain.realm.replace(".", "-")
+        )
+        DB_LDIF_FILE = "{}-userRoot.ldif".format(dashed_domain_name)
+        known_user = "testuser1"
+
+        tasks.kinit_admin(self.master)
+        tasks.kinit_admin(self.replicas[0])
+
+        backup_path = tasks.get_backup_dir(self.master)
+        remote_ipa_tar_file = backup_path + "/ipa-full.tar"
+        ipa_tar_file = self.master.get_file_contents(
+            remote_ipa_tar_file
+        )
+        replica_file_name = "/tmp/ipa-full.tar"
+        self.replicas[0].put_file_contents(
+            replica_file_name, ipa_tar_file
+        )
+        self.replicas[0].run_command(
+            ["/usr/bin/tar", "-xvf", replica_file_name]
+        )
+
+        result = run_migrate(
+            self.replicas[0],
+            "prod-mode",
+            self.master.hostname,
+            "cn=Directory Manager",
+            self.master.config.admin_password,
+            extra_args=["-f", DB_LDIF_FILE, "-n"],
+        )
+        assert result.returncode == 0
+
+        install_msg = self.replicas[0].get_file_contents(
+            paths.IPA_MIGRATE_LOG, encoding="utf-8"
+        )
+        assert "--db-ldif={}".format(DB_LDIF_FILE) in install_msg
+        assert "Migrating schema" in install_msg
+        assert "Migrating configuration" in install_msg
+
+        show_result = self.replicas[0].run_command(
+            ["ipa", "user-show", known_user]
+        )
+        assert "User login: {}".format(known_user) in (
+            show_result.stdout_text)
+
+
+class TestIPAMigrationPluginsMigrated(MigrationTest):
+    """
+    Tests that ipa-migrate carries cn=config attributes listed for the
+    Extdom extop plugin.
+
+    Before migration the replica's ``nsslapd-basedn`` on
+    ``cn=ipa_extdom_extop,cn=plugins,cn=config`` is set to a bogus DN; the
+    source keeps the real IPA suffix. After prod-mode migration the replica
+    must match the source for that attribute.
+    """
+    num_replicas = 1
+    num_clients = 0
+    topology = "line"
+
+    @pytest.fixture(scope="class", autouse=True)
+    def run_prod_mode_migration(self, mh):
+        """Diverge extdom nsslapd-basedn on replica.
+        """
+        tasks.kinit_admin(self.master)
+        tasks.kinit_admin(self.replicas[0])
+        ldif_template = (
+            "dn: {dn}\n"
+            "changetype: modify\n"
+            "replace: {attr}\n"
+            "{attr}: {value}\n"
+        )
+        tasks.ldapmodify_dm(
+            self.replicas[0],
+            ldif_template.format(
+                dn=EXTDOM_EXTOP_PLUGIN_DN,
+                attr=EXTDOM_EXTOP_BASEDN_ATTR,
+                value=EXTDOM_EXTOP_REPLICA_BOGUS_BASEDN,
+            ),
+        )
+        result = run_migrate(
+            self.replicas[0],
+            "prod-mode",
+            self.master.hostname,
+            "cn=Directory Manager",
+            self.master.config.admin_password,
+            extra_args=["-n"],
+        )
+        assert result.returncode == 0, (
+            "ipa-migrate failed (returncode={}): {}"
+            .format(result.returncode,
+                    result.stderr_text or result.stdout_text)
+        )
+
+    def test_plugin_config_migrated(self):
+        """
+        Replica extdom `nsslapd-basedn` matches source
+        after migration.
+        """
+        expected = str(self.master.domain.basedn)
+        result = tasks.ldapsearch_dm(
+            self.replicas[0],
+            EXTDOM_EXTOP_PLUGIN_DN,
+            [EXTDOM_EXTOP_BASEDN_ATTR],
+            scope="base",
+            raiseonerr=False,
+        )
+        assert re.search(
+            r"^{}:\s*{}$".format(
+                re.escape(EXTDOM_EXTOP_BASEDN_ATTR),
+                re.escape(expected),
+            ),
+            result.stdout_text,
+            re.IGNORECASE | re.MULTILINE,
+        ), (
+            "Expected {}={} on replica after migration; got:\n{}"
+            .format(EXTDOM_EXTOP_BASEDN_ATTR, expected, result.stdout_text)
+        )

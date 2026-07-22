@@ -139,6 +139,12 @@ static int ipadb_ldap_attr_to_tl_data(LDAP *lcontext, LDAPMessage *le,
     vals = ldap_get_values_len(lcontext, le, attrname);
     if (vals) {
         for (i = 0; vals[i]; i++) {
+            /* There should be at least 2 bytes encoding the tl_data type. */
+            if (vals[i]->bv_len < 2) {
+                ret = EINVAL;
+                goto done;
+            }
+
             next = calloc(1, sizeof(krb5_tl_data));
             if (!next) {
                 ret = ENOMEM;
@@ -791,6 +797,7 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
     char *princ_sid;
     char **acl_list;
     krb5_timestamp restime;
+    krb5_timestamp pw_exp_from_ldap = 0;
     bool resbool;
     int result;
     int ret;
@@ -879,11 +886,22 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
                                            "krbPasswordExpiration", &restime);
     switch (ret) {
     case 0:
-        entry->pw_expiration = restime;
-
-        /* If we are using only RADIUS, we don't know expiration. */
-        if (ua == IPADB_USER_AUTH_RADIUS)
+        pw_exp_from_ldap = restime;
+        /* If the user has any passwordless authentication method available
+         * (RADIUS, PKINIT, passkey, or IdP), skip the password expiration
+         * check here.  The KDC checks pw_expiration before pre-authentication
+         * runs, so keeping it set would block passwordless methods from
+         * even being attempted.
+         *
+         * The real expiration is preserved in ied->pw_expiration so that
+         * ipa_kdcpolicy_check_as() can still enforce it when a password-based
+         * method is actually used. */
+        if (ua & (IPADB_USER_AUTH_RADIUS | IPADB_USER_AUTH_PKINIT |
+                  IPADB_USER_AUTH_IDP | IPADB_USER_AUTH_PASSKEY)) {
             entry->pw_expiration = 0;
+        } else {
+            entry->pw_expiration = restime;
+        }
     case ENOENT:
         break;
     default:
@@ -1150,6 +1168,7 @@ static krb5_error_code ipadb_parse_ldap_entry(krb5_context kcontext,
     }
 
     ied->user_auth = ua;
+    ied->pw_expiration = pw_exp_from_ldap;
 
     /* If enabled, set the otp user string, enabling otp. */
     if (ua & IPADB_USER_AUTH_OTP) {
@@ -2675,7 +2694,7 @@ static krb5_error_code ipadb_get_ldap_mod_str_list(struct ipadb_mods *imods,
             kerr = ENOMEM;
             goto done;
         }
-        bvs[i]->bv_len = strlen(strlist[i]) + 1;
+        bvs[i]->bv_len = strlen(strlist[i]);
     }
 
     kerr = ipadb_get_ldap_mod_bvalues(imods, attrname, bvs, len, mod_op);

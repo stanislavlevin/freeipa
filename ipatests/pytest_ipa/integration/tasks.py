@@ -1620,12 +1620,91 @@ def add_a_record(master, host):
                              raiseonerr=False)
 
     # If not, add it
-    if cmd.returncode != 0:
+    if cmd.returncode != 0 or 'A record' not in cmd.stdout_text:
         master.run_command(['ipa',
                             'dnsrecord-add',
                             master.domain.name,
                             host.hostname + ".",
                             '--a-rec', host.ip])
+
+
+def add_dns_record(master, zone, name, record_type, record_value,
+                   *extra_args, raiseonerr=True):
+    """Add DNS record of any type.
+
+    :param master: The IPA master host to run command on
+    :param zone: DNS zone name (e.g., 'example.com.')
+    :param name: Record name (e.g., 'www' or '@' for zone apex)
+    :param record_type: Record type like 'a', 'aaaa', 'afsdb', 'cname',
+                        'txt', 'srv', 'mx', 'ptr', 'naptr', 'dname',
+                        'cert', 'loc', 'kx', etc.
+    :param record_value: List of values for the record
+    :param extra_args: Additional arguments (variable positional args)
+    :param raiseonerr: If True, raise exception on command failure
+    :return: Command result object
+    """
+    command = ['ipa', 'dnsrecord-add', zone, name]
+    opt = f'--{record_type}-rec'
+    for val in record_value:
+        command.extend([opt, val])
+    command.extend(extra_args)
+    return master.run_command(command, raiseonerr=raiseonerr)
+
+
+def del_dns_record(master, zone, name, record_type=None, record_value=None,
+                   del_all=False, raiseonerr=True):
+    """Delete DNS record of any type.
+
+    :param record_type: Record type like 'a', 'aaaa', 'afsdb', 'cname', etc.
+    :param record_value: List of values (optional)
+    :param del_all: If True, delete all records for this name
+    """
+    command = ['ipa', 'dnsrecord-del', zone, name]
+    if del_all:
+        command.append('--del-all')
+    elif record_type and record_value:
+        opt = f'--{record_type}-rec'
+        for val in record_value:
+            command.extend([opt, val])
+    return master.run_command(command, raiseonerr=raiseonerr)
+
+
+def find_dns_record(master, zone, name=None, raiseonerr=True):
+    """Find DNS record.
+
+    :param name: Record name, if not provided searches all records in zone
+    """
+    command = ['ipa', 'dnsrecord-find', zone]
+    if name is not None:
+        command.append(name)
+    return master.run_command(command, raiseonerr=raiseonerr)
+
+
+def show_dns_record(master, zone, name, *extra_args, raiseonerr=True):
+    """Show DNS record details.
+
+    :param master: The IPA host to run command on
+    :param zone: DNS zone name
+    :param name: Record name
+    :param extra_args: Additional arguments (variable positional args)
+    :param raiseonerr: If True, raise exception on command failure
+    :return: Command result object
+    """
+    command = ['ipa', 'dnsrecord-show', zone, name]
+    command.extend(extra_args)
+    return master.run_command(command, raiseonerr=raiseonerr)
+
+
+def mod_dns_record(master, zone, name, *extra_args, raiseonerr=True):
+    """Modify DNS record value.
+
+    :param zone: DNS zone name
+    :param name: Record name
+    :param extra_args: Additional arguments for dnsrecord-mod command
+    """
+    command = ['ipa', 'dnsrecord-mod', zone, name]
+    command.extend(extra_args)
+    return master.run_command(command, raiseonerr=raiseonerr)
 
 
 def resolve_record(nameserver, query, rtype="SOA", retry=True, timeout=100):
@@ -2002,7 +2081,9 @@ def ldappasswd_sysaccount_change(user, oldpw, newpw, master, use_dirman=False):
 
 
 def add_dns_zone(master, zone, skip_overlap_check=False,
-                 dynamic_update=False, add_a_record_hosts=None):
+                 dynamic_update=False, add_a_record_hosts=None,
+                 admin_email=None, refresh=None, retry=None,
+                 expire=None, minimum=None, ttl=None, raiseonerr=True):
     """
     Add DNS zone if it is not already added.
     """
@@ -2010,14 +2091,27 @@ def add_dns_zone(master, zone, skip_overlap_check=False,
     result = master.run_command(
         ['ipa', 'dnszone-show', zone], raiseonerr=False)
 
+    # Verify both return code and zone name before adding
     if result.returncode != 0:
         command = ['ipa', 'dnszone-add', zone]
         if skip_overlap_check:
             command.append('--skip-overlap-check')
         if dynamic_update:
             command.append('--dynamic-update=True')
+        if admin_email:
+            command.append('--admin-email=' + admin_email)
+        if refresh:
+            command.append('--refresh=' + str(refresh))
+        if retry:
+            command.append('--retry=' + str(retry))
+        if expire:
+            command.append('--expire=' + str(expire))
+        if minimum:
+            command.append('--minimum=' + str(minimum))
+        if ttl:
+            command.append('--ttl=' + str(ttl))
 
-        master.run_command(command)
+        master.run_command(command, raiseonerr=raiseonerr)
 
         if add_a_record_hosts:
             for host in add_a_record_hosts:
@@ -2025,6 +2119,71 @@ def add_dns_zone(master, zone, skip_overlap_check=False,
                                     host.hostname + ".", '--a-rec', host.ip])
     else:
         logger.debug('Zone %s already added.', zone)
+
+
+def del_dns_zone(host, zone, raiseonerr=False):
+    """Delete DNS zone."""
+    return host.run_command(
+        ['ipa', 'dnszone-del', zone], raiseonerr=raiseonerr)
+
+
+def find_dns_zone(host, zone, all_attrs=False, raiseonerr=True):
+    """Find DNS zone."""
+    command = ['ipa', 'dnszone-find', zone]
+    if all_attrs:
+        command.append('--all')
+    return host.run_command(command, raiseonerr=raiseonerr)
+
+
+def show_dns_zone(host, zone, all_attrs=False, raw=False,
+                  *extra_args, raiseonerr=True):
+    """Show DNS zone.
+
+    :param host: The IPA host to run command on
+    :param zone: DNS zone name
+    :param all_attrs: If True, show all attributes
+    :param raw: If True, show raw LDAP attributes
+    :param extra_args: Additional arguments (variable positional args)
+    :param raiseonerr: If True, raise exception on command failure
+    :return: Command result object
+    """
+    command = ['ipa', 'dnszone-show', zone]
+    if all_attrs:
+        command.append('--all')
+    if raw:
+        command.append('--raw')
+    command.extend(extra_args)
+    return host.run_command(command, raiseonerr=raiseonerr)
+
+
+def mod_dns_zone(host, zone, *extra_args, raiseonerr=True):
+    """Modify DNS zone.
+
+    :param host: The IPA host to run command on
+    :param zone: DNS zone name
+    :param extra_args: Additional arguments (variable positional args)
+    """
+    command = ['ipa', 'dnszone-mod', zone]
+    command.extend(extra_args)
+    return host.run_command(command, raiseonerr=raiseonerr)
+
+
+def add_dns_zone_permission(host, zone, raiseonerr=True):
+    """Add permission to manage DNS zone."""
+    return host.run_command(['ipa', 'dnszone-add-permission', zone],
+                            raiseonerr=raiseonerr)
+
+
+def remove_dns_zone_permission(host, zone, raiseonerr=True):
+    """Remove permission to manage DNS zone."""
+    return host.run_command(['ipa', 'dnszone-remove-permission', zone],
+                            raiseonerr=raiseonerr)
+
+
+def find_permission(host, permission, raiseonerr=True):
+    """Find permission."""
+    return host.run_command(['ipa', 'permission-find', permission],
+                            raiseonerr=raiseonerr)
 
 
 def sign_ca_and_transport(host, csr_name, root_ca_name, ipa_ca_name,
@@ -2113,9 +2272,9 @@ def user_add(host, login, first='test', last='user', extra_args=(),
     return host.run_command(cmd, stdin_text=stdin_text)
 
 
-def user_del(host, login):
+def user_del(host, login, raiseonerr=True):
     cmd = ["ipa", "user-del", login]
-    return host.run_command(cmd)
+    return host.run_command(cmd, raiseonerr=raiseonerr)
 
 
 def group_add(host, groupname, extra_args=()):
@@ -2126,18 +2285,19 @@ def group_add(host, groupname, extra_args=()):
     return host.run_command(cmd)
 
 
-def group_del(host, groupname):
+def group_del(host, groupname, raiseonerr=True):
     cmd = [
         "ipa", "group-del", groupname,
     ]
-    return host.run_command(cmd)
+    return host.run_command(cmd, raiseonerr=raiseonerr)
 
 
 def group_add_member(host, groupname, users=None,
-                     raiseonerr=True, extra_args=()):
-    cmd = [
-        "ipa", "group-add-member", groupname
-    ]
+                     raiseonerr=True, extra_args=(), noninteractive=False):
+    cmd = ["ipa"]
+    if noninteractive:
+        cmd.append("-n")
+    cmd.extend(["group-add-member", groupname])
     if users:
         cmd.append("--users")
         cmd.append(users)
@@ -2243,12 +2403,12 @@ def hbacrule_remove_service(host, rulename, services=None,
     return host.run_command(cmd, raiseonerr=raiseonerr)
 
 
-def hbacrule_del(host, rulename, extra_args=()):
+def hbacrule_del(host, rulename, extra_args=(), raiseonerr=True):
     cmd = [
         "ipa", "hbacrule-del", rulename
     ]
     cmd.extend(extra_args)
-    return host.run_command(cmd)
+    return host.run_command(cmd, raiseonerr=raiseonerr)
 
 
 def hbacrule_enable(host, rulename, raiseonerr=True):
@@ -2258,6 +2418,102 @@ def hbacrule_enable(host, rulename, raiseonerr=True):
 
 def hbacrule_disable(host, rulename, raiseonerr=True):
     cmd = ["ipa", "hbacrule-disable", rulename]
+    return host.run_command(cmd, raiseonerr=raiseonerr)
+
+
+def selinuxusermap_add(host, mapname, extra_args=()):
+    cmd = ["ipa", "selinuxusermap-add", mapname]
+    cmd.extend(extra_args)
+    return host.run_command(cmd)
+
+
+def selinuxusermap_del(host, mapname, extra_args=(), raiseonerr=True):
+    cmd = ["ipa", "selinuxusermap-del", mapname]
+    cmd.extend(extra_args)
+    return host.run_command(cmd, raiseonerr=raiseonerr)
+
+
+def selinuxusermap_show(host, mapname, extra_args=()):
+    cmd = ["ipa", "selinuxusermap-show", mapname]
+    cmd.extend(extra_args)
+    return host.run_command(cmd)
+
+
+def selinuxusermap_add_user(host, mapname, users=None, groups=None,
+                            raiseonerr=True, extra_args=()):
+    cmd = ["ipa", "selinuxusermap-add-user", mapname]
+    if users:
+        cmd.append(f"--users={users}")
+    if groups:
+        cmd.append(f"--groups={groups}")
+    cmd.extend(extra_args)
+    return host.run_command(cmd, raiseonerr=raiseonerr)
+
+
+def selinuxusermap_add_hosts(
+        host,
+        mapname,
+        hosts=None,
+        raiseonerr=True,
+        extra_args=None,
+):
+    cmd = ["ipa", "selinuxusermap-add-host", mapname]
+    if hosts:
+        cmd.extend(["--hosts", hosts])
+    if extra_args:
+        cmd.extend(extra_args)
+    return host.run_command(cmd, raiseonerr=raiseonerr)
+
+
+def selinuxusermap_enable(host, mapname, extra_args=()):
+    cmd = ["ipa", "selinuxusermap-enable", mapname]
+    cmd.extend(extra_args)
+    return host.run_command(cmd)
+
+
+def selinuxusermap_disable(host, mapname, extra_args=()):
+    cmd = ["ipa", "selinuxusermap-disable", mapname]
+    cmd.extend(extra_args)
+    return host.run_command(cmd)
+
+
+def selinuxusermap_mod(host, mapname, extra_args=()):
+    cmd = ["ipa", "selinuxusermap-mod", mapname]
+    cmd.extend(extra_args)
+    return host.run_command(cmd)
+
+
+def selinuxusermap_find(host, criteria=None, extra_args=()):
+    cmd = ["ipa", "selinuxusermap-find"]
+    if criteria is not None:
+        cmd.append(criteria)
+    cmd.extend(extra_args)
+    return host.run_command(cmd)
+
+
+def selinuxusermap_remove_user(host, mapname, users=None, groups=None,
+                               raiseonerr=True, extra_args=()):
+    cmd = ["ipa", "selinuxusermap-remove-user", mapname]
+    if users:
+        cmd.append(f"--users={users}")
+    if groups:
+        cmd.append(f"--groups={groups}")
+    cmd.extend(extra_args)
+    return host.run_command(cmd, raiseonerr=raiseonerr)
+
+
+def selinuxusermap_remove_hosts(
+        host,
+        mapname,
+        hosts=None,
+        raiseonerr=True,
+        extra_args=None,
+):
+    cmd = ["ipa", "selinuxusermap-remove-host", mapname]
+    if hosts:
+        cmd.extend(["--hosts", hosts])
+    if extra_args:
+        cmd.extend(extra_args)
     return host.run_command(cmd, raiseonerr=raiseonerr)
 
 
@@ -2979,6 +3235,11 @@ def get_healthcheck_version(host):
     return get_package_version(host, '*ipa-healthcheck')
 
 
+def get_softhsm_version(host):
+    """Get softhsm version on remote host"""
+    return get_package_version(host, 'softhsm')
+
+
 def wait_for_ipa_to_start(host, timeout=60):
     """Wait up to timeout seconds for ipa to start on a given host.
 
@@ -3220,3 +3481,67 @@ def service_control_dirsrv(host, function='restart'):
     instance = realm_to_serverid(host.domain.realm)
     cmd = host.run_command(['systemctl', function, f"dirsrv@{instance}"])
     assert cmd.returncode == 0
+
+
+def host_add_with_random_password(host, new_host):
+    """
+    Add a new host with a random password and return the generated password.
+    """
+    kinit_admin(host)
+    cmd = host.run_command(
+        ['ipa', 'host-add', new_host.hostname, '--random']
+    )
+    result = re.search("Random password: (?P<password>.*$)",
+                       cmd.stdout_text,
+                       re.MULTILINE)
+    randpasswd1 = result.group('password')
+    return randpasswd1
+
+
+def ipa_join(host, *extra_args, raiseonerr=True):
+    """Run ipa-join command.
+
+    :param host: The host to run command on
+    :param extra_args: Additional arguments (variable positional args)
+                       e.g., '--hostname=client.example.com',
+                             '--server=master.example.com',
+                             '--keytab=/tmp/test.keytab',
+                             '--bindpw=password',
+                             '-u' (for unenroll)
+    :param raiseonerr: If True, raise exception on command failure
+    :return: Command result object
+    """
+    command = ['ipa-join']
+    command.extend(extra_args)
+    return host.run_command(command, raiseonerr=raiseonerr)
+
+
+def host_del(host, hostname, *extra_args, raiseonerr=True):
+    """Delete a host from IPA.
+
+    :param host: The IPA host to run command on
+    :param hostname: Hostname to delete
+    :param extra_args: Additional arguments (variable positional args)
+    :param raiseonerr: If True, raise exception on command failure
+    :return: Command result object
+    """
+    command = ['ipa', 'host-del', hostname]
+    command.extend(extra_args)
+    return host.run_command(command, raiseonerr=raiseonerr)
+
+
+def host_add(host, hostname, *extra_args, password=None, raiseonerr=True):
+    """Add a host to IPA.
+
+    :param host: The IPA host to run command on
+    :param hostname: Hostname to add
+    :param extra_args: Additional arguments (variable positional args)
+    :param password: OTP/enrollment password for the host (optional)
+    :param raiseonerr: If True, raise exception on command failure
+    :return: Command result object
+    """
+    command = ['ipa', 'host-add', hostname]
+    if password:
+        command.append(f'--password={password}')
+    command.extend(extra_args)
+    return host.run_command(command, raiseonerr=raiseonerr)

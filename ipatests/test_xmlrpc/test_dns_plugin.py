@@ -529,6 +529,16 @@ class test_dns(Declarative):
         ),
 
 
+        # Test for BZ 783272: proper error for record add to nonexistent zone
+        dict(
+            desc='Try to add record to non-existent zone (BZ 783272)',
+            command=('dnsrecord_add', [u'unknowndomain.test.', u'testrecord'],
+                     {'locrecord': u'49 11 42.4 N 16 36 29.6 E 227.64m'}),
+            expected=errors.NotFound(
+                reason=u'unknowndomain.test.: DNS zone not found'),
+        ),
+
+
         dict(
             desc='Create zone %r' % zone1,
             command=(
@@ -1088,7 +1098,7 @@ class test_dns(Declarative):
 
 
         dict(
-            desc='Create record %r in zone %r' % (zone1, name1),
+            desc='Create single A record %r in zone %r' % (name1, zone1),
             command=('dnsrecord_add', [zone1, name1], {'arecord': arec2}),
             expected={
                 'value': name1_dnsname,
@@ -1132,8 +1142,20 @@ class test_dns(Declarative):
 
 
         dict(
-            desc='Add A record to %r in zone %r' % (name1, zone1),
-            command=('dnsrecord_add', [zone1, name1], {'arecord': arec3}),
+            desc='Delete single A record from %r in zone %r' % (name1, zone1),
+            command=('dnsrecord_del', [zone1, name1], {'arecord': arec2}),
+            expected={
+                'value': [name1_dnsname],
+                'summary': u'Deleted record "%s"' % name1,
+                'result': {'failed': []},
+            },
+        ),
+
+
+        dict(
+            desc='Add multiple A records to %r in zone %r' % (name1, zone1),
+            command=('dnsrecord_add', [zone1, name1],
+                     {'arecord': [arec2, arec3]}),
             expected={
                 'value': name1_dnsname,
                 'summary': None,
@@ -1148,14 +1170,29 @@ class test_dns(Declarative):
 
 
         dict(
-            desc='Remove A record from %r in zone %r' % (name1, zone1),
-            command=('dnsrecord_del', [zone1, name1], {'arecord': arec2}),
+            desc='Delete multiple A records from %r in zone %r' % (
+                name1, zone1),
+            command=('dnsrecord_del', [zone1, name1],
+                     {'arecord': [arec2, arec3]}),
             expected={
                 'value': [name1_dnsname],
+                'summary': u'Deleted record "%s"' % name1,
+                'result': {'failed': []},
+            },
+        ),
+
+
+        dict(
+            desc='Re-add A record %r for subsequent tests' % arec3,
+            command=('dnsrecord_add', [zone1, name1], {'arecord': arec3}),
+            expected={
+                'value': name1_dnsname,
                 'summary': None,
                 'result': {
+                    'dn': name1_dn,
                     'idnsname': [name1_dnsname],
                     'arecord': [arec3],
+                    'objectclass': objectclasses.dnsrecord,
                 },
             },
         ),
@@ -1226,6 +1263,73 @@ class test_dns(Declarative):
                     'arecord': [arec3],
                 },
             },
+        ),
+
+
+        dict(
+            desc='Try to add invalid AAAA record to %r in zone %r' % (
+                name1, zone1),
+            command=('dnsrecord_add', [zone1, name1],
+                     {'aaaarecord': u'invalid:ipv6:addr'}),
+            expected=errors.ValidationError(
+                name='ip_address',
+                error=u'invalid IP address format'),
+        ),
+
+
+        # Test for BZ 789919: IP address with three octets should be rejected
+        dict(
+            desc='Try to add A record with 3-octet IP to %r in zone %r '
+                 '(BZ 789919)' % (name1, zone1),
+            command=('dnsrecord_add', [zone1, name1],
+                     {'arecord': u'1.1.1'}),
+            expected=errors.ValidationError(
+                name='ip_address',
+                error=u'invalid IP address format'),
+        ),
+
+
+        dict(
+            desc='Add AAAA record to %r in zone %r using dnsrecord_add' % (
+                name1, zone1),
+            command=('dnsrecord_add', [zone1, name1], {'aaaarecord': aaaarec1}),
+            expected={
+                'value': name1_dnsname,
+                'summary': None,
+                'result': {
+                    'dn': name1_dn,
+                    'idnsname': [name1_dnsname],
+                    'arecord': [arec3],
+                    'aaaarecord': [aaaarec1],
+                    'objectclass': objectclasses.dnsrecord,
+                },
+            },
+        ),
+
+
+        dict(
+            desc='Delete AAAA record from %r in zone %r using dnsrecord_del' % (
+                name1, zone1),
+            command=('dnsrecord_del', [zone1, name1], {'aaaarecord': aaaarec1}),
+            expected={
+                'value': [name1_dnsname],
+                'summary': None,
+                'result': {
+                    'idnsname': [name1_dnsname],
+                    'arecord': [arec3],
+                },
+            },
+        ),
+
+        # Test for BZ 789987: error when deleting non-existent AAAA value
+        dict(
+            desc='Try to delete non-existent AAAA record value from %r '
+                 '(BZ 789987)' % name1,
+            command=('dnsrecord_del', [zone1, name1],
+                     {'aaaarecord': u'2620:52:0:41c9:5054:ff:fe62:65'}),
+            expected=errors.AttrValueNotFound(
+                attr='AAAA record',
+                value=u'2620:52:0:41c9:5054:ff:fe62:65'),
         ),
 
         dict(
@@ -1350,6 +1454,37 @@ class test_dns(Declarative):
             },
         ),
 
+
+        dict(
+            desc='Add NAPTR record to zone %r using dnsrecord_add' % (zone1),
+            command=('dnsrecord_add', [zone1, u'_naptr'],
+                     {'naptrrecord': u'100 10 "U" "E2U+sip" "" _sip._udp'}),
+            expected={
+                'value': DNSName(u'_naptr'),
+                'summary': None,
+                'result': {
+                    'objectclass': objectclasses.dnsrecord,
+                    'dn': DN(('idnsname', '_naptr'), zone1_dn),
+                    'idnsname': [DNSName(u'_naptr')],
+                    'naptrrecord': [u'100 10 "U" "E2U+sip" "" _sip._udp'],
+                },
+            },
+        ),
+
+
+        dict(
+            desc='Delete NAPTR record from zone %r using dnsrecord_del' % (
+                zone1),
+            command=('dnsrecord_del', [zone1, u'_naptr'],
+                     {'naptrrecord': u'100 10 "U" "E2U+sip" "" _sip._udp'}),
+            expected={
+                'value': [DNSName(u'_naptr')],
+                'summary': u'Deleted record "%s"' % u'_naptr',
+                'result': {'failed': []},
+            },
+        ),
+
+
         dict(
             desc='Try to add CNAME record to %r using dnsrecord_add' % (name1),
             command=('dnsrecord_add', [zone1, name1], {'cnamerecord': absnxname}),
@@ -1456,6 +1591,66 @@ class test_dns(Declarative):
                       '(RFC 2181, section 6.1)'),
         ),
 
+
+        dict(
+            desc='Add DNAME record with underscore to zone %r' % (zone1),
+            command=('dnsrecord_add', [zone1, u'bar_underscore'],
+                     {'dnamerecord': absnxname}),
+            expected={
+                'value': DNSName(u'bar_underscore'),
+                'summary': None,
+                'result': {
+                    'objectclass': objectclasses.dnsrecord,
+                    'dn': DN(('idnsname', 'bar_underscore'), zone1_dn),
+                    'idnsname': [DNSName(u'bar_underscore')],
+                    'dnamerecord': [absnxname],
+                },
+            },
+        ),
+
+
+        dict(
+            desc='Delete DNAME record with underscore from zone %r' % (zone1),
+            command=('dnsrecord_del', [zone1, u'bar_underscore'],
+                     {'dnamerecord': absnxname}),
+            expected={
+                'value': [DNSName(u'bar_underscore')],
+                'summary': u'Deleted record "%s"' % u'bar_underscore',
+                'result': {'failed': []},
+            },
+        ),
+
+
+        dict(
+            desc='Add CERT record to zone %r using dnsrecord_add' % (zone1),
+            command=('dnsrecord_add', [zone1, u'_cert'],
+                     {'certrecord': u'1 1 1 F835EDA21E94B565716F'}),
+            expected={
+                'value': DNSName(u'_cert'),
+                'summary': None,
+                'result': {
+                    'objectclass': objectclasses.dnsrecord,
+                    'dn': DN(('idnsname', '_cert'), zone1_dn),
+                    'idnsname': [DNSName(u'_cert')],
+                    'certrecord': [u'1 1 1 F835EDA21E94B565716F'],
+                },
+            },
+        ),
+
+
+        dict(
+            desc='Delete CERT record from zone %r using dnsrecord_del' % (
+                zone1),
+            command=('dnsrecord_del', [zone1, u'_cert'],
+                     {'certrecord': u'1 1 1 F835EDA21E94B565716F'}),
+            expected={
+                'value': [DNSName(u'_cert')],
+                'summary': u'Deleted record "%s"' % u'_cert',
+                'result': {'failed': []},
+            },
+        ),
+
+
         dict(
             desc='Add NS+DNAME record to %r zone record using dnsrecord_add' % (zone2),
             command=('dnsrecord_add', [zone2, u'@'],
@@ -1493,6 +1688,26 @@ class test_dns(Declarative):
                     u' (see RFC 2230 for details)'),
         ),
 
+        # Test for BZ 738788: KX record with negative preference
+        dict(
+            desc='Try to add KX record with negative preference (BZ 738788)',
+            command=('dnsrecord_add', [zone1, name1],
+                     {'kxrecord': u'-1 1.2.3.4'}),
+            expected=errors.ValidationError(
+                name='preference',
+                error=u'must be at least 0'),
+        ),
+
+        # Test for BZ 738788: KX record with preference exceeding max
+        dict(
+            desc='Try to add KX record with preference > max (BZ 738788)',
+            command=('dnsrecord_add', [zone1, name1],
+                     {'kxrecord': u'333383838383 1.2.3.4'}),
+            expected=errors.ValidationError(
+                name='preference',
+                error=u'can be at most 65535'),
+        ),
+
         dict(
             desc='Add KX record to %r using dnsrecord_add' % (name1),
             command=('dnsrecord_add', [zone1, name1], {'kxrecord': u'1 foo-1' }),
@@ -1522,6 +1737,22 @@ class test_dns(Declarative):
                     'arecord': [arec3],
                     'kxrecord': [u'1 foo-1'],
                     'txtrecord': [u'foo bar'],
+                },
+            },
+        ),
+
+
+        dict(
+            desc='Delete TXT record from %r using dnsrecord_del' % (name1),
+            command=('dnsrecord_del', [zone1, name1],
+                     {'txtrecord': u'foo bar'}),
+            expected={
+                'value': [name1_dnsname],
+                'summary': None,
+                'result': {
+                    'idnsname': [name1_dnsname],
+                    'arecord': [arec3],
+                    'kxrecord': [u'1 foo-1'],
                 },
             },
         ),
@@ -1878,6 +2109,38 @@ class test_dns(Declarative):
                 },
             },
         ),
+
+
+        dict(
+            desc='Delete PTR record %r from %r using dnsrecord_del' % (
+                revname1, revzone1),
+            command=('dnsrecord_del', [revzone1, revname1],
+                     {'ptrrecord': absnxname}),
+            expected={
+                'value': [revname1_dnsname],
+                'summary': u'Deleted record "%s"' % revname1,
+                'result': {'failed': []},
+            },
+        ),
+
+
+        dict(
+            desc='Re-add PTR record %r to %r for subsequent tests' % (
+                revname1, revzone1),
+            command=('dnsrecord_add', [revzone1, revname1],
+                     {'ptrrecord': absnxname}),
+            expected={
+                'value': revname1_dnsname,
+                'summary': None,
+                'result': {
+                    'objectclass': objectclasses.dnsrecord,
+                    'dn': revname1_dn,
+                    'idnsname': [revname1_dnsname],
+                    'ptrrecord': [absnxname],
+                },
+            },
+        ),
+
 
         dict(
             desc='Update global DNS settings',
@@ -3110,6 +3373,19 @@ class test_dns(Declarative):
                     'idnsname': [dnsafsdbres1_punycoded],
                     'afsdbrecord': [u'0 ' + idnzone1_mname_punycoded],
                 },
+            },
+        ),
+
+
+        dict(
+            desc='Delete AFSDB record from %r in zone %r' % (
+                dnsafsdbres1, idnzone1),
+            command=('dnsrecord_del', [idnzone1, dnsafsdbres1],
+                     {'afsdbrecord': u'0 ' + idnzone1_mname}),
+            expected={
+                'value': [dnsafsdbres1_dnsname],
+                'summary': u'Deleted record "%s"' % dnsafsdbres1,
+                'result': {'failed': []},
             },
         ),
 
@@ -6376,6 +6652,95 @@ class test_dns_soa(Declarative):
             ),
         ),
 
+        # BZ 817413: Test middle label longer than 63 chars
+        dict(
+            desc='Try to add zone with middle label > 63 chars (BZ 817413)',
+            command=(
+                'dnszone_add',
+                [u'domain.sixthreemax.'
+                 u'12345678901234567890123345678901234567890'
+                 u'123456789012345678901234567890.com'],
+                {}
+            ),
+            expected=errors.ConversionError(
+                name='name',
+                error=u'DNS label cannot be longer than 63 characters'
+            ),
+        ),
+
+        # BZ 817413: Test first label longer than 63 chars
+        dict(
+            desc='Try to add zone with first label > 63 chars (BZ 817413)',
+            command=(
+                'dnszone_add',
+                [u'firstlkjhjklasghduygasiudfygvq7i6ertf78q6t4871y8347y2r8734'
+                 u'y87aylfisduhcvkljasnkljnasdljdnclakj.long.com'],
+                {}
+            ),
+            expected=errors.ConversionError(
+                name='name',
+                error=u'DNS label cannot be longer than 63 characters'
+            ),
+        ),
+
+        # BZ 817413: Test TLD longer than 63 chars
+        dict(
+            desc='Try to add zone with TLD > 63 chars (BZ 817413)',
+            command=(
+                'dnszone_add',
+                [u'long.tld.tldlkjhjklasghduygasiudfygvq7i6ertf78q6t4871y8347'
+                 u'y2r8734y87aylfisduhcvkljasnkljnasdljdnclakj'],
+                {}
+            ),
+            expected=errors.ConversionError(
+                name='name',
+                error=u'DNS label cannot be longer than 63 characters'
+            ),
+        ),
+
+        # BZ 817413: Test numeric TLD is allowed (success case)
+        dict(
+            desc='Add zone with numeric TLD (BZ 817413)',
+            command=('dnszone_add', [u'domain.numeric.123.'], {}),
+            expected={
+                'value': DNSName(u'domain.numeric.123.'),
+                'summary': None,
+                'result': {
+                    'dn': DN(('idnsname', 'domain.numeric.123.'),
+                             api.env.container_dns, api.env.basedn),
+                    'idnsname': [DNSName(u'domain.numeric.123.')],
+                    'idnszoneactive': [True],
+                    'idnssoamname': [self_server_ns_dnsname],
+                    'nsrecord': lambda x: True,
+                    'idnssoarname': lambda x: True,
+                    'idnssoaserial': [fuzzy_digits],
+                    'idnssoarefresh': [fuzzy_digits],
+                    'idnssoaretry': [fuzzy_digits],
+                    'idnssoaexpire': [fuzzy_digits],
+                    'idnssoaminimum': [fuzzy_digits],
+                    'idnsallowdynupdate': [False],
+                    'idnsupdatepolicy': [u'grant %(realm)s krb5-self * A; '
+                                         u'grant %(realm)s krb5-self * AAAA; '
+                                         u'grant %(realm)s krb5-self * SSHFP;'
+                                         % dict(realm=api.env.realm)],
+                    'idnsallowtransfer': [u'none;'],
+                    'idnsallowquery': [u'any;'],
+                    'objectclass': objectclasses.dnszone,
+                },
+            },
+        ),
+
+        # BZ 817413: Delete zone with numeric TLD (cleanup)
+        dict(
+            desc='Delete zone with numeric TLD (BZ 817413)',
+            command=('dnszone_del', [u'domain.numeric.123.'], {}),
+            expected={
+                'value': [DNSName(u'domain.numeric.123.')],
+                'summary': u'Deleted DNS zone "domain.numeric.123."',
+                'result': {'failed': []},
+            },
+        ),
+
         dict(
             desc='Adding a zone - %r - with invalid s e-mail - %r' %
                  (zone6, zone6_rname_invalid_dnsname),
@@ -6426,6 +6791,61 @@ class test_dns_soa(Declarative):
                 reason=u"Nameserver '%s' does not have a corresponding "
                        u"A/AAAA record" %
                        zone6_unresolvable_ns_dnsname,),
+        ),
+
+        dict(
+            desc='Adding a zone - %r - with invalid SOA refresh value' % zone6,
+            command=(
+                'dnszone_add', [zone6], {
+                    'idnssoarefresh': 12345678901234,
+                }),
+            expected=errors.ValidationError(
+                name='refresh',
+                error=u'can be at most 2147483647'),
+        ),
+
+        dict(
+            desc='Adding a zone - %r - with invalid SOA retry value' % zone6,
+            command=(
+                'dnszone_add', [zone6], {
+                    'idnssoaretry': 12345678901234,
+                }),
+            expected=errors.ValidationError(
+                name='retry',
+                error=u'can be at most 2147483647'),
+        ),
+
+        dict(
+            desc='Adding a zone - %r - with invalid SOA expire value' % zone6,
+            command=(
+                'dnszone_add', [zone6], {
+                    'idnssoaexpire': 12345678901234,
+                }),
+            expected=errors.ValidationError(
+                name='expire',
+                error=u'can be at most 2147483647'),
+        ),
+
+        dict(
+            desc='Adding a zone - %r - with invalid SOA minimum value' % zone6,
+            command=(
+                'dnszone_add', [zone6], {
+                    'idnssoaminimum': 12345678901234,
+                }),
+            expected=errors.ValidationError(
+                name='minimum',
+                error=u'can be at most 2147483647'),
+        ),
+
+        dict(
+            desc='Adding a zone - %r - with invalid TTL value' % zone6,
+            command=(
+                'dnszone_add', [zone6], {
+                    'dnsttl': 12345678901234,
+                }),
+            expected=errors.ValidationError(
+                name='ttl',
+                error=u'can be at most 2147483647'),
         ),
     ]
 
