@@ -80,6 +80,7 @@ Patch: %name-%version-alt.patch
 BuildRequires(pre): rpm-build-python3
 
 BuildRequires: libcmocka-devel
+BuildRequires: chrpath
 BuildRequires: libini_config-devel
 BuildRequires: libkrb5-devel >= %krb5_version
 BuildRequires: libpopt-devel
@@ -677,6 +678,14 @@ rm %buildroot/%plugin_dir/libipa_graceperiod.la
 rm %buildroot/%plugin_dir/libtopology.la
 rm %buildroot/%_libdir/krb5/plugins/kdb/ipadb.la
 rm %buildroot/%_libdir/samba/pdb/ipasam.la
+
+# samba-devel 4.22.11 injects bogus RPATH via .pc files
+# https://bugzilla.altlinux.org/60003
+samba_libdir=$(pkg-config --variable=libdir samba-util)
+chrpath -r ${samba_libdir}/samba %buildroot%_libdir/samba/pdb/ipasam.so
+chrpath -d %buildroot%_libdir/krb5/plugins/kdb/ipadb.so
+chrpath -d %buildroot%_libexecdir/ipa/ipa-print-pac
+chrpath -d %buildroot%plugin_dir/libipa_cldap.so
 
 # So we can own our Apache configuration
 mkdir -p %buildroot%apache2_confdir/{sites-available,extra-available,extra-enabled}
