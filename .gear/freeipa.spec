@@ -60,8 +60,8 @@
 
 Name: freeipa
 # don't forget to update .gear/rules
-Version: 4.13.1
-Release: alt7
+Version: 4.13.2
+Release: alt1
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1224,6 +1224,9 @@ fi
 %python3_sitelibdir/ipaplatform-%version-py%_python3_version.egg-info/
 
 %changelog
+* Wed Jul 23 2026 Danila Skachedubov <skachedubov@altlinux.org> 4.13.2-alt1
+- 4.13.1 -> 4.13.2.
+
 * Mon Apr 27 2026 Stanislav Levin <slev@altlinux.org> 4.13.1-alt7
 - Made dogtag-less mode the package-based option.
 
