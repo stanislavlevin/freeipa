@@ -758,6 +758,8 @@ mkdir -p %buildroot%_sharedstatedir/ipa-client/sysrestore
 %if_without only_client
 
 %post server-core
+# Create system users BEFORE restarting dbus and oddjob
+%sysusers_create ipa.conf
 /bin/systemctl daemon-reload 2>&1 ||:
 # upgrade
 if [ $1 -gt 1 ] ; then
@@ -787,15 +789,7 @@ if [ -e /usr/sbin/ipa_kpasswd ]; then
 fi
 
 %pre server-common
-# create users and groups
-# create kdcproxy group and user
-getent group kdcproxy >/dev/null || groupadd -f -r kdcproxy ||:
-getent passwd kdcproxy >/dev/null || useradd -r -g kdcproxy -s /sbin/nologin -d / -c "IPA KDC Proxy User" kdcproxy ||:
-# create ipaapi group and user
-getent group ipaapi >/dev/null || groupadd -f -r ipaapi ||:
-getent passwd ipaapi >/dev/null || useradd -r -g ipaapi -s /sbin/nologin -d / -c "IPA Framework User" ipaapi ||:
-# add apache to ipaaapi group
-id -Gn apache2 | grep '\bipaapi\b' >/dev/null || usermod apache2 -a -G ipaapi ||:
+# Users are created via systemd-sysusers in %post server-core
 
 %post server-dns
 # first installation
@@ -987,6 +981,7 @@ fi
 %attr(644,root,root) %_unitdir/ipa-custodia.service
 %ghost %attr(644,root,root) %etc_systemd_dir/httpd2.service.d/ipa.conf
 %_tmpfilesdir/ipa.conf
+%_sysusersdir/ipa.conf
 %attr(644,root,root) %_journal_catalogdir/ipa.catalog
 # END
 %attr(755,root,root) %plugin_dir/libipa_pwd_extop.so
