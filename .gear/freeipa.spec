@@ -259,6 +259,7 @@ Conflicts: freeipa-server <= 4.13.1-alt6
 %filter_from_provides /python3(migration\(\..*\)\?)/d
 # manually manage dependency on python-pki
 %filter_from_requires /python3(pki\(\..*\)\?)/d
+%filter_from_requires /libgse-private-samba/d
 
 %description server-core
 %desc_common
