@@ -201,7 +201,6 @@ jobs:
     vmImage: $(VM_IMAGE)
   dependsOn:
     - Build
-    - Lint
   condition: and(succeeded(), eq(variables.RUN_BASE_TESTS, true))
   variables:
     IPA_IMAGE_ARTIFACT: $[ dependencies.Build.outputs['artifacts_image.image'] ]
@@ -217,7 +216,6 @@ jobs:
     vmImage: $(VM_IMAGE)
   dependsOn:
     - Build
-    - Lint
   condition: and(succeeded(), eq(variables.RUN_GATING_TESTS, true))
   variables:
     IPA_IMAGE_ARTIFACT: $[ dependencies.Build.outputs['artifacts_image.image'] ]
@@ -234,7 +232,6 @@ jobs:
     vmImage: $(VM_IMAGE)
   dependsOn:
     - Build
-    - Lint
   condition: and(succeeded(), eq(variables.RUN_NIGHTLY_TESTS, true))
   variables:
     IPA_IMAGE_ARTIFACT: $[ dependencies.Build.outputs['artifacts_image.image'] ]
