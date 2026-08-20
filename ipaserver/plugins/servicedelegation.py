@@ -6,6 +6,7 @@ import six
 
 from ipalib import api
 from ipalib import Str
+from ipalib.parameters import Principal
 from ipalib.plugable import Registry
 from .baseldap import (
     LDAPObject,
@@ -172,7 +173,7 @@ class servicedelegation(LDAPObject):
             label=_('Allowed to Impersonate'),
             flags={'no_create', 'no_update', 'no_search'},
         ),
-        Str(
+        Principal(
             'memberprincipal',
             label=_('Member principals'),
             flags={'no_create', 'no_update', 'no_search'},
@@ -209,8 +210,8 @@ class servicedelegation_add_member(LDAPAddMember):
         for attr in self.member_attrs:
             name = self.member_names[attr]
             doc = self.member_param_doc % name
-            yield Str('%s*' % name, cli_name='%ss' % name, doc=doc,
-                      label=_('member %s') % name, alwaysask=True)
+            yield Principal('%s*' % name, cli_name='%ss' % name, doc=doc,
+                            label=_('member %s') % name, alwaysask=True)
 
     def get_member_dns(self, **options):
         """
@@ -299,8 +300,8 @@ class servicedelegation_remove_member(LDAPRemoveMember):
         for attr in self.member_attrs:
             name = self.member_names[attr]
             doc = self.member_param_doc % name
-            yield Str('%s*' % name, cli_name='%ss' % name, doc=doc,
-                      label=_('member %s') % name, alwaysask=True)
+            yield Principal('%s*' % name, cli_name='%ss' % name, doc=doc,
+                            label=_('member %s') % name, alwaysask=True)
 
     def get_member_dns(self, **options):
         """

@@ -53,6 +53,12 @@ from ipaserver.plugins.ldap2 import AUTOBIND_DISABLED
 
 logger = logging.getLogger(__name__)
 
+SAFE_XML_PARSER = etree.XMLParser(
+    resolve_entities=False,
+    no_network=True,
+    load_dtd=False,
+    dtd_validation=False,
+)
 
 class ValidationError(Exception):
     pass
@@ -268,8 +274,12 @@ class XMLDecryptor:
         if len(self.__key) * 8 != klen:
             raise ValidationError("Invalid key length!")
 
-        # If a MAC is present, perform validation.
-        if mac:
+        if self.__hmac is not None:
+            # The document declared <MACMethod>; per RFC 6030 §6.1.1 every
+            # encrypted value MUST carry a ValueMAC. Refuse a stripped one.
+            if not mac:
+                raise ValidationError(
+                    "MACMethod declared but <ValueMAC> missing on key")
             tmp = self.__hmac.copy()
             tmp.update(data)
             try:
@@ -472,7 +482,7 @@ class PSKCDocument:
     def __init__(self, filename):
         self.__keyname = None
         self.__decryptor = None
-        self.__doc = etree.parse(filename)
+        self.__doc = etree.parse(filename, parser=SAFE_XML_PARSER)
         self.__mkey = fetch(self.__doc, "./pskc:MACMethod/pskc:MACKey")
         self.__algo = fetch(self.__doc, "./pskc:MACMethod/@Algorithm", convertHMACType)
 

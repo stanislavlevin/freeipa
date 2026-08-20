@@ -112,6 +112,16 @@ class test_otptoken_import:
         else:
             assert False
 
+    def test_missingmac(self):
+        doc = PSKCDocument(os.path.join(basename, "pskc-missingmac.xml"))
+        doc.setKey(codecs.decode('12345678901234567890123456789012', 'hex'))
+        try:
+            [(t.id, t.options) for t in doc.getKeyPackages()]
+        except ValidationError as e:  # <ValueMAC> missing on key
+            assert str(e) == "MACMethod declared but <ValueMAC> missing on key"
+        else:
+            assert False
+
     def test_full(self):
         doc = PSKCDocument(os.path.join(basename, "full.xml"))
         assert [(t.id, t.options) for t in doc.getKeyPackages()] == \
@@ -148,3 +158,15 @@ class test_otptoken_import:
         assert convertHashName('something-sha256') == u'sha1'
         assert convertHashName('') == u'sha1'
         assert convertHashName(None) == u'sha1'
+
+    def test_entity(self):
+        doc = PSKCDocument(os.path.join(basename, "pskc-entity.xml"))
+        # Make sure ipatokenvendor is not filled with local file content
+        assert [(t.id, t.options) for t in doc.getKeyPackages()] == \
+            [(u'Entity1', {
+                'ipatokenotpkey': u'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+                'type': u'hotp',
+                'ipatokenserial': u'1',
+                'ipatokenhotpcounter': 0,
+                'ipatokenotpdigits': 6,
+            })]
