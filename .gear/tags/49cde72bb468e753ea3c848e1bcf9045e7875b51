@@ -1,0 +1,23 @@
+object 3af131529c795764b27dca04ce0097db043d355a
+type commit
+tag release-4-13-3
+tagger Rafael Guterres Jeffman <rjeffman@redhat.com> 1787167505 -0300
+
+tagging IPAv4 4.13.3
+-----BEGIN PGP SIGNATURE-----
+
+iQJkBAABCABOFiEES356+7CqqYlHyiQn8X4lab7jgAwFAmqGAxIbFIAAAAAABAAO
+bWFudTIsMi41KzEuMTIsMCwzFBxyamVmZm1hbkByZWRoYXQuY29tAAoJEPF+JWm+
+44AMLGMP/0Ofqc7CgQ/9ELo0JwTHQA8cTc997dgypYNULUVhGC5rokYMTHb0oN1x
+XzgJyo6KinRUhPurbik0u9+Tag2kqlSdcNjnE2B3bKI5bSLL+zgfVLJqurgShaJ3
+qE65Wh44HgysR9dY4LNRVnLJmQfjo9OovnrVUkEzi+zJM3Gz+n5yOqpBU1Ix6qbV
+jZv9RuKxYd5O+/oFwspuIrnRonVLIeHnljx4hLfc3YNEYwvAetJeg21zNvIBqzAH
++rf35JLhxKijlUf0j2pQWSmTqF1ukHeav/oCo0bDkG9XvBUJFBNdQnsuiaquq9Nd
+GPj9YJvX1tKJv7bOwCnZAi1IvmZ4ugFQ9PplpUAomXO8arJNZj8L7vqal8YlvsMK
+UGNgq7IRbJbaJCjpXnbDn+WGMGtGG5aPCDdDgC/Owa12iRfEF6tLwo/rQzNTLHxW
+xvwj1I+Ag0IWKbqCWsoUZ38x1tN9CQsbGgemMfK+9h8SwpafofYNarnK5MmzowVH
+4gZtSlMgSwEXAW0yTtGvSpRGHVlRvCzLfeFKqWbvxrP9+BxBpA3JSEmOVtOJ6nSf
+f85Mr0d+d3X8LeUzh+OeMdFoGmPrcSp5xQ7SfRgwfg/7pdm663owN+NTMwPsx+jE
+Vwu5R7iKd5cmvA2tVxvL6dp8vzivuLX9XxmR4ds1wfUgdZcvCiAM
+=Y/U0
+-----END PGP SIGNATURE-----
