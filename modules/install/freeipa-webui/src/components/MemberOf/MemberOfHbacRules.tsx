@@ -1,6 +1,6 @@
 import React from "react";
 // PatternFly
-import { Pagination, PaginationVariant } from "@patternfly/react-core";
+import { PaginationVariant } from "@patternfly/react-core";
 // Data types
 import {
   User,
@@ -11,6 +11,7 @@ import {
 // Components
 import MemberOfToolbar from "./MemberOfToolbar";
 import MemberTable from "src/components/tables/MembershipTable";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
 import MemberOfAddModal, { AvailableItems } from "./MemberOfAddModal";
 import MemberOfDeleteModal from "./MemberOfDeleteModal";
 import { MembershipDirection } from "src/components/MemberOf/MemberOfToolbar";
@@ -19,6 +20,7 @@ import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // RPC
 import { ErrorResult } from "src/services/rpc";
 import {
@@ -48,9 +50,7 @@ const MemberOfHbacRules = (props: MemberOfHbacRulesProps) => {
     page,
     setPage,
     perPage,
-    setPerPage,
     searchValue,
-    setSearchValue,
     membershipDirection,
     setMembershipDirection,
   } = useListPageSearchParams();
@@ -118,10 +118,6 @@ const MemberOfHbacRules = (props: MemberOfHbacRulesProps) => {
     }
   }, [hbacRulesNamesToLoad]);
 
-  React.useEffect(() => {
-    setMembershipDirection(props.direction);
-  }, [props.entity]);
-
   // Update HBAC rules
   React.useEffect(() => {
     if (fullHbacRulesQuery.data && !fullHbacRulesQuery.isFetching) {
@@ -175,9 +171,9 @@ const MemberOfHbacRules = (props: MemberOfHbacRulesProps) => {
 
   // Load available HBAC rules, delay the search for opening the modal
   const hbacRulesQuery = useGettingHbacRulesQuery({
-    search: adderSearchValue,
+    searchValue: adderSearchValue,
     apiVersion: API_VERSION_BACKUP,
-    sizelimit: 100,
+    sizeLimit: 100,
     startIdx: 0,
     stopIdx: 100,
   });
@@ -307,9 +303,8 @@ const MemberOfHbacRules = (props: MemberOfHbacRulesProps) => {
   return (
     <>
       <MemberOfToolbar
-        searchText={searchValue}
-        onSearchTextChange={setSearchValue}
-        onSearch={() => {}}
+        searchPlaceholder="Search HBAC rules"
+        searchAriaLabel="Search HBAC rules"
         refreshButtonEnabled={isRefreshButtonEnabled}
         onRefreshButtonClick={props.onRefreshData}
         deleteButtonEnabled={
@@ -324,11 +319,8 @@ const MemberOfHbacRules = (props: MemberOfHbacRulesProps) => {
         membershipDirection={membershipDirection}
         onMembershipDirectionChange={setMembershipDirection}
         helpIconEnabled={true}
+        onHelpIconClick={() => dispatch(toggleHelpPanel())}
         totalItems={hbacRuleNames.length}
-        perPage={perPage}
-        page={page}
-        onPerPageChange={setPerPage}
-        onPageChange={setPage}
       />
       <MemberTable
         entityList={hbacRules}
@@ -349,15 +341,12 @@ const MemberOfHbacRules = (props: MemberOfHbacRulesProps) => {
         showTableRows={showTableRows}
       />
       {hbacRuleNames.length > 0 && (
-        <Pagination
-          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-          itemCount={hbacRuleNames.length}
-          widgetId="pagination-options-menu-bottom"
-          perPage={perPage}
-          page={page}
+        <PaginationLayout
+          list={[]}
+          totalCount={hbacRuleNames.length}
           variant={PaginationVariant.bottom}
-          onSetPage={(_e, page) => setPage(page)}
-          onPerPageSelect={(_e, perPage) => setPerPage(perPage)}
+          widgetId="pagination-options-menu-bottom"
+          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
         />
       )}
       <MemberOfAddModal

@@ -31,11 +31,12 @@ Feature: Hbac rule settings manipulation
 
   @cleanup
   Scenario: Delete the user for cleanup
-    Given I delete element "user" named "admin" from rule "rule1"
+    Given I delete hbac rule "rule1"
 
   @seed
   Scenario: Add a user to the rule
-    Given I have element "user" named "admin" in rule "rule1"
+    Given hbac rule "rule1" exists
+    Given I have element user named "admin" in rule "rule1"
 
   @test
   Scenario: Remove user from Who category
@@ -77,11 +78,12 @@ Feature: Hbac rule settings manipulation
 
   @cleanup
   Scenario: Delete the group for cleanup
-    Given I delete element "group" named "admins" from rule "rule1"
+    Given I delete hbac rule "rule1"
 
   @seed
   Scenario: Add a group to the rule
-    Given I have element "group" named "admins" in rule "rule1"
+    Given hbac rule "rule1" exists
+    Given I have element group named "admins" in rule "rule1"
 
   @test
   Scenario: Remove group from Who category
@@ -145,9 +147,14 @@ Feature: Hbac rule settings manipulation
     Then I should not see "hbac-rules-tab-settings-tab-users" tab
     Then I should not see "hbac-rules-tab-settings-tab-groups" tab
 
+  @cleanup
+  Scenario: Delete the group for cleanup
+    Given I delete hbac rule "rule1"
+
   @seed
   Scenario: Add a new host that will be used in the tests
     Given host "my-new-host.ipa.test" exists
+    Given hbac rule "rule1" exists
 
   @test
   Scenario: Add host to Host category
@@ -174,9 +181,15 @@ Feature: Hbac rule settings manipulation
 
   @cleanup
   Scenario: Delete the host from the rule
-    Given I delete host "my-new-host" from rule "rule1"
+    Given I delete host "my-new-host.ipa.test"
+    Given I delete hbac rule "rule1"
 
   @seed
+  Scenario: Prep: Create rule and host
+    Given hbac rule "rule1" exists
+    Given host "my-new-host.ipa.test" exists
+
+  @test
   Scenario: Add a host to the rule
     Given I am logged in as admin
     And I am on "hbac-rules/rule1" page
@@ -199,6 +212,17 @@ Feature: Hbac rule settings manipulation
     And I should see "add-member-success" alert
     Then I should see "my-new-host.ipa.test" entry in the data table
 
+  @cleanup
+  Scenario: Delete the host from the rule
+    Given I delete host "my-new-host.ipa.test"
+    Given I delete hbac rule "rule1"
+
+  @seed
+  Scenario: Prep: Create rule and host
+    Given host "my-new-host.ipa.test" exists
+    Given hbac rule "rule1" exists
+    Given I have host "my-new-host" in rule "rule1"
+
   @test
   Scenario: Remove host from Host category
     Given I am logged in as admin
@@ -213,6 +237,16 @@ Feature: Hbac rule settings manipulation
     When I click on the "modal-button-delete" button
     Then I should see "remove-member-success" alert
     Then I should not see "my-new-host.ipa.test" entry in the data table
+
+  @cleanup
+  Scenario: Delete the host from the rule
+    Given I delete host "my-new-host.ipa.test"
+    Given I delete hbac rule "rule1"
+
+  @seed
+  Scenario: Prep: Create rule and host
+    Given host "my-new-host.ipa.test" exists
+    Given hbac rule "rule1" exists
 
   @test
   Scenario: Add hostgroup to Host category
@@ -239,11 +273,12 @@ Feature: Hbac rule settings manipulation
 
   @cleanup
   Scenario: Delete the hostgroup from the rule
-    Given I delete element "hostgroup" named "ipaservers" from rule "rule1"
+    Given I delete hbac rule "rule1"
 
   @seed
   Scenario: Add a hostgroup to the rule
-    Given I have element "hostgroup" named "ipaservers" in rule "rule1"
+    Given hbac rule "rule1" exists
+    Given I have hostgroup "ipaservers" in rule "rule1"
 
   @test
   Scenario: Remove hostgroup from Host category
@@ -259,6 +294,16 @@ Feature: Hbac rule settings manipulation
     When I click on the "modal-button-delete" button
     Then I should see "remove-member-success" alert
     Then I should not see "ipaservers" entry in the data table
+
+  @cleanup
+  Scenario: Delete the hostgroup from the rule
+    Given I delete hbac rule "rule1"
+    Given I delete host "my-new-host.ipa.test"
+
+  @seed
+  Scenario: Add a new host that will be used in the tests
+    Given hbac rule "rule1" exists
+    Given host "my-new-host.ipa.test" exists
 
   @test
   Scenario: Set Host category to allow all hosts
@@ -310,7 +355,12 @@ Feature: Hbac rule settings manipulation
 
   @cleanup
   Scenario: Delete host for cleanup
+    Given I delete hbac rule "rule1"
     Given I delete host "my-new-host.ipa.test"
+
+  @seed
+  Scenario: Add a service to the rule
+    Given hbac rule "rule1" exists
 
   @test
   Scenario: Add service to Service category
@@ -337,10 +387,11 @@ Feature: Hbac rule settings manipulation
 
   @cleanup
   Scenario: Delete the service from the rule
-    Given I delete service "crond" from rule "rule1"
+    And I delete hbac rule "rule1"
 
   @seed
   Scenario: Add a service to the rule
+    Given hbac rule "rule1" exists
     Given I have service "crond" in rule "rule1"
 
   @test
@@ -357,6 +408,14 @@ Feature: Hbac rule settings manipulation
     When I click on the "modal-button-delete" button
     Then I should see "remove-member-success" alert
     Then I should not see "crond" entry in the data table
+
+  @cleanup
+  Scenario: Delete the service from the rule
+    And I delete hbac rule "rule1"
+
+  @seed
+  Scenario: Prep: Create rule
+    Given hbac rule "rule1" exists
 
   @test
   Scenario: Add service group to Service category
@@ -383,10 +442,11 @@ Feature: Hbac rule settings manipulation
 
   @cleanup
   Scenario: Delete the service group from the rule
-    Given I delete servicegroup "ftp" from rule "rule1"
+    Given I delete hbac rule "rule1"
 
   @seed
   Scenario: Add a service group to the rule
+    Given hbac rule "rule1" exists
     Given I have servicegroup "ftp" in rule "rule1"
 
   @test
@@ -403,6 +463,14 @@ Feature: Hbac rule settings manipulation
     When I click on the "modal-button-delete" button
     Then I should see "remove-member-success" alert
     Then I should not see "ftp" entry in the data table
+
+  @cleanup
+  Scenario: Delete the service group from the rule
+    Given I delete hbac rule "rule1"
+
+  @seed
+  Scenario: Prep: Create rule
+    Given hbac rule "rule1" exists
 
   @test
   Scenario: Set Service category to allow all services

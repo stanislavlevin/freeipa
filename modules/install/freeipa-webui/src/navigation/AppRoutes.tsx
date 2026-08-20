@@ -73,6 +73,16 @@ import IdRanges from "src/pages/IdRanges/IdRanges";
 import { useConfigurationSettings } from "src/utils/configurationSettings";
 import Trusts from "src/pages/Trusts/Trusts";
 import TrustsTabs from "src/pages/Trusts/TrustsTabs";
+import IdRangesTabs from "src/pages/IdRanges/IdRangesTabs";
+import GlobalTrustConfig from "src/pages/Trusts/GlobalTrustConfig";
+import OtpTokens from "src/pages/OtpTokens/OtpTokens";
+import AutomountLocations from "src/pages/AutomountLocations/AutomountLocations";
+import TopologyGraph from "src/pages/Topology/TopologyGraph";
+import OtpTokensTabs from "src/pages/OtpTokens/OtpTokensTabs";
+import Roles from "src/pages/Roles/Roles";
+import RolesTabs from "src/pages/Roles/RolesTabs";
+import Privileges from "src/pages/Privileges/Privileges";
+import PrivilegesTabs from "src/pages/Privileges/PrivilegesTabs";
 
 // Renders routes (React)
 export const AppRoutes = ({ isInitialDataLoaded }): React.ReactElement => {
@@ -449,6 +459,19 @@ export const AppRoutes = ({ isInitialDataLoaded }): React.ReactElement => {
               <Route path="kerberos-ticket-policy">
                 <Route path="" element={<KrbTicketPolicy />} />
               </Route>
+              <Route path="otp-tokens">
+                <Route path="" element={<OtpTokens />} />
+                <Route path=":ipatokenuniqueid">
+                  <Route
+                    path=""
+                    element={<OtpTokensTabs section="settings" />}
+                  />
+                  <Route
+                    path="managedby_user"
+                    element={<OtpTokensTabs section="managedby_user" />}
+                  />
+                </Route>
+              </Route>
               <Route path="identity-provider-references">
                 <Route path="" element={<IdpReferences />} />
                 <Route path=":cn">
@@ -515,13 +538,81 @@ export const AppRoutes = ({ isInitialDataLoaded }): React.ReactElement => {
               <Route path="dns-global-config">
                 <Route path="" element={<DnsGlobalConfig />} />
               </Route>
+              <Route path="automount-locations">
+                <Route path="" element={<AutomountLocations />} />
+              </Route>
               <Route path="id-ranges">
                 <Route path="" element={<IdRanges />} />
+                <Route path=":cn">
+                  <Route
+                    path=""
+                    element={<IdRangesTabs section="settings" />}
+                  />
+                </Route>
               </Route>
               <Route path="trusts">
                 <Route path="" element={<Trusts />} />
                 <Route path=":cn">
                   <Route path="" element={<TrustsTabs section="settings" />} />
+                  <Route path="trusted-domains">
+                    <Route
+                      path=""
+                      element={<TrustsTabs section="trusted-domains" />}
+                    />
+                  </Route>
+                </Route>
+              </Route>
+              <Route path="trusts-config">
+                <Route path="" element={<GlobalTrustConfig />} />
+              </Route>
+              <Route path="topology-graph">
+                <Route path="" element={<TopologyGraph />} />
+              </Route>
+              <Route path="roles">
+                <Route path="" element={<Roles />} />
+                <Route path=":cn">
+                  <Route path="" element={<RolesTabs section="settings" />} />
+                  <Route
+                    path="member_user"
+                    element={<RolesTabs section="member_user" />}
+                  />
+                  <Route
+                    path="member_group"
+                    element={<RolesTabs section="member_group" />}
+                  />
+                  <Route
+                    path="member_host"
+                    element={<RolesTabs section="member_host" />}
+                  />
+                  <Route
+                    path="member_hostgroup"
+                    element={<RolesTabs section="member_hostgroup" />}
+                  />
+                  <Route
+                    path="member_service"
+                    element={<RolesTabs section="member_service" />}
+                  />
+                  <Route
+                    path="member_idoverrideuser"
+                    element={<RolesTabs section="member_idoverrideuser" />}
+                  />
+                  <Route
+                    path="member_sysaccount"
+                    element={<RolesTabs section="member_sysaccount" />}
+                  />
+                  <Route
+                    path="privileges"
+                    element={<RolesTabs section="privileges" />}
+                  />
+                </Route>
+              </Route>
+              <Route path="privileges">
+                <Route path="" element={<Privileges />} />
+                <Route path=":cn">
+                  <Route
+                    path=""
+                    element={<PrivilegesTabs section="settings" />}
+                  />
                 </Route>
               </Route>
               <Route path="configuration" element={<Configuration />} />

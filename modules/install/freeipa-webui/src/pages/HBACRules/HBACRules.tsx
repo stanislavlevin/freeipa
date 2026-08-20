@@ -20,6 +20,7 @@ import { useAppDispatch, useAppSelector } from "src/store/hooks";
 // Layouts
 import TitleLayout from "src/components/layouts/TitleLayout";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import ToolbarLayout from "src/components/layouts/ToolbarLayout";
 import SearchInputLayout from "src/components/layouts/SearchInputLayout";
@@ -33,30 +34,32 @@ import AddHBACRule from "src/components/modals/HbacModals/AddHBACRule";
 import DeleteHBACRule from "src/components/modals/HbacModals/DeleteHBACRule";
 import DisableEnableHBACRules from "src/components/modals/HbacModals/DisableEnableHBACRules";
 // Hooks
-import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
+import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Utils
 import { API_VERSION_BACKUP, isHbacRuleSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // RPC client
-import { GenericPayload, useSearchEntriesMutation } from "src/services/rpc";
+import { GenericPayload } from "src/services/rpc";
 import { useGettingHbacRulesQuery } from "src/services/rpcHBACRules";
 // Errors
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 import GlobalErrors from "src/components/errors/GlobalErrors";
 import ModalErrors from "src/components/errors/ModalErrors";
 
 const HBACRules = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("hbac-rules");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({ pathname: "hbac-rules" });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
+  useUpdateRoute({ pathname: "hbac-rules" });
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -69,12 +72,11 @@ const HBACRules = () => {
   const globalErrors = useApiError([]);
   const modalErrors = useApiError([]);
 
+  // URL parameters: page number, page size, search value
+  const { page, perPage, searchValue } = useListPageSearchParams();
+
   // Main states - what user can define / what we could use in page URL
-  const [searchValue, setSearchValue] = React.useState("");
-  const [page, setPage] = useState<number>(1);
-  const [perPage, setPerPage] = useState<number>(10);
   const [totalCount, setRulesTotalCount] = useState<number>(0);
-  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
 
   // Page indexes
   const firstUserIdx = (page - 1) * perPage;
@@ -82,7 +84,7 @@ const HBACRules = () => {
 
   // Derived states - what we get from API
   const rulesDataResponse = useGettingHbacRulesQuery({
-    searchValue: "",
+    searchValue: searchValue,
     sizeLimit: 0,
     apiVersion: apiVersion || API_VERSION_BACKUP,
     startIdx: firstUserIdx,
@@ -91,14 +93,13 @@ const HBACRules = () => {
 
   const {
     data: batchResponse,
-    isLoading: isBatchLoading,
+    isFetching: isBatchFetching,
     error: batchError,
   } = rulesDataResponse;
 
   // Handle data when the API call is finished
   useEffect(() => {
     if (rulesDataResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected users on refresh
       setRulesTotalCount(0);
       globalErrors.clear();
@@ -123,8 +124,6 @@ const HBACRules = () => {
       setRulesTotalCount(totalCount);
       // Update the list of users
       setRulesList(rulesList);
-      // Show table elements
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -141,21 +140,12 @@ const HBACRules = () => {
 
   // Refresh button handling
   const refreshRulesData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected users on refresh
     setRulesTotalCount(0);
     clearSelectedRules();
 
     rulesDataResponse.refetch();
   };
-
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    rulesDataResponse.refetch();
-  }, [page, perPage]);
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -195,106 +185,12 @@ const HBACRules = () => {
     setIsDisableEnableOp(value);
   };
 
-  // Elements selected (per page)
-  //  - This will help to calculate the remaining elements on a specific page (bulk selector)
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-
-  // Rules displayed on the first page
-  const updateShownRulesList = (newShownRulesList: HBACRule[]) => {
-    setRulesList(newShownRulesList);
-  };
-
-  // Update search input valie
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
   const [selectedRules, setSelectedRules] = useState<HBACRule[]>([]);
 
   const clearSelectedRules = () => {
     const emptyList: HBACRule[] = [];
     setSelectedRules(emptyList);
   };
-
-  const [retrieveRules] = useSearchEntriesMutation({});
-
-  // Issue a search using a specific search value
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setSearchIsDisabled(true);
-    setRulesTotalCount(0);
-    retrieveRules({
-      searchValue: searchValue,
-      sizeLimit: 0,
-      apiVersion: apiVersion || API_VERSION_BACKUP,
-      startIdx: firstUserIdx,
-      stopIdx: lastUserIdx,
-      entryType: "hbacrule",
-    } as GenericPayload).then((result) => {
-      // Manage new response here
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for HBAC rules",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const rulesListResult = result.data?.result.results || [];
-          const rulesListSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const rulesList: HBACRule[] = [];
-
-          for (let i = 0; i < rulesListSize; i++) {
-            rulesList.push(rulesListResult[i].result);
-          }
-
-          setRulesTotalCount(totalCount);
-          setRulesList(rulesList);
-          // Show table elements
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
-  // Show table rows
-  const [showTableRows, setShowTableRows] = useState(!isBatchLoading);
-
-  // Show table rows only when data is fully retrieved
-  useEffect(() => {
-    if (showTableRows !== !isBatchLoading) {
-      setShowTableRows(!isBatchLoading);
-    }
-  }, [isBatchLoading]);
 
   // Modals functionality
   const [showAddModal, setShowAddModal] = useState(false);
@@ -385,17 +281,6 @@ const HBACRules = () => {
 
   // Data wrappers
   // TODO: Better separation of concerts
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownRulesList,
-    totalCount,
-  };
-
   // - 'BulkSelectorHBACRulesPrep'
   const rulesBulkSelectorData = {
     selected: selectedRules,
@@ -411,10 +296,11 @@ const HBACRules = () => {
     updateIsDisableEnableOp,
   };
 
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    rulesList,
+    selectedRules.map((item) => ipaPrimaryKey(item.cn)),
+    (item) => ipaPrimaryKey(item.cn)
+  );
 
   // 'DeleteRules'
   const deleteRulesButtonsData = {
@@ -453,13 +339,6 @@ const HBACRules = () => {
     updateIsDisableEnableOp,
   };
 
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
   // List of Toolbar items
   const toolbarItems: ToolbarItem[] = [
     {
@@ -480,10 +359,8 @@ const HBACRules = () => {
         <SearchInputLayout
           dataCy="search"
           name="search"
-          ariaLabel="Search user"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          ariaLabel="Search HBAC rules"
+          placeholder="Search HBAC rules"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -498,7 +375,7 @@ const HBACRules = () => {
       element: (
         <SecondaryButton
           onClickHandler={refreshRulesData}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           dataCy="hbac-rules-button-refresh"
         >
           Refresh
@@ -509,7 +386,7 @@ const HBACRules = () => {
       key: 4,
       element: (
         <SecondaryButton
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isBatchFetching}
           onClickHandler={onDeleteHandler}
           dataCy="hbac-rules-button-delete"
         >
@@ -522,7 +399,7 @@ const HBACRules = () => {
       element: (
         <SecondaryButton
           onClickHandler={onAddClickHandler}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           dataCy="hbac-rules-button-add"
         >
           Add
@@ -533,7 +410,7 @@ const HBACRules = () => {
       key: 6,
       element: (
         <SecondaryButton
-          isDisabled={isDisableButtonDisabled || !showTableRows}
+          isDisabled={isDisableButtonDisabled || isBatchFetching}
           onClickHandler={() => onEnableDisableHandler(true)}
           dataCy="hbac-rules-button-disable"
         >
@@ -545,7 +422,7 @@ const HBACRules = () => {
       key: 7,
       element: (
         <SecondaryButton
-          isDisabled={isEnableButtonDisabled || !showTableRows}
+          isDisabled={isEnableButtonDisabled || isBatchFetching}
           onClickHandler={() => onEnableDisableHandler(false)}
           dataCy="hbac-rules-button-enable"
         >
@@ -559,14 +436,19 @@ const HBACRules = () => {
     },
     {
       key: 10,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 11,
       element: (
         <PaginationLayout
           list={rulesList}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -577,72 +459,80 @@ const HBACRules = () => {
 
   // Render 'Active users'
   return (
-    <div>
-      <PageSection hasBodyWrapper={false}>
-        <TitleLayout id="hbacrules title" headingLevel="h1" text="HBAC rules" />
-      </PageSection>
-      <PageSection hasBodyWrapper={false} isFilled={false}>
-        <Flex direction={{ default: "column" }}>
-          <FlexItem>
-            <ToolbarLayout toolbarItems={toolbarItems} />
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto" }}>
-            <OuterScrollContainer>
-              <InnerScrollContainer
-                style={{ height: "60vh", overflow: "auto" }}
-              >
-                {batchError !== undefined && batchError ? (
-                  <GlobalErrors errors={globalErrors.getAll()} />
-                ) : (
-                  <HBACRulesTable
-                    shownElementsList={rulesList}
-                    showTableRows={showTableRows}
-                    rulesData={rulesTableData}
-                    buttonsData={rulesTableButtonsData}
-                    paginationData={selectedPerPageData}
-                    searchValue={searchValue}
-                  />
-                )}
-              </InnerScrollContainer>
-            </OuterScrollContainer>
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
-            <PaginationLayout
-              list={rulesList}
-              paginationData={paginationData}
-              variant={PaginationVariant.bottom}
-              widgetId="pagination-options-menu-bottom"
-            />
-          </FlexItem>
-        </Flex>
-      </PageSection>
-      <AddHBACRule
-        show={showAddModal}
-        handleModalToggle={onAddModalToggle}
-        onOpenAddModal={onAddClickHandler}
-        onCloseAddModal={onCloseAddModal}
-        onRefresh={refreshRulesData}
-      />
-      <DeleteHBACRule
-        show={showDeleteModal}
-        handleModalToggle={onDeleteModalToggle}
-        selectedRulesData={selectedRulesData}
-        buttonsData={deleteRulesButtonsData}
-        onRefresh={refreshRulesData}
-      />
-      <DisableEnableHBACRules
-        show={showEnableDisableModal}
-        handleModalToggle={onEnableDisableModalToggle}
-        optionSelected={enableDisableOptionSelected}
-        selectedRulesData={selectedRulesData}
-        buttonsData={disableEnableButtonsData}
-        onRefresh={refreshRulesData}
-      />
-      <ModalErrors
-        errors={modalErrors.getAll()}
-        dataCy="hbac-rules-modal-error"
-      />
-    </div>
+    <>
+      <div>
+        <PageSection hasBodyWrapper={false}>
+          <TitleLayout
+            id="hbacrules title"
+            headingLevel="h1"
+            text="HBAC rules"
+          />
+        </PageSection>
+        <PageSection hasBodyWrapper={false} isFilled={false}>
+          <Flex direction={{ default: "column" }}>
+            <FlexItem>
+              <ToolbarLayout toolbarItems={toolbarItems} />
+            </FlexItem>
+            <FlexItem style={{ flex: "0 0 auto" }}>
+              <OuterScrollContainer>
+                <InnerScrollContainer
+                  style={{ height: "60vh", overflow: "auto" }}
+                >
+                  {batchError !== undefined && batchError ? (
+                    <GlobalErrors errors={globalErrors.getAll()} />
+                  ) : (
+                    <HBACRulesTable
+                      shownElementsList={rulesList}
+                      showTableRows={!isBatchFetching}
+                      rulesData={rulesTableData}
+                      buttonsData={rulesTableButtonsData}
+                      paginationData={selectedPerPageData}
+                      searchValue={searchValue}
+                    />
+                  )}
+                </InnerScrollContainer>
+              </OuterScrollContainer>
+            </FlexItem>
+            <FlexItem
+              style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}
+            >
+              <PaginationLayout
+                list={rulesList}
+                totalCount={totalCount}
+                variant={PaginationVariant.bottom}
+                widgetId="pagination-options-menu-bottom"
+              />
+            </FlexItem>
+          </Flex>
+        </PageSection>
+        <AddHBACRule
+          show={showAddModal}
+          handleModalToggle={onAddModalToggle}
+          onOpenAddModal={onAddClickHandler}
+          onCloseAddModal={onCloseAddModal}
+          onRefresh={refreshRulesData}
+        />
+        <DeleteHBACRule
+          show={showDeleteModal}
+          handleModalToggle={onDeleteModalToggle}
+          selectedRulesData={selectedRulesData}
+          buttonsData={deleteRulesButtonsData}
+          onRefresh={refreshRulesData}
+        />
+        <DisableEnableHBACRules
+          show={showEnableDisableModal}
+          handleModalToggle={onEnableDisableModalToggle}
+          optionSelected={enableDisableOptionSelected}
+          selectedRulesData={selectedRulesData}
+          buttonsData={disableEnableButtonsData}
+          onRefresh={refreshRulesData}
+        />
+        <ModalErrors
+          errors={modalErrors.getAll()}
+          dataCy="hbac-rules-modal-error"
+        />
+      </div>
+    </>
   );
 };
 

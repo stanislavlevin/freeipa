@@ -4,7 +4,6 @@ import { PageSection, Tabs, Tab, TabTitleText } from "@patternfly/react-core";
 // React Router DOM
 import { useNavigate } from "react-router";
 // Navigation
-import { URL_PREFIX } from "src/navigation/NavRoutes";
 import { NotFound } from "src/components/errors/PageErrors";
 // Hooks
 import { useDnsServersSettingsData } from "src/hooks/useDnsServersSettingsData";
@@ -49,11 +48,11 @@ const DnsServersTabs = ({ section }: { section: string }) => {
     const currentPath: BreadCrumbItem[] = [
       {
         name: "DNS servers",
-        url: URL_PREFIX + "/" + pathname,
+        url: "/" + pathname,
       },
       {
         name: idnsserverid,
-        url: URL_PREFIX + "/" + pathname + "/" + idnsserverid,
+        url: "/" + pathname + "/" + idnsserverid,
         isActive: true,
       },
     ];
@@ -85,7 +84,15 @@ const DnsServersTabs = ({ section }: { section: string }) => {
         />
       </PageSection>
       <PageSection hasBodyWrapper={false} isFilled={false}>
-        <Tabs activeKey={section} onSelect={handleTabClick}>
+        <Tabs
+          activeKey={section}
+          onSelect={handleTabClick}
+          variant="secondary"
+          isBox
+          className="pf-v6-u-ml-lg"
+          mountOnEnter
+          unmountOnExit
+        >
           <Tab
             eventKey="settings"
             title={<TabTitleText>Settings</TabTitleText>}

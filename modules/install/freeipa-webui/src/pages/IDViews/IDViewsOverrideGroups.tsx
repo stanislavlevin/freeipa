@@ -25,10 +25,12 @@ import SearchInputLayout from "src/components/layouts/SearchInputLayout";
 import PaginationLayout from "src/components/layouts/PaginationLayout";
 // Errors
 import GlobalErrors from "src/components/errors/GlobalErrors";
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
 // Utils
 import { isGroupOverrideSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 import IDViewsOverrideGroupsTable from "src/pages/IDViews/IDViewsOverrideGroupsTable";
 // Modals
 import AddIdOverrideGroupModal from "src/components/modals/IdOverrideModals/AddIdOverrideGroup";
@@ -41,7 +43,6 @@ import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import {
   IDOverridePayload,
   useGettingIDOverrideGroupsQuery,
-  useSearchOverrideEntriesMutation,
 } from "src/services/rpcIdOverrides";
 
 interface PropsToOverrides {
@@ -54,12 +55,10 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
   const dispatch = useAppDispatch();
   const globalErrors = useApiError([]);
 
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
   const [totalCount, setTotalCount] = useState<number>(0);
   const [groupsList, setGroupsList] = useState<IDViewOverrideGroup[]>([]);
   const [selectedGroups, setSelectedGroupsList] = useState<string[]>([]);
-  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
 
   const clearSelectedGroups = () => {
     const emptyList: string[] = [];
@@ -70,10 +69,6 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
     selectedGroups,
     clearSelectedGroups,
   };
-
-  // Page indexes
-  const firstIdx = (page - 1) * perPage;
-  const lastIdx = page * perPage;
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -90,17 +85,11 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
     setIsDeletion(value);
   };
 
-  // Elements selected (per page)
-  //  - This will help to calculate the remaining elements on a specific page (bulk selector)
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    groupsList,
+    selectedGroups,
+    (group) => ipaPrimaryKey(group.ipaanchoruuid)
+  );
 
   const selectableTable = groupsList.filter(isGroupOverrideSelectable);
 
@@ -118,98 +107,28 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
     updateIsDeletion,
   };
 
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
+  // Page indexes
+  const firstIdx = (page - 1) * perPage;
+  const lastIdx = page * perPage;
 
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-
-  const updateShownGroupsList = (newShownGroupsList: IDViewOverrideGroup[]) => {
-    setGroupsList(newShownGroupsList);
-  };
-
-  // Update search input valie
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
-  const [retrieveEntries] = useSearchOverrideEntriesMutation({});
-
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setTotalCount(0);
-    setSearchIsDisabled(true);
-    retrieveEntries({
-      idView: props.idview,
-      searchValue: searchValue,
-      sizeLimit: 0,
-      startIdx: firstIdx,
-      stopIdx: lastIdx,
-      entryType: "idoverridegroup",
-    } as IDOverridePayload).then((result) => {
-      // Manage new response here
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for override groups",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const groupsListResult = result.data?.result.results || [];
-          const groupsListSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const groupList: IDViewOverrideGroup[] = [];
-
-          for (let i = 0; i < groupsListSize; i++) {
-            groupList.push(groupsListResult[i].result);
-          }
-          setGroupsList(groupList);
-          setTotalCount(totalCount);
-          // Show table elements
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
-  // SearchInputLayout
-  const searchValueData = {
+  const dataResponse = useGettingIDOverrideGroupsQuery({
+    idView: props.idview,
     searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
-  const dataResponse = useGettingIDOverrideGroupsQuery(props.idview);
+    sizeLimit: 0,
+    startIdx: firstIdx,
+    stopIdx: lastIdx,
+    entryType: "idoverridegroup",
+  } as IDOverridePayload);
 
   const {
     data: batchResponse,
-    isLoading: isBatchLoading,
+    isFetching: isBatchFetching,
     error: batchError,
   } = dataResponse;
 
   // Handle data when the API call is finished
   useEffect(() => {
     if (dataResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected on refresh
       setTotalCount(0);
       globalErrors.clear();
@@ -222,9 +141,16 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
       dataResponse.data &&
       batchResponse !== undefined
     ) {
-      setGroupsList(batchResponse);
-      setTotalCount(batchResponse.length);
-      setShowTableRows(true);
+      const groupsListResult = batchResponse.result.results || [];
+      const groupsListSize = batchResponse.result.count || 0;
+      const total = batchResponse.result.totalCount || 0;
+      const groupList: IDViewOverrideGroup[] = [];
+
+      for (let i = 0; i < groupsListSize; i++) {
+        groupList.push(groupsListResult[i].result);
+      }
+      setGroupsList(groupList);
+      setTotalCount(total);
     }
     // API response: Error
     if (
@@ -240,7 +166,7 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
         })
       );
     }
-  }, [dataResponse]);
+  }, [dataResponse.isFetching, dataResponse.data]);
 
   const onRefresh = () => {
     props.onRefresh();
@@ -248,21 +174,6 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
   };
 
   // Show table rows
-  const [showTableRows, setShowTableRows] = useState(!isBatchLoading);
-
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  useEffect(() => {
-    dataResponse.refetch();
-  }, [page, perPage]);
-
-  // Show table rows only when data is fully retrieved
-  useEffect(() => {
-    if (showTableRows !== !isBatchLoading) {
-      setShowTableRows(!isBatchLoading);
-    }
-  }, [isBatchLoading]);
-
   // Modals functionality
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -280,17 +191,6 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
   };
   const onDeleteModalToggle = () => {
     setShowDeleteModal(!showDeleteModal);
-  };
-
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownGroupsList,
-    totalCount,
   };
 
   // - 'Delete modal'
@@ -331,9 +231,7 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
           dataCy="search"
           name="search"
           ariaLabel="Search groups"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          placeholder="Search groups"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -359,7 +257,7 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
       element: (
         <SecondaryButton
           dataCy="id-views-tab-override-groups-button-delete"
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isBatchFetching}
           onClickHandler={onDeleteHandler}
         >
           Delete
@@ -372,7 +270,7 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
         <SecondaryButton
           dataCy="id-views-tab-override-groups-button-add"
           onClickHandler={onAddClickHandler}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
         >
           Add
         </SecondaryButton>
@@ -383,7 +281,7 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
       element: (
         <PaginationLayout
           list={props.groups}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -409,7 +307,7 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
               <IDViewsOverrideGroupsTable
                 elementsList={groupsList}
                 shownElementsList={groupsList}
-                showTableRows={showTableRows}
+                showTableRows={!isBatchFetching}
                 overrideEntryData={groupsTableData}
                 buttonsData={viewsTableButtonsData}
                 paginationData={selectedPerPageData}
@@ -420,7 +318,7 @@ const IDViewsOverrideGroups = (props: PropsToOverrides) => {
       </div>
       <PaginationLayout
         list={groupsList}
-        paginationData={paginationData}
+        totalCount={totalCount}
         variant={PaginationVariant.bottom}
         widgetId="pagination-options-menu-bottom"
         className="pf-v6-u-pb-0 pf-v6-u-pr-md"

@@ -9,7 +9,6 @@ import {
 import "../user_groups/user_groups";
 import "../common/data_tables";
 import { navigateTo } from "../common/navigation";
-import { loginAsAdmin, logout } from "../common/authentication";
 import { isOptionSelected, selectOption } from "../common/ui/select";
 
 const fillUserGroupRule = (userGroupName: string, selector: string) => {
@@ -17,7 +16,7 @@ const fillUserGroupRule = (userGroupName: string, selector: string) => {
   isOptionSelected(userGroupName, selector);
 };
 
-export const createUserGroupRule = (userGroupName: string) => {
+const createUserGroupRule = (userGroupName: string) => {
   cy.dataCy("auto-member-user-rules-button-add").click();
   cy.dataCy("add-rule-modal").should("exist");
 
@@ -27,6 +26,14 @@ export const createUserGroupRule = (userGroupName: string) => {
   cy.dataCy("add-rule-modal").should("not.exist");
   searchForEntry(userGroupName);
   entryExists(userGroupName);
+};
+
+export const createUserGroupRuleExec = (userGroupName: string) => {
+  cy.ipa({
+    command: "automember-add",
+    name: userGroupName,
+    specificOptions: "--type group",
+  });
 };
 
 const deleteUserGroupRule = (userGroupName: string) => {
@@ -41,6 +48,14 @@ const deleteUserGroupRule = (userGroupName: string) => {
   searchForEntry(userGroupName);
   entryDoesNotExist(userGroupName);
   cy.dataCy("delete-rule-success").should("exist");
+};
+
+const deleteUserGroupRuleExec = (userGroupName: string) => {
+  cy.ipa({
+    command: "automember-del",
+    name: userGroupName,
+    specificOptions: "--type group",
+  });
 };
 
 const setDefaultUserGroupRule = (userGroupName: string) => {
@@ -58,26 +73,7 @@ const setDefaultUserGroupRule = (userGroupName: string) => {
 };
 
 Given("user group rule {string} exists", (userGroupName: string) => {
-  loginAsAdmin();
-  navigateTo("user-groups");
-
-  cy.dataCy("user-groups-button-add").click();
-  cy.dataCy("add-user-group-modal").should("exist");
-
-  cy.dataCy("modal-textbox-group-name").type(userGroupName);
-  cy.dataCy("modal-textbox-group-name").should("have.value", userGroupName);
-
-  cy.dataCy("modal-button-add").click();
-  cy.dataCy("add-user-group-modal").should("not.exist");
-  searchForEntry(userGroupName);
-  entryExists(userGroupName);
-
-  navigateTo("user-group-rules");
-  createUserGroupRule(userGroupName);
-
-  searchForEntry(userGroupName);
-  entryExists(userGroupName);
-  logout();
+  createUserGroupRuleExec(userGroupName);
 });
 
 When(
@@ -112,14 +108,7 @@ Then(
 );
 
 Given("I delete user group rule {string}", (userGroupName: string) => {
-  loginAsAdmin();
-  navigateTo("user-group-rules");
-
-  deleteUserGroupRule(userGroupName);
-
-  searchForEntry(userGroupName);
-  entryDoesNotExist(userGroupName);
-  logout();
+  deleteUserGroupRuleExec(userGroupName);
 });
 
 When("I try to delete user group rule {string}", (userGroupName: string) => {

@@ -28,17 +28,40 @@ import { NO_SELECTION_OPTION } from "src/utils/constUtils";
 // RTK
 import { ErrorResult } from "src/services/rpc";
 import {
+  AddOtpTokenPayload,
   useAddOtpTokenMutation,
   useGetActiveUsersQuery,
 } from "src/services/rpcUsers";
 // Utils
 import { API_VERSION_BACKUP, toGeneralizedTime } from "src/utils/utils";
+import {
+  AlgorithmType,
+  OtpTokenDigits,
+  OtpTokenTypeValue,
+} from "src/utils/datatypes/globalDataTypes";
+
+interface OtpTokenValues {
+  tokenType: OtpTokenTypeValue;
+  tokenAlgorithm: AlgorithmType;
+  tokenDigits: OtpTokenDigits;
+  uniqueId: string;
+  description: string;
+  selectedOwner: string;
+  validityStart: Date | null;
+  validityEnd: Date | null;
+  model: string;
+  vendor: string;
+  serial: string;
+  key: string;
+  clockInterval: string;
+}
 
 interface PropsToAddOtpToken {
   uid: string | undefined;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   onClose: () => void;
+  onRefresh?: () => void;
 }
 
 const AddOtpToken = (props: PropsToAddOtpToken) => {
@@ -56,24 +79,22 @@ const AddOtpToken = (props: PropsToAddOtpToken) => {
   React.useEffect(() => {
     if (!isActiveUsersListLoading) {
       if (activeUsersListData !== undefined) {
-        activeUsersListData.forEach((user) => {
-          activeUsersUids.push(user.uid[0]);
-        });
+        setOwnersToSelect([
+          NO_SELECTION_OPTION,
+          ...new Set(activeUsersListData.map((user) => user.uid[0])),
+        ]);
       }
-      // Add empty option at the beginning of the list
-      activeUsersUids.unshift(NO_SELECTION_OPTION);
-      setOwnersToSelect(activeUsersUids);
     }
   }, [isActiveUsersListLoading]);
 
   // Track initial values to detect changes
-  const initialValues = {
+  const initialValues: OtpTokenValues = {
     tokenType: "totp",
     tokenAlgorithm: "sha1",
     tokenDigits: "6",
     uniqueId: "",
     description: "",
-    selectedOwner: props.uid,
+    selectedOwner: props.uid ?? "",
     validityStart: null,
     validityEnd: null,
     model: "",
@@ -83,7 +104,9 @@ const AddOtpToken = (props: PropsToAddOtpToken) => {
     clockInterval: "",
   };
 
-  const [tokenType, setTokenType] = React.useState(initialValues.tokenType);
+  const [tokenType, setTokenType] = React.useState<OtpTokenTypeValue>(
+    initialValues.tokenType
+  );
   const [tokenAlgorithm, setTokenAlgorithm] = React.useState(
     initialValues.tokenAlgorithm
   );
@@ -91,19 +114,19 @@ const AddOtpToken = (props: PropsToAddOtpToken) => {
     initialValues.tokenDigits
   );
 
-  const onTokenTypeChange = (checked: boolean, value: string) => {
+  const onTokenTypeChange = (checked: boolean, value: OtpTokenTypeValue) => {
     if (checked) {
       setTokenType(value);
     }
   };
 
-  const onTokenAlgorithmChange = (checked: boolean, value: string) => {
+  const onTokenAlgorithmChange = (checked: boolean, value: AlgorithmType) => {
     if (checked) {
       setTokenAlgorithm(value);
     }
   };
 
-  const onTokenDigitsChange = (checked: boolean, value: string) => {
+  const onTokenDigitsChange = (checked: boolean, value: OtpTokenDigits) => {
     if (checked) {
       setTokenDigits(value);
     }
@@ -503,19 +526,21 @@ const AddOtpToken = (props: PropsToAddOtpToken) => {
 
   // QR code modal
   const [isQrModalOpen, setIsQrModalOpen] = React.useState(false);
-  const [addAndAddAnotherChecked, setAddAndAddAnotherChecked] =
-    React.useState(false);
   const onQrModalClose = () => {
     setIsQrModalOpen(false);
   };
 
   // Buttons functionality
   // - API call to add otp token
-  const onAddOtpToken = (addAndAddAnotherChecked: boolean) => {
+  const onAddOtpToken = () => {
     // Get updated values as params
     const params = getModifiedValues();
     // Payload
-    const payload = [[uniqueId], params];
+    const payload: AddOtpTokenPayload = {
+      ipatokenuniqueid: uniqueId,
+      type: tokenType,
+      ...params,
+    };
 
     addOtpToken(payload).then((response) => {
       if ("data" in response) {
@@ -523,12 +548,7 @@ const AddOtpToken = (props: PropsToAddOtpToken) => {
           // Update URI
           setUri(response.data.result.result.uri as string);
           // Close modal
-          if (addAndAddAnotherChecked) {
-            props.onClose();
-            setAddAndAddAnotherChecked(true);
-          } else {
-            props.onClose();
-          }
+          props.onClose();
           // Show QR modal
           setIsQrModalOpen(true);
           // Reset fields
@@ -547,15 +567,6 @@ const AddOtpToken = (props: PropsToAddOtpToken) => {
       }
     });
   };
-
-  // If the 'add and add another' option has been selected,
-  //  open the modal again after showing the previous generated QR code.
-  React.useEffect(() => {
-    if (!isQrModalOpen && addAndAddAnotherChecked) {
-      props.setIsOpen(true);
-      setAddAndAddAnotherChecked(false);
-    }
-  }, [isQrModalOpen, addAndAddAnotherChecked]);
 
   // Reset fields
   const resetFields = () => {
@@ -591,14 +602,6 @@ const AddOtpToken = (props: PropsToAddOtpToken) => {
       Add
     </Button>,
     <Button
-      data-cy="modal-button-add-and-add-another"
-      key={"add-and-add-another-otp-token"}
-      variant="primary"
-      onClick={() => onAddOtpToken(true)}
-    >
-      Add and add another
-    </Button>,
-    <Button
       data-cy="modal-button-cancel"
       key={"cancel-reset-password"}
       variant="link"
@@ -619,7 +622,7 @@ const AddOtpToken = (props: PropsToAddOtpToken) => {
         formId="add-otp-token-form"
         fields={fields}
         show={props.isOpen}
-        onSubmit={() => onAddOtpToken(false)}
+        onSubmit={() => onAddOtpToken()}
         onClose={props.onClose}
         actions={actions}
       />
@@ -627,6 +630,7 @@ const AddOtpToken = (props: PropsToAddOtpToken) => {
         isOpen={isQrModalOpen}
         onClose={onQrModalClose}
         QrUri={uri}
+        onRefresh={props.onRefresh}
       />
     </>
   );

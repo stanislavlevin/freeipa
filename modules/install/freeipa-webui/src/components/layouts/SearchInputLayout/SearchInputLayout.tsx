@@ -1,12 +1,12 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { FormEvent, SyntheticEvent } from "react";
+import React from "react";
 // PatternFly
 import { SearchInput } from "@patternfly/react-core";
+// Router
+import { useSearchParams } from "react-router";
 
 interface SearchValueData {
   searchValue: string;
-  updateSearchValue: (value: string) => void;
-  submitSearchValue?: () => void;
+  onSubmit: (value: string) => void;
 }
 
 interface PropsToSearchInput {
@@ -14,20 +14,42 @@ interface PropsToSearchInput {
   dataCy: string;
   ariaLabel?: string;
   placeholder?: string;
-  searchValueData: SearchValueData;
+  /** Local override for non-list UIs (e.g. DualListLayout). When omitted, uses URL search params. */
+  searchValueData?: SearchValueData;
   isDisabled?: boolean;
 }
 
 const SearchInputLayout = (props: PropsToSearchInput) => {
-  const onSearchChange = (
-    _event: FormEvent<HTMLInputElement>,
-    value: string
-  ) => {
-    props.searchValueData.updateSearchValue(value);
-  };
+  const [params, setParams] = useSearchParams();
+  const committedSearchValue =
+    props.searchValueData !== undefined
+      ? props.searchValueData.searchValue
+      : params.get("search") || "";
+  const [inputValue, setInputValue] = React.useState(committedSearchValue);
+  const prevSearchValue = React.useRef(committedSearchValue);
+  if (prevSearchValue.current !== committedSearchValue) {
+    prevSearchValue.current = committedSearchValue;
+    setInputValue(committedSearchValue);
+  }
 
-  const onSearchClear = (_event: SyntheticEvent<HTMLButtonElement, Event>) => {
-    props.searchValueData.updateSearchValue("");
+  const commitSearch = (value: string) => {
+    if (props.searchValueData !== undefined) {
+      props.searchValueData.onSubmit(value);
+      return;
+    }
+    setParams(
+      (currentParams) => {
+        if (value !== "") {
+          currentParams.set("search", value);
+        } else {
+          currentParams.delete("search");
+        }
+        // Reset to first page when search changes
+        currentParams.delete("p");
+        return currentParams;
+      },
+      { replace: true }
+    );
   };
 
   return (
@@ -36,14 +58,13 @@ const SearchInputLayout = (props: PropsToSearchInput) => {
       name={props.name}
       aria-label={props.ariaLabel}
       placeholder={props.placeholder}
-      value={props.searchValueData.searchValue}
-      onSearch={
-        props.searchValueData.submitSearchValue
-          ? props.searchValueData.submitSearchValue
-          : () => void undefined
-      }
-      onChange={onSearchChange}
-      onClear={onSearchClear}
+      value={inputValue}
+      onSearch={(_, value: string) => commitSearch(value)}
+      onChange={(_event, value: string) => setInputValue(value)}
+      onClear={() => {
+        setInputValue("");
+        commitSearch("");
+      }}
       isDisabled={props.isDisabled}
     />
   );

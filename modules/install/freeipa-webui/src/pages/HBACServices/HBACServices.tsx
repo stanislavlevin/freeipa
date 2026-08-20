@@ -20,6 +20,7 @@ import { useAppSelector, useAppDispatch } from "src/store/hooks";
 // Layouts
 import TitleLayout from "src/components/layouts/TitleLayout";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import ToolbarLayout from "src/components/layouts/ToolbarLayout";
 import SearchInputLayout from "src/components/layouts/SearchInputLayout";
@@ -32,30 +33,32 @@ import BulkSelectorPrep from "src/components/BulkSelectorPrep";
 import AddHBACService from "src/components/modals/HbacModals/AddHBACService";
 import DeleteHBACService from "src/components/modals/HbacModals/DeleteHBACService";
 // Hooks
-import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
+import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Utils
 import { API_VERSION_BACKUP, isHbacServiceSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // RPC client
-import { GenericPayload, useSearchEntriesMutation } from "src/services/rpc";
+import { GenericPayload } from "src/services/rpc";
 import { useGettingHbacServicesQuery } from "src/services/rpcHBACServices";
 // Errors
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 import GlobalErrors from "src/components/errors/GlobalErrors";
 import ModalErrors from "src/components/errors/ModalErrors";
 
 const HBACServices = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("hbac-services");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({ pathname: "hbac-services" });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
+  useUpdateRoute({ pathname: "hbac-services" });
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -68,12 +71,11 @@ const HBACServices = () => {
   const globalErrors = useApiError([]);
   const modalErrors = useApiError([]);
 
+  // URL parameters: page number, page size, search value
+  const { page, perPage, searchValue } = useListPageSearchParams();
+
   // Main states - what user can define / what we could use in page URL
-  const [searchValue, setSearchValue] = React.useState("");
-  const [page, setPage] = useState<number>(1);
-  const [perPage, setPerPage] = useState<number>(10);
   const [totalCount, setServicesTotalCount] = useState<number>(0);
-  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
 
   // Page indexes
   const firstIdx = (page - 1) * perPage;
@@ -81,7 +83,7 @@ const HBACServices = () => {
 
   // Derived states - what we get from API
   const servicesDataResponse = useGettingHbacServicesQuery({
-    searchValue: "",
+    searchValue: searchValue,
     sizeLimit: 0,
     apiVersion: apiVersion || API_VERSION_BACKUP,
     startIdx: firstIdx,
@@ -90,14 +92,13 @@ const HBACServices = () => {
 
   const {
     data: batchResponse,
-    isLoading: isBatchLoading,
+    isFetching: isBatchFetching,
     error: batchError,
   } = servicesDataResponse;
 
   // Handle data when the API call is finished
   useEffect(() => {
     if (servicesDataResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected users on refresh
       setServicesTotalCount(0);
       globalErrors.clear();
@@ -122,8 +123,6 @@ const HBACServices = () => {
       setServicesTotalCount(totalCount);
       // Update the list
       setServicesList(servicesList);
-      // Show table elements
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -140,21 +139,12 @@ const HBACServices = () => {
 
   // Refresh button handling
   const refreshServicesData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected users on refresh
     setServicesTotalCount(0);
     clearSelectedServices();
 
     servicesDataResponse.refetch();
   };
-
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    servicesDataResponse.refetch();
-  }, [page, perPage]);
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -171,33 +161,6 @@ const HBACServices = () => {
     setIsDeletion(value);
   };
 
-  // Elements selected (per page)
-  //  - This will help to calculate the remaining elements on a specific page (bulk selector)
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-
-  // Services displayed on the first page
-  const updateShownServicesList = (newShownServicesList: HBACService[]) => {
-    setServicesList(newShownServicesList);
-  };
-
-  // Update search input valie
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
   const [selectedServices, setSelectedServices] = useState<HBACService[]>([]);
 
   const clearSelectedServices = () => {
@@ -205,73 +168,7 @@ const HBACServices = () => {
     setSelectedServices(emptyList);
   };
 
-  const [retrieveServices] = useSearchEntriesMutation({});
-
-  // Issue a search using a specific search value
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setSearchIsDisabled(true);
-    setServicesTotalCount(0);
-    retrieveServices({
-      searchValue: searchValue,
-      sizeLimit: 0,
-      apiVersion: apiVersion || API_VERSION_BACKUP,
-      startIdx: firstIdx,
-      stopIdx: lastIdx,
-      entryType: "hbacsvc",
-    } as GenericPayload).then((result) => {
-      // Manage new response here
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for HBAC services",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const servicesListResult = result.data?.result.results || [];
-          const servicesListSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const servicesList: HBACService[] = [];
-
-          for (let i = 0; i < servicesListSize; i++) {
-            servicesList.push(servicesListResult[i].result);
-          }
-
-          setServicesTotalCount(totalCount);
-          setServicesList(servicesList);
-          // Show table elements
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
   // Show table rows
-  const [showTableRows, setShowTableRows] = useState(!isBatchLoading);
-
-  // Show table rows only when data is fully retrieved
-  useEffect(() => {
-    if (showTableRows !== !isBatchLoading) {
-      setShowTableRows(!isBatchLoading);
-    }
-  }, [isBatchLoading]);
-
   // Modals functionality
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -348,17 +245,6 @@ const HBACServices = () => {
 
   // Data wrappers
   // TODO: Better separation of concerts
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownServicesList,
-    totalCount,
-  };
-
   // - 'BulkSelectorHBACServicesPrep'
   const rulesBulkSelectorData = {
     selected: selectedServices,
@@ -371,10 +257,11 @@ const HBACServices = () => {
     updateIsDeleteButtonDisabled,
   };
 
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    servicesList,
+    selectedServices.map((item) => ipaPrimaryKey(item.cn)),
+    (item) => ipaPrimaryKey(item.cn)
+  );
 
   // 'DeleteServices'
   const deleteServicesButtonsData = {
@@ -402,13 +289,6 @@ const HBACServices = () => {
     updateIsDeletion,
   };
 
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
   // List of Toolbar items
   const toolbarItems: ToolbarItem[] = [
     {
@@ -429,10 +309,8 @@ const HBACServices = () => {
         <SearchInputLayout
           dataCy="search"
           name="search"
-          ariaLabel="Search services"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          ariaLabel="Search HBAC services"
+          placeholder="Search HBAC services"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -447,7 +325,7 @@ const HBACServices = () => {
       element: (
         <SecondaryButton
           onClickHandler={refreshServicesData}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           dataCy="hbac-services-button-refresh"
         >
           Refresh
@@ -458,7 +336,7 @@ const HBACServices = () => {
       key: 4,
       element: (
         <SecondaryButton
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isBatchFetching}
           onClickHandler={onDeleteHandler}
           dataCy="hbac-services-button-delete"
         >
@@ -471,7 +349,7 @@ const HBACServices = () => {
       element: (
         <SecondaryButton
           onClickHandler={onAddClickHandler}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           dataCy="hbac-services-button-add"
         >
           Add
@@ -484,14 +362,19 @@ const HBACServices = () => {
     },
     {
       key: 7,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 8,
       element: (
         <PaginationLayout
           list={servicesList}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -501,68 +384,72 @@ const HBACServices = () => {
   ];
 
   return (
-    <div>
-      <PageSection hasBodyWrapper={false}>
-        <TitleLayout
-          id="hbacservices title"
-          headingLevel="h1"
-          text="HBAC services"
+    <>
+      <div>
+        <PageSection hasBodyWrapper={false}>
+          <TitleLayout
+            id="hbacservices title"
+            headingLevel="h1"
+            text="HBAC services"
+          />
+        </PageSection>
+        <PageSection hasBodyWrapper={false} isFilled={false}>
+          <Flex direction={{ default: "column" }}>
+            <FlexItem>
+              <ToolbarLayout toolbarItems={toolbarItems} />
+            </FlexItem>
+            <FlexItem style={{ flex: "0 0 auto" }}>
+              <OuterScrollContainer>
+                <InnerScrollContainer
+                  style={{ height: "60vh", overflow: "auto" }}
+                >
+                  {batchError !== undefined && batchError ? (
+                    <GlobalErrors errors={globalErrors.getAll()} />
+                  ) : (
+                    <HBACServicesTable
+                      shownElementsList={servicesList}
+                      showTableRows={!isBatchFetching}
+                      servicesData={servicesTableData}
+                      buttonsData={servicesTableButtonsData}
+                      paginationData={selectedPerPageData}
+                      searchValue={searchValue}
+                    />
+                  )}
+                </InnerScrollContainer>
+              </OuterScrollContainer>
+            </FlexItem>
+            <FlexItem
+              style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}
+            >
+              <PaginationLayout
+                list={servicesList}
+                totalCount={totalCount}
+                variant={PaginationVariant.bottom}
+                widgetId="pagination-options-menu-bottom"
+              />
+            </FlexItem>
+          </Flex>
+        </PageSection>
+        <AddHBACService
+          show={showAddModal}
+          handleModalToggle={onAddModalToggle}
+          onOpenAddModal={onAddClickHandler}
+          onCloseAddModal={onCloseAddModal}
+          onRefresh={refreshServicesData}
         />
-      </PageSection>
-      <PageSection hasBodyWrapper={false} isFilled={false}>
-        <Flex direction={{ default: "column" }}>
-          <FlexItem>
-            <ToolbarLayout toolbarItems={toolbarItems} />
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto" }}>
-            <OuterScrollContainer>
-              <InnerScrollContainer
-                style={{ height: "60vh", overflow: "auto" }}
-              >
-                {batchError !== undefined && batchError ? (
-                  <GlobalErrors errors={globalErrors.getAll()} />
-                ) : (
-                  <HBACServicesTable
-                    shownElementsList={servicesList}
-                    showTableRows={showTableRows}
-                    servicesData={servicesTableData}
-                    buttonsData={servicesTableButtonsData}
-                    paginationData={selectedPerPageData}
-                    searchValue={searchValue}
-                  />
-                )}
-              </InnerScrollContainer>
-            </OuterScrollContainer>
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
-            <PaginationLayout
-              list={servicesList}
-              paginationData={paginationData}
-              variant={PaginationVariant.bottom}
-              widgetId="pagination-options-menu-bottom"
-            />
-          </FlexItem>
-        </Flex>
-      </PageSection>
-      <AddHBACService
-        show={showAddModal}
-        handleModalToggle={onAddModalToggle}
-        onOpenAddModal={onAddClickHandler}
-        onCloseAddModal={onCloseAddModal}
-        onRefresh={refreshServicesData}
-      />
-      <DeleteHBACService
-        show={showDeleteModal}
-        handleModalToggle={onDeleteModalToggle}
-        selectedServicesData={selectedServicesData}
-        buttonsData={deleteServicesButtonsData}
-        onRefresh={refreshServicesData}
-      />
-      <ModalErrors
-        errors={modalErrors.getAll()}
-        dataCy="hbac-services-modal-error"
-      />
-    </div>
+        <DeleteHBACService
+          show={showDeleteModal}
+          handleModalToggle={onDeleteModalToggle}
+          selectedServicesData={selectedServicesData}
+          buttonsData={deleteServicesButtonsData}
+          onRefresh={refreshServicesData}
+        />
+        <ModalErrors
+          errors={modalErrors.getAll()}
+          dataCy="hbac-services-modal-error"
+        />
+      </div>
+    </>
   );
 };
 

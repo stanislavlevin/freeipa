@@ -1,6 +1,7 @@
 import React from "react";
 // PatternFly
 import {
+  Button,
   DropdownItem,
   Flex,
   FlexItem,
@@ -20,6 +21,8 @@ import {
 import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import useUpdateRoute from "src/hooks/useUpdateRoute";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 import { addAlert } from "src/store/Global/alerts-slice";
 // Utils
 import { dnsZoneAsRecord } from "src/utils/dnsZonesUtils";
@@ -34,8 +37,8 @@ import {
 // Components
 import IpaTextInput from "src/components/Form/IpaTextInput/IpaTextInput";
 import TabLayout from "src/components/layouts/TabLayout";
-import SecondaryButton from "src/components/layouts/SecondaryButton";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import KebabLayout from "src/components/layouts/KebabLayout";
 import IpaTextArea from "src/components/Form/IpaTextArea";
 import IpaTextboxList from "src/components/Form/IpaTextboxList";
@@ -62,6 +65,9 @@ interface DnsZonesSettingsProps {
 
 const DnsZonesSettings = (props: DnsZonesSettingsProps) => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("dns-zones-settings");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
   useUpdateRoute({ pathname: props.pathname });
@@ -156,7 +162,8 @@ const DnsZonesSettings = (props: DnsZonesSettingsProps) => {
   };
 
   // on Save handler method
-  const onSave = () => {
+  const onSave = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setIsDataLoading(true);
     const modifiedValues = props.modifiedValues();
 
@@ -267,36 +274,40 @@ const DnsZonesSettings = (props: DnsZonesSettingsProps) => {
     {
       key: 0,
       element: (
-        <SecondaryButton
-          dataCy="dns-zones-tab-settings-button-refresh"
-          onClickHandler={props.onRefresh}
+        <Button
+          variant="secondary"
+          data-cy="dns-zones-tab-settings-button-refresh"
+          onClick={props.onRefresh}
         >
           Refresh
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 1,
       element: (
-        <SecondaryButton
-          dataCy="dns-zones-tab-settings-button-revert"
+        <Button
+          variant="secondary"
+          data-cy="dns-zones-tab-settings-button-revert"
           isDisabled={!props.isModified || isDataLoading}
-          onClickHandler={onRevert}
+          onClick={onRevert}
         >
           Revert
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 2,
       element: (
-        <SecondaryButton
-          dataCy="dns-zones-tab-settings-button-save"
+        <Button
+          variant="primary"
+          data-cy="dns-zones-tab-settings-button-save"
           isDisabled={!props.isModified || isDataLoading}
-          onClickHandler={onSave}
+          type="submit"
+          form="dns-zones-settings-form"
         >
           Save
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
@@ -334,6 +345,7 @@ const DnsZonesSettings = (props: DnsZonesSettingsProps) => {
           <SidebarPanel variant="sticky">
             <HelpTextWithIconLayout
               textContent="Help"
+              onClick={() => dispatch(toggleHelpPanel())}
               icon={
                 <OutlinedQuestionCircleIcon className="pf-v6-u-primary-color-100 pf-v6-u-mr-sm" />
               }
@@ -342,7 +354,11 @@ const DnsZonesSettings = (props: DnsZonesSettingsProps) => {
           <SidebarContent className="pf-v6-u-mr-xl">
             <Flex direction={{ default: "column", lg: "row" }}>
               <FlexItem flex={{ default: "flex_1" }}>
-                <Form className="pf-v6-u-mb-lg">
+                <Form
+                  className="pf-v6-u-mb-lg"
+                  id="dns-zones-settings-form"
+                  onSubmit={onSave}
+                >
                   <FormGroup label="Zone name" role="idnsname">
                     <IpaTextInput
                       dataCy="dns-zones-tab-settings-textbox-idnsname"
@@ -521,7 +537,9 @@ const DnsZonesSettings = (props: DnsZonesSettingsProps) => {
                       name={"idnsallowquery"}
                       ariaLabel={"Allow query textbox list"}
                       ipaObject={ipaObject}
-                      setIpaObject={recordOnChange}
+                      onChange={recordOnChange}
+                      objectName="dnszone"
+                      metadata={props.metadata}
                     />
                   </FormGroup>
                   <FormGroup label="Allow transfer" role="idnsallowtransfer">
@@ -530,7 +548,9 @@ const DnsZonesSettings = (props: DnsZonesSettingsProps) => {
                       name={"idnsallowtransfer"}
                       ariaLabel={"Allow transfer textbox list"}
                       ipaObject={ipaObject}
-                      setIpaObject={recordOnChange}
+                      onChange={recordOnChange}
+                      objectName="dnszone"
+                      metadata={props.metadata}
                     />
                   </FormGroup>
                   <FormGroup label="Zone forwarders" role="idnsforwarders">
@@ -539,11 +559,14 @@ const DnsZonesSettings = (props: DnsZonesSettingsProps) => {
                       name={"idnsforwarders"}
                       ariaLabel={"Zone forwarders textbox list"}
                       ipaObject={ipaObject}
-                      setIpaObject={recordOnChange}
+                      onChange={recordOnChange}
+                      objectName="dnszone"
+                      metadata={props.metadata}
                     />
                   </FormGroup>
                   <FormGroup label="Forward policy" role="idnsforwardpolicy">
                     <IpaForwardPolicy
+                      dataCy="dns-zones-tab-settings"
                       name={"idnsforwardpolicy"}
                       ariaLabel={"Forward policy radio group"}
                       ipaObject={ipaObject}
@@ -604,7 +627,6 @@ const DnsZonesSettings = (props: DnsZonesSettingsProps) => {
         elementsList={[props.dnsZone.idnsname || ""]}
         setElementsList={() => {}} // No need to unselect elements in this case
         operation={isDnsZoneEnabled ? "disable" : "enable"}
-        setShowTableRows={setIsDataLoading}
         onRefresh={props.onRefresh}
       />
       <DeleteDnsZonesModal

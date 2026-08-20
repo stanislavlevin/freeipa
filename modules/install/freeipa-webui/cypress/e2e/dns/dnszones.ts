@@ -2,11 +2,11 @@ import { Given, Then, When } from "@badeball/cypress-cucumber-preprocessor";
 import {
   entryExists,
   entryDoesNotExist,
+  isElementDisabled,
+  isElementEnabled,
   searchForEntry,
   selectEntry,
 } from "../common/data_tables";
-import { navigateTo } from "../common/navigation";
-import { loginAsAdmin, logout } from "../common/authentication";
 
 const fillDnsZone = (zone: string) => {
   cy.dataCy("modal-textbox-dns-zone-name").type(zone);
@@ -30,7 +30,7 @@ const fillReversedDnsZoneWithSkipOverlapCheck = (ip: string) => {
   cy.dataCy("modal-checkbox-skip-overlap-check").should("be.checked");
 };
 
-export const createDnsZone = (zone: string) => {
+const createDnsZone = (zone: string) => {
   cy.dataCy("dns-zones-button-add").click();
   cy.dataCy("add-dns-zone-modal").should("exist");
 
@@ -80,29 +80,17 @@ const createReversedDnsZoneWithSkipOverlapCheck = (ip: string) => {
   cy.dataCy("add-dns-zone-modal").should("not.exist");
 };
 
-const deleteDnsZone = (zoneName: string) => {
-  selectEntry(zoneName);
-
-  cy.dataCy("dns-zones-button-delete").click();
-  cy.dataCy("dns-zones-delete-modal").should("exist");
-
-  cy.dataCy("modal-button-ok").click();
-  cy.dataCy("dns-zones-delete-modal").should("not.exist");
-};
+const DNS_ZONE_STATUS_LABEL = "idnszoneactive";
 
 const isDisabled = (name: string) => {
-  cy.get("tr[id='" + name + "'] td[data-label=idnszoneactive]").contains(
-    "Disabled"
-  );
+  isElementDisabled(name, DNS_ZONE_STATUS_LABEL);
 };
 
-export const isEnabled = (name: string) => {
-  cy.get("tr[id='" + name + "'] td[data-label=idnszoneactive]").contains(
-    "Enabled"
-  );
+const isEnabled = (name: string) => {
+  isElementEnabled(name, DNS_ZONE_STATUS_LABEL);
 };
 
-export const disableDnsZone = (zoneName: string) => {
+const disableDnsZone = (zoneName: string) => {
   selectEntry(zoneName);
 
   cy.dataCy("dns-zones-button-disable").click();
@@ -124,11 +112,6 @@ const enableDnsZone = (zoneName: string) => {
   isEnabled(zoneName);
 };
 
-// E.g. "my-dnszone" -> "my-dnszone."
-export const parseZoneName = (zoneName: string) => {
-  return zoneName + ".";
-};
-
 When("I create a DNS zone {string}", (zoneName: string) => {
   createDnsZone(zoneName);
 });
@@ -138,14 +121,10 @@ When("I create a reverse DNS zone {string}", (ip: string) => {
 });
 
 Given("I delete DNS zone {string}", (zoneName: string) => {
-  loginAsAdmin();
-  navigateTo("dns-zones");
-
-  deleteDnsZone(zoneName);
-
-  searchForEntry(zoneName);
-  entryDoesNotExist(zoneName);
-  logout();
+  cy.ipa({
+    command: "dnszone-del",
+    name: zoneName,
+  });
 });
 
 When(
@@ -172,14 +151,10 @@ Then("I should not see DNS zone {string} in the list", (zoneName: string) => {
 });
 
 Given("DNS zone {string} exists", (zoneName: string) => {
-  loginAsAdmin();
-  navigateTo("dns-zones");
-
-  createDnsZone(zoneName);
-
-  searchForEntry(parseZoneName(zoneName));
-  entryExists(parseZoneName(zoneName));
-  logout();
+  cy.ipa({
+    command: "dnszone-add",
+    name: zoneName,
+  });
 });
 
 Then(

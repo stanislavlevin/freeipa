@@ -86,7 +86,7 @@ const AddDnsForwardZoneModalInner = (props: PropsToAddModal) => {
           if (error) {
             dispatch(
               addAlert({
-                name: "add-dnszone-error",
+                name: "add-dnsforwardzones-error",
                 title: error.message,
                 variant: "danger",
               })
@@ -96,8 +96,8 @@ const AddDnsForwardZoneModalInner = (props: PropsToAddModal) => {
           if (data) {
             dispatch(
               addAlert({
-                name: "add-dnszone-success",
-                title: "DNS Zone successfully added",
+                name: "add-dnsforwardzones-success",
+                title: "DNS forward zone successfully added",
                 variant: "success",
               })
             );
@@ -113,9 +113,15 @@ const AddDnsForwardZoneModalInner = (props: PropsToAddModal) => {
       });
   };
 
+  const onFormSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsAddButtonSpinning(true);
+    onAddDnsForwardZone();
+  };
+
   // Form fields
   const formFields = (
-    <Form id="add-dns-forward-zone-modal-form">
+    <Form onSubmit={onFormSubmit} id="add-dns-forward-zone-modal-form">
       <Flex
         direction={{ default: "column" }}
         className="pf-v6-u-ml-lg pf-v6-u-mb-md"
@@ -262,10 +268,6 @@ const AddDnsForwardZoneModalInner = (props: PropsToAddModal) => {
         (isReverseZoneIpRadioChecked && reverseZoneIP === "")
       }
       form="add-dns-forward-zone-modal-form"
-      onClick={() => {
-        setIsAddButtonSpinning(true);
-        onAddDnsForwardZone();
-      }}
     >
       {isAddButtonSpinning ? (
         <>

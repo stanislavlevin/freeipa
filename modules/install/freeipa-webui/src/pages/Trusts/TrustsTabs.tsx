@@ -4,7 +4,6 @@ import { PageSection, Tabs, Tab, TabTitleText } from "@patternfly/react-core";
 // React Router DOM
 import { useNavigate } from "react-router";
 // Navigation
-import { URL_PREFIX } from "src/navigation/NavRoutes";
 import { NotFound } from "src/components/errors/PageErrors";
 // Hooks
 import { useTrustsSettingsData } from "src/hooks/useTrustsSettingsData";
@@ -16,6 +15,7 @@ import BreadCrumb, {
 } from "src/components/layouts/BreadCrumb/BreadCrumb";
 import TrustsSettings from "src/pages/Trusts/TrustsSettings";
 import { CnParams, useSafeParams } from "src/utils/paramsUtils";
+import TrustedDomains from "./TrustedDomains";
 
 const TrustsTabs = ({ section }: { section: string }) => {
   const { cn } = useSafeParams<CnParams>(["cn"]);
@@ -40,10 +40,15 @@ const TrustsTabs = ({ section }: { section: string }) => {
     () => [
       {
         name: "Trusts",
-        url: URL_PREFIX + "/" + pathname,
+        url: "/" + pathname,
+      },
+      {
+        name: cn,
+        url: "/" + pathname + "/" + cn,
+        isActive: true,
       },
     ],
-    [pathname]
+    [pathname, cn]
   );
 
   // Handling of the API data
@@ -64,9 +69,9 @@ const TrustsTabs = ({ section }: { section: string }) => {
     <>
       <PageSection hasBodyWrapper={false}>
         <BreadCrumb breadcrumbItems={breadcrumbItems} />
-      </PageSection>
-      <PageSection hasBodyWrapper={true}>
         <TitleLayout id={cn} preText="Trust:" text={cn} headingLevel="h1" />
+      </PageSection>
+      <PageSection hasBodyWrapper={true} type="tabs" isFilled>
         <Tabs
           activeKey={section}
           onSelect={handleTabClick}
@@ -94,6 +99,14 @@ const TrustsTabs = ({ section }: { section: string }) => {
               onResetValues={trustsSettingsData.resetValues}
               pathname={pathname}
             />
+          </Tab>
+          <Tab
+            eventKey="trusted-domains"
+            name="trusted-domains"
+            title={<TabTitleText>Trusted domains</TabTitleText>}
+            data-cy="trusts-tab-trusted-domains"
+          >
+            <TrustedDomains trustId={cn} />
           </Tab>
         </Tabs>
       </PageSection>

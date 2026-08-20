@@ -46,8 +46,6 @@ const AddService = (props: PropsToAddService) => {
 
   // Set host names list
   const [addSpinning, setAddBtnSpinning] = React.useState<boolean>(false);
-  const [addAgainSpinning, setAddAgainBtnSpinning] =
-    React.useState<boolean>(false);
 
   // 'Service' select
   const [isServiceOpen, setIsServiceOpen] = useState(false);
@@ -351,7 +349,6 @@ const AddService = (props: PropsToAddService) => {
     setIsHostNameOpen(false);
     setIsServiceOpen(false);
     setAddBtnSpinning(false);
-    setAddAgainBtnSpinning(false);
   };
 
   // Clean fields and close modal (To prevent data persistence when reopen modal)
@@ -373,10 +370,6 @@ const AddService = (props: PropsToAddService) => {
 
   // Define status flags to determine user added successfully or error
   let isAdditionSuccess = true;
-
-  // Track which button has been clicked ('onAddUser' or 'onAddAndAddAnother')
-  // to better handle the 'retry' function and its behavior
-  let onAddServiceClicked = true;
 
   // Add host data
   const addServiceData = async () => {
@@ -418,29 +411,7 @@ const AddService = (props: PropsToAddService) => {
     });
   };
 
-  const addAndAddAnotherHandler = () => {
-    onAddServiceClicked = false;
-    const validation = validateFields();
-    if (validation) {
-      setAddAgainBtnSpinning(true);
-      addServiceData().then(() => {
-        if (isAdditionSuccess) {
-          // Do not close the modal, but clean fields & reset validations
-          cleanAllFields();
-          resetValidations();
-        } else {
-          // Close the modal without cleaning fields
-          if (props.onCloseAddModal !== undefined) {
-            props.onCloseAddModal();
-          }
-          setAddAgainBtnSpinning(false);
-        }
-      });
-    }
-  };
-
   const addServiceHandler = () => {
-    onAddServiceClicked = true;
     const validation = validateFields();
     if (validation) {
       setAddBtnSpinning(true);
@@ -487,12 +458,7 @@ const AddService = (props: PropsToAddService) => {
     // Close the error modal
     closeAndCleanErrorParameters();
 
-    // Repeats the same previous operation
-    if (onAddServiceClicked) {
-      addServiceHandler();
-    } else {
-      addAndAddAnotherHandler();
-    }
+    addServiceHandler();
   };
 
   const errorModalActions = [
@@ -525,32 +491,19 @@ const AddService = (props: PropsToAddService) => {
 
   // Buttons that will be shown at the end of the form
   const modalActions = [
-    <SecondaryButton
-      dataCy="modal-button-add"
+    <Button
+      data-cy="modal-button-add"
       key="add-new-service"
       name="add"
-      isDisabled={buttonDisabled || addAgainSpinning || addSpinning}
-      onClickHandler={addServiceHandler}
-      form="modal-form"
+      isDisabled={buttonDisabled || addSpinning}
+      type="submit"
+      form="add-service-modal"
       spinnerAriaValueText="Adding"
       spinnerAriaLabel="Adding"
       isLoading={addSpinning}
     >
       {addSpinning ? "Adding" : "Add"}
-    </SecondaryButton>,
-    <SecondaryButton
-      dataCy="modal-button-add-and-add-another"
-      key="add-and-add-another-new-service"
-      name="add_and_add_another"
-      isDisabled={buttonDisabled || addAgainSpinning || addSpinning}
-      onClickHandler={addAndAddAnotherHandler}
-      form="modal-form"
-      spinnerAriaValueText="Adding again"
-      spinnerAriaLabel="Adding again"
-      isLoading={addAgainSpinning}
-    >
-      {addAgainSpinning ? "Adding" : "Add and add another"}
-    </SecondaryButton>,
+    </Button>,
     <Button
       data-cy="modal-button-cancel"
       key="cancel-new-service"
@@ -571,6 +524,7 @@ const AddService = (props: PropsToAddService) => {
         offPosition="76px"
         title="Add service"
         formId="add-service-modal"
+        onSubmit={addServiceHandler}
         fields={fields}
         show={props.show}
         onClose={cleanAndCloseModal}

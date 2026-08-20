@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 // PatternFly
 import {
+  Button,
   Flex,
   FlexItem,
   JumpLinks,
@@ -14,15 +15,17 @@ import {
 import { useAppDispatch, useAppSelector } from "src/store/hooks";
 // Layouts
 import TitleLayout from "src/components/layouts/TitleLayout";
-import SecondaryButton from "src/components/layouts/SecondaryButton";
 import DataSpinner from "src/components/layouts/DataSpinner";
 // Components
 import ToolbarLayout from "src/components/layouts/ToolbarLayout";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 import { useConfigSettings } from "src/hooks/useConfigSettingsData";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 // Utils
 import { API_VERSION_BACKUP } from "src/utils/utils";
 import { asRecord } from "../../utils/hostUtils";
@@ -47,14 +50,12 @@ import { useGettingGroupsQuery } from "src/services/rpcUserGroups";
 
 const Configuration = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("configuration");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({ pathname: "configuration" });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
+  useUpdateRoute({ pathname: "configuration" });
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -206,40 +207,42 @@ const Configuration = () => {
     {
       key: 0,
       element: (
-        <SecondaryButton
-          dataCy="configuration-button-refresh"
-          onClickHandler={onRefresh}
+        <Button
+          data-cy="configuration-button-refresh"
+          variant="secondary"
+          onClick={onRefresh}
         >
           Refresh
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 1,
       element: (
-        <SecondaryButton
-          dataCy="configuration-button-revert"
+        <Button
+          data-cy="configuration-button-revert"
+          variant="secondary"
           isDisabled={!configData.modified}
-          onClickHandler={onRevert}
+          onClick={onRevert}
         >
           Revert
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 2,
       element: (
-        <SecondaryButton
-          dataCy="configuration-button-save"
+        <Button
+          data-cy="configuration-button-save"
+          variant="primary"
           isDisabled={!configData.modified || isSaving}
-          onClickHandler={onSave}
+          onClick={onSave}
           isLoading={isSaving}
           spinnerAriaValueText="Saving"
-          spinnerAriaLabelledBy="Saving"
           spinnerAriaLabel="Saving"
         >
           {isSaving ? "Saving" : "Save"}
-        </SecondaryButton>
+        </Button>
       ),
     },
   ];
@@ -268,12 +271,14 @@ const Configuration = () => {
       >
         <Sidebar isPanelRight>
           <SidebarPanel variant="sticky">
-            <HelpTextWithIconLayout textContent="Help" />
+            <HelpTextWithIconLayout
+              textContent="Help"
+              onClick={() => dispatch(toggleHelpPanel())}
+            />
             <JumpLinks
               isVertical
               label="Jump to section"
               scrollableSelector="#settings-page"
-              offset={220} // for masthead
               expandable={{ default: "expandable", md: "nonExpandable" }}
             >
               <JumpLinksItem key={0} href="#search-options">

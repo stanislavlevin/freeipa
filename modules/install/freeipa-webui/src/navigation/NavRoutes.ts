@@ -50,11 +50,14 @@ const PasswordPoliciesGroupRef = "password-policies";
 // - Kerberos ticket policy
 const KerberosTicketPolicyGroupRef = "kerberos-ticket-policy";
 // AUTHENTICATION
+const OtpTokensGroupRef = "otp-tokens";
 const IdentityProviderReferencesGroupRef = "identity-provider-references";
 const CertificateMappingGroupRef = "cert-id-mapping-rules";
 const CertificateMappingConfigGroupRef = "cert-id-mapping-global-config";
 const CertificateMappingMatchGroupRef = "cert-id-mapping-match";
 // NETWORK SERVICES
+// - Automount
+const AutomountLocationsGroupRef = "automount-locations";
 // - DNS zones
 const DNSZonesGroupRef = "dns-zones";
 const DNSForwardZonesGroupRef = "dns-forward-zones";
@@ -63,6 +66,12 @@ const DNSGlobalConfigGroupRef = "dns-global-config";
 // IPA SERVER
 // - Trusts
 const TrustsGroupRef = "trusts";
+const TrustsGlobalConfigGroupRef = "trusts-config";
+// - Topology
+const TopologyGroupRef = "topology-graph";
+// - Role-based access control
+const RbacGroupRef = "rbac";
+const PrivilegesGroupRef = "privileges";
 // - Configuration
 const ConfigRef = "configuration";
 
@@ -311,6 +320,13 @@ export const getNavigationRoutes = (
       path: "",
       items: [
         {
+          label: "OTP tokens",
+          group: OtpTokensGroupRef,
+          title: `${BASE_TITLE} - OTP tokens`,
+          path: "otp-tokens",
+          items: [],
+        },
+        {
           label: "Identity Provider references",
           group: IdentityProviderReferencesGroupRef,
           title: `${BASE_TITLE} - Identity Provider references`,
@@ -353,8 +369,8 @@ export const getNavigationRoutes = (
       group: "",
       title: `${BASE_TITLE} - Network services`,
       path: "",
-      items:
-        dnsIsEnabled === true
+      items: [
+        ...(dnsIsEnabled === true
           ? [
               {
                 label: "DNS",
@@ -393,7 +409,15 @@ export const getNavigationRoutes = (
                 ],
               },
             ]
-          : [],
+          : []),
+        {
+          label: "Automount locations",
+          group: AutomountLocationsGroupRef,
+          title: `${BASE_TITLE} - Automount locations`,
+          path: "automount-locations",
+          items: [],
+        },
+      ],
     },
     {
       label: "IPA Server",
@@ -402,11 +426,48 @@ export const getNavigationRoutes = (
       path: "",
       items: [
         {
+          label: "Role-based access control",
+          group: RbacGroupRef,
+          title: `${BASE_TITLE} - Role-based access control`,
+          path: "",
+          items: [
+            {
+              label: "Roles",
+              group: RbacGroupRef,
+              title: `${BASE_TITLE} - Roles`,
+              path: "roles",
+              items: [],
+            },
+            {
+              label: "Privileges",
+              group: PrivilegesGroupRef,
+              title: `${BASE_TITLE} - Privileges`,
+              path: "privileges",
+              items: [],
+            },
+          ],
+        },
+        {
           label: "Trusts",
           group: TrustsGroupRef,
           title: `${BASE_TITLE} - Trusts`,
           path: "trusts",
-          items: [],
+          items: [
+            {
+              label: "Trusts",
+              group: TrustsGroupRef,
+              title: `${BASE_TITLE} - Trusts`,
+              path: "trusts",
+              items: [],
+            },
+            {
+              label: "Trusts global config",
+              group: TrustsGlobalConfigGroupRef,
+              title: `${BASE_TITLE} - Trusts global config`,
+              path: "trusts-config",
+              items: [],
+            },
+          ],
         },
         {
           label: "ID ranges",
@@ -414,6 +475,21 @@ export const getNavigationRoutes = (
           title: `${BASE_TITLE} - ID ranges`,
           path: "id-ranges",
           items: [],
+        },
+        {
+          label: "Topology",
+          group: TopologyGroupRef,
+          title: `${BASE_TITLE} - Topology`,
+          path: "topology-graph",
+          items: [
+            {
+              label: "Topology graph",
+              group: TopologyGroupRef,
+              title: `${BASE_TITLE} - Topology graph`,
+              path: "topology-graph",
+              items: [],
+            },
+          ],
         },
         {
           label: "Configuration",

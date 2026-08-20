@@ -14,28 +14,29 @@ import {
 // Data types
 import { IDPServer } from "src/utils/datatypes/globalDataTypes";
 // Hooks
-import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Redux
 import { useAppDispatch, useAppSelector } from "src/store/hooks";
 // RPC
-import {
-  useGetIdpEntriesQuery,
-  useSearchIdpEntriesMutation,
-} from "src/services/rpcIdp";
+import { useGetIdpEntriesQuery } from "src/services/rpcIdp";
 // Utils
 import { isIdpServerSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // Components
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
 import ToolbarLayout, {
   ToolbarItem,
 } from "src/components/layouts/ToolbarLayout";
 import SearchInputLayout from "src/components/layouts/SearchInputLayout";
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import PaginationLayout from "src/components/layouts/PaginationLayout";
 import TitleLayout from "src/components/layouts/TitleLayout";
 import GlobalErrors from "src/components/errors/GlobalErrors";
@@ -47,16 +48,14 @@ import DeleteModal from "src/components/modals/IdpReferences/DeleteModal";
 
 const IdpReferences = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("idp-references");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({
+  useUpdateRoute({
     pathname: "identity-provider-references",
   });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -64,8 +63,7 @@ const IdpReferences = () => {
   ) as string;
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   // Handle API calls errors
   const globalErrors = useApiError([]);
@@ -76,8 +74,6 @@ const IdpReferences = () => {
 
   // States
   const [idpReferences, setIdpReferences] = React.useState<IDPServer[]>([]);
-  const [isSearchDisabled, setIsSearchDisabled] =
-    React.useState<boolean>(false);
   const [totalCount, setTotalCount] = React.useState<number>(0);
 
   // API calls
@@ -89,12 +85,11 @@ const IdpReferences = () => {
     stopIdx: lastUserIdx,
   });
 
-  const { data, isLoading, error } = idpsResponse;
+  const { data, isFetching, error } = idpsResponse;
 
   // Handle data when the API call is finished
   React.useEffect(() => {
     if (idpsResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected elements on refresh
       setTotalCount(0);
       globalErrors.clear();
@@ -115,8 +110,6 @@ const IdpReferences = () => {
       setTotalCount(totalCount);
       // Update the list of elements
       setIdpReferences(elementsList);
-      // Show table elements
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -135,7 +128,6 @@ const IdpReferences = () => {
   const [selectedElements, setSelectedElements] = React.useState<IDPServer[]>(
     []
   );
-  const [selectedPerPage, setSelectedPerPage] = React.useState<number>(0);
 
   const clearSelectedElements = () => {
     const emptyList: IDPServer[] = [];
@@ -144,15 +136,10 @@ const IdpReferences = () => {
 
   // Refresh button handling
   const refreshData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected elements on refresh
     setTotalCount(0);
 
-    idpsResponse.refetch().then(() => {
-      setShowTableRows(true);
-    });
+    idpsResponse.refetch();
   };
 
   // 'Delete' button state
@@ -208,104 +195,20 @@ const IdpReferences = () => {
     }
   };
 
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    idpsResponse.refetch();
-  }, []);
+  const selectedPerPageData = getSelectedPerPageData(
+    idpReferences,
+    selectedElements.map((item) => ipaPrimaryKey(item.cn)),
+    (item) => ipaPrimaryKey(item.cn)
+  );
 
   // Show table rows
-  const [showTableRows, setShowTableRows] = React.useState(!isLoading);
-
-  // Show table rows only when data is fully retrieved
-  React.useEffect(() => {
-    if (showTableRows !== !isLoading) {
-      setShowTableRows(!isLoading);
-    }
-  }, [isLoading]);
-
-  // Search API call
-  const [searchEntry] = useSearchIdpEntriesMutation();
-
-  const submitSearchValue = () => {
-    searchEntry({
-      searchValue: searchValue,
-      apiVersion,
-      sizelimit: 100,
-      startIdx: 0,
-      stopIdx: 200, // Search will consider a max. of elements
-    }).then((result) => {
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for IdPs",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const listResult = result.data?.result.results || [];
-          const listSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const elementsList: IDPServer[] = [];
-
-          for (let i = 0; i < listSize; i++) {
-            elementsList.push(listResult[i].result);
-          }
-
-          setTotalCount(totalCount);
-          setIdpReferences(elementsList);
-          setShowTableRows(true);
-        }
-        setIsSearchDisabled(false);
-      }
-    });
-  };
-
   // Data wrappers
-  // TODO: Better separation of concerts
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage: setPage,
-    updatePerPage: setPerPage,
-    updateSelectedPerPage: setSelectedPerPage,
-    updateShownElementsList: setIdpReferences,
-    totalCount,
-  };
-
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue: setSearchValue,
-    submitSearchValue,
-  };
-
   // - 'BulkSelectorrep'
   const bulkSelectorData = {
     selected: selectedElements,
     updateSelected: updateSelectedIdpRefs,
     selectableTable: selectableIdpRefsTable,
     nameAttr: "cn",
-  };
-
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage: setSelectedPerPage,
   };
 
   // Modals functionality
@@ -350,10 +253,8 @@ const IdpReferences = () => {
         <SearchInputLayout
           dataCy="search"
           name="search"
-          ariaLabel="Search subIds"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={isSearchDisabled}
+          ariaLabel="Search IdP references"
+          placeholder="Search IdP references"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -369,7 +270,7 @@ const IdpReferences = () => {
         <SecondaryButton
           dataCy="idp-references-button-refresh"
           onClickHandler={refreshData}
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
         >
           Refresh
         </SecondaryButton>
@@ -380,7 +281,7 @@ const IdpReferences = () => {
       element: (
         <SecondaryButton
           dataCy="idp-references-button-delete"
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isFetching}
           onClickHandler={onOpenDeleteModal}
         >
           Delete
@@ -392,7 +293,7 @@ const IdpReferences = () => {
       element: (
         <SecondaryButton
           dataCy="idp-references-button-add"
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
           onClickHandler={onOpenAddModal}
         >
           Add
@@ -405,14 +306,19 @@ const IdpReferences = () => {
     },
     {
       key: 7,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 8,
       element: (
         <PaginationLayout
           list={idpReferences}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -423,99 +329,100 @@ const IdpReferences = () => {
 
   // Render component
   return (
-    <div>
-      <PageSection hasBodyWrapper={false}>
-        <TitleLayout
-          id="Identity Provider references page"
-          headingLevel="h1"
-          text="Identity Provider references"
+    <>
+      <div>
+        <PageSection hasBodyWrapper={false}>
+          <TitleLayout
+            id="Identity Provider references page"
+            headingLevel="h1"
+            text="Identity Provider references"
+          />
+        </PageSection>
+        <PageSection hasBodyWrapper={false} isFilled={false}>
+          <Flex direction={{ default: "column" }}>
+            <FlexItem>
+              <ToolbarLayout toolbarItems={toolbarItems} />
+            </FlexItem>
+            <FlexItem style={{ flex: "0 0 auto" }}>
+              <OuterScrollContainer>
+                <InnerScrollContainer
+                  style={{ height: "60vh", overflow: "auto" }}
+                >
+                  {error !== undefined && error ? (
+                    <GlobalErrors errors={globalErrors.getAll()} />
+                  ) : (
+                    <MainTable
+                      tableTitle="Identity Provider references table"
+                      shownElementsList={idpReferences}
+                      pk="cn"
+                      keyNames={["cn", "ipaidpclientid", "ipaidpscope"]}
+                      columnNames={[
+                        "Identity Provider reference name",
+                        "Client identifier",
+                        "Scope",
+                      ]}
+                      hasCheckboxes={true}
+                      pathname="identity-provider-references"
+                      showTableRows={!isFetching}
+                      showLink={true}
+                      elementsData={{
+                        isElementSelectable: isIdpServerSelectable,
+                        selectedElements,
+                        selectableElementsTable: selectableIdpRefsTable,
+                        setElementsSelected: setIdpRefsSelected,
+                        clearSelectedElements,
+                      }}
+                      buttonsData={{
+                        updateIsDeleteButtonDisabled: (value) =>
+                          setIsDeleteButtonDisabled(value),
+                        isDeletion,
+                        updateIsDeletion: (value) => setIsDeletion(value),
+                      }}
+                      paginationData={selectedPerPageData}
+                    />
+                  )}
+                </InnerScrollContainer>
+              </OuterScrollContainer>
+            </FlexItem>
+            <FlexItem
+              style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}
+            >
+              <PaginationLayout
+                list={idpReferences}
+                totalCount={totalCount}
+                variant={PaginationVariant.bottom}
+                widgetId="pagination-options-menu-bottom"
+              />
+            </FlexItem>
+          </Flex>
+        </PageSection>
+        <AddModal
+          isOpen={showAddModal}
+          onCloseModal={onCloseAddModal}
+          onRefresh={refreshData}
+          title="Add Identity Provider reference"
         />
-      </PageSection>
-      <PageSection hasBodyWrapper={false} isFilled={false}>
-        <Flex direction={{ default: "column" }}>
-          <FlexItem>
-            <ToolbarLayout toolbarItems={toolbarItems} />
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto" }}>
-            <OuterScrollContainer>
-              <InnerScrollContainer
-                style={{ height: "60vh", overflow: "auto" }}
-              >
-                {error !== undefined && error ? (
-                  <GlobalErrors errors={globalErrors.getAll()} />
-                ) : (
-                  <MainTable
-                    tableTitle="Identity Provider references table"
-                    shownElementsList={idpReferences}
-                    pk="cn"
-                    keyNames={["cn", "ipaidpclientid", "ipaidpscope"]}
-                    columnNames={[
-                      "Identity Provider reference name",
-                      "Client identifier",
-                      "Scope",
-                    ]}
-                    hasCheckboxes={true}
-                    pathname="identity-provider-references"
-                    showTableRows={showTableRows}
-                    showLink={true}
-                    elementsData={{
-                      isElementSelectable: isIdpServerSelectable,
-                      selectedElements,
-                      selectableElementsTable: selectableIdpRefsTable,
-                      setElementsSelected: setIdpRefsSelected,
-                      clearSelectedElements,
-                    }}
-                    buttonsData={{
-                      updateIsDeleteButtonDisabled: (value) =>
-                        setIsDeleteButtonDisabled(value),
-                      isDeletion,
-                      updateIsDeletion: (value) => setIsDeletion(value),
-                    }}
-                    paginationData={{
-                      selectedPerPage,
-                      updateSelectedPerPage: setSelectedPerPage,
-                    }}
-                  />
-                )}
-              </InnerScrollContainer>
-            </OuterScrollContainer>
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
-            <PaginationLayout
-              list={idpReferences}
-              paginationData={paginationData}
-              variant={PaginationVariant.bottom}
-              widgetId="pagination-options-menu-bottom"
-            />
-          </FlexItem>
-        </Flex>
-      </PageSection>
-      <AddModal
-        isOpen={showAddModal}
-        onCloseModal={onCloseAddModal}
-        onRefresh={refreshData}
-        title="Add Identity Provider reference"
-      />
-      <DeleteModal
-        show={showDeleteModal}
-        onClose={onCloseDeleteModal}
-        selectedData={{
-          selectedElements,
-          clearSelectedElements,
-        }}
-        buttonsData={{
-          updateIsDeleteButtonDisabled: setIsDeleteButtonDisabled,
-          updateIsDeletion: setIsDeletion,
-        }}
-        columnNames={[
-          "Identity Provider reference name",
-          "Client identifier",
-          "Scope",
-        ]}
-        keyNames={["cn", "ipaidpclientid", "ipaidpscope"]}
-        onRefresh={refreshData}
-      />
-    </div>
+        <DeleteModal
+          show={showDeleteModal}
+          onClose={onCloseDeleteModal}
+          selectedData={{
+            selectedElements,
+            clearSelectedElements,
+          }}
+          buttonsData={{
+            updateIsDeleteButtonDisabled: setIsDeleteButtonDisabled,
+            updateIsDeletion: setIsDeletion,
+          }}
+          columnNames={[
+            "Identity Provider reference name",
+            "Client identifier",
+            "Scope",
+          ]}
+          keyNames={["cn", "ipaidpclientid", "ipaidpscope"]}
+          onRefresh={refreshData}
+        />
+      </div>
+    </>
   );
 };
 

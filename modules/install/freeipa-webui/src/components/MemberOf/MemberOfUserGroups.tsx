@@ -1,16 +1,12 @@
 import React from "react";
 // PatternFly
-import {
-  FlexItem,
-  Flex,
-  Pagination,
-  PaginationVariant,
-} from "@patternfly/react-core";
+import { FlexItem, Flex, PaginationVariant } from "@patternfly/react-core";
 // Data types
 import { User, UserGroup } from "src/utils/datatypes/globalDataTypes";
 // Components
 import MemberOfToolbar from "./MemberOfToolbar";
 import MemberTable from "src/components/tables/MembershipTable";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
 import MemberOfAddModal, { AvailableItems } from "./MemberOfAddModal";
 import MemberOfDeleteModal from "./MemberOfDeleteModal";
 // Redux
@@ -19,6 +15,7 @@ import { useAppDispatch } from "src/store/hooks";
 import { addAlert } from "src/store/Global/alerts-slice";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
 import { MembershipDirection } from "src/components/MemberOf/MemberOfToolbar";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // RPC
 import { ErrorResult } from "src/services/rpc";
 import {
@@ -47,9 +44,7 @@ const MemberOfUserGroups = (props: MemberOfUserGroupsProps) => {
     page,
     setPage,
     perPage,
-    setPerPage,
     searchValue,
-    setSearchValue,
     membershipDirection,
     setMembershipDirection,
   } = useListPageSearchParams();
@@ -161,9 +156,9 @@ const MemberOfUserGroups = (props: MemberOfUserGroupsProps) => {
 
   // Load available User groups
   const userGroupsQuery = useGettingGroupsQuery({
-    search: adderSearchValue,
+    searchValue: adderSearchValue,
     apiVersion: API_VERSION_BACKUP,
-    sizelimit: 100,
+    sizeLimit: 100,
     startIdx: 0,
     stopIdx: 100,
   });
@@ -285,9 +280,8 @@ const MemberOfUserGroups = (props: MemberOfUserGroupsProps) => {
     <>
       <Flex direction={{ default: "column" }}>
         <MemberOfToolbar
-          searchText={searchValue}
-          onSearchTextChange={setSearchValue}
-          onSearch={() => {}}
+          searchPlaceholder="Search user groups"
+          searchAriaLabel="Search user groups"
           refreshButtonEnabled={isRefreshButtonEnabled}
           onRefreshButtonClick={props.onRefreshUserData}
           deleteButtonEnabled={
@@ -302,11 +296,8 @@ const MemberOfUserGroups = (props: MemberOfUserGroupsProps) => {
           membershipDirection={membershipDirection}
           onMembershipDirectionChange={setMembershipDirection}
           helpIconEnabled={true}
+          onHelpIconClick={() => dispatch(toggleHelpPanel())}
           totalItems={userGroupNames.length}
-          perPage={perPage}
-          page={page}
-          onPerPageChange={setPerPage}
-          onPageChange={setPage}
         />
         <MemberTable
           entityList={userGroups}
@@ -328,15 +319,11 @@ const MemberOfUserGroups = (props: MemberOfUserGroupsProps) => {
         />
         {userGroupNames.length > 0 && (
           <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
-            <Pagination
-              // className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-              itemCount={userGroupNames.length}
-              widgetId="pagination-options-menu-bottom"
-              perPage={perPage}
-              page={page}
+            <PaginationLayout
+              list={[]}
+              totalCount={userGroupNames.length}
               variant={PaginationVariant.bottom}
-              onSetPage={(_e, page) => setPage(page)}
-              onPerPageSelect={(_e, perPage) => setPerPage(perPage)}
+              widgetId="pagination-options-menu-bottom"
             />
           </FlexItem>
         )}

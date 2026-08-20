@@ -9,7 +9,6 @@ import {
   SelectOption,
 } from "@patternfly/react-core";
 // Layouts
-import SecondaryButton from "src/components/layouts/SecondaryButton";
 import ModalWithFormLayout from "src/components/layouts/ModalWithFormLayout";
 // Errors
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
@@ -45,8 +44,6 @@ const AddRule = (props: PropsToAddRule) => {
 
   // States
   const [addSpinning, setAddBtnSpinning] = React.useState<boolean>(false);
-  const [addAgainSpinning, setAddAgainBtnSpinning] =
-    React.useState<boolean>(false);
   const [groupSelected, setGroupSelected] = React.useState("");
   const [isSelectOpen, setIsSelectOpen] = React.useState(false);
 
@@ -143,7 +140,6 @@ const AddRule = (props: PropsToAddRule) => {
     setGroupSelected("");
     setIsSelectOpen(false);
     setAddBtnSpinning(false);
-    setAddAgainBtnSpinning(false);
   };
 
   // Clean fields and close modal (To prevent data persistence when reopen modal)
@@ -193,69 +189,19 @@ const AddRule = (props: PropsToAddRule) => {
     });
   };
 
-  // Add and add another
-  const onAddAndAddAnother = () => {
-    const addPayload: AddPayload = {
-      group: groupSelected,
-      type: props.ruleType,
-    };
-
-    setAddAgainBtnSpinning(true);
-    addRuleCommand(addPayload).then((response) => {
-      if ("data" in response) {
-        const data = response.data;
-        const error = data?.error as FetchBaseQueryError | SerializedError;
-
-        if (error) {
-          dispatch(
-            addAlert({
-              name: "add-rule-error",
-              title: JSON.stringify(error, null, 2),
-              variant: "danger",
-            })
-          );
-        } else {
-          // Set alert: success
-          dispatch(
-            addAlert({
-              name: "add-rule-success",
-              title: "Entry successfully added",
-              variant: "success",
-            })
-          );
-          setAddAgainBtnSpinning(false);
-
-          // Clean fields and refresh table
-          cleanFields();
-          if (props.onRefresh) props.onRefresh();
-        }
-      }
-    });
-  };
-
   const modalActions = [
-    <SecondaryButton
-      dataCy={"modal-button-add"}
+    <Button
+      data-cy={"modal-button-add"}
       key="add"
-      onClickHandler={onAdd}
+      type="submit"
+      form="add-rule-modal"
       isLoading={addSpinning}
       spinnerAriaValueText="Adding"
       spinnerAriaLabel="Adding"
       isDisabled={buttonDisabled}
     >
       Add
-    </SecondaryButton>,
-    <SecondaryButton
-      dataCy={"modal-button-add-and-add-another"}
-      key="add-another"
-      onClickHandler={onAddAndAddAnother}
-      isLoading={addAgainSpinning}
-      spinnerAriaValueText="Adding"
-      spinnerAriaLabel="Adding"
-      isDisabled={buttonDisabled}
-    >
-      Add and add another
-    </SecondaryButton>,
+    </Button>,
     <Button
       data-cy={"modal-button-cancel"}
       key="cancel-new-rule"
@@ -276,6 +222,7 @@ const AddRule = (props: PropsToAddRule) => {
         offPosition="76px"
         title="Add rule"
         formId="add-rule-modal"
+        onSubmit={() => onAdd()}
         fields={fields}
         show={props.show}
         onClose={cleanAndCloseModal}

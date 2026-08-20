@@ -45,8 +45,6 @@ const AddHost = (props: PropsToAddHost) => {
   const [description, setDescription] = useState("");
 
   const [addSpinning, setAddBtnSpinning] = React.useState<boolean>(false);
-  const [addAgainSpinning, setAddAgainBtnSpinning] =
-    React.useState<boolean>(false);
 
   // Checkboxes
   const [forceCheckbox, setForceCheckbox] = useState(false);
@@ -58,7 +56,7 @@ const AddHost = (props: PropsToAddHost) => {
   // The domain name should require at least two labels,
   // but IPA accepts names like 'a.b'.
   const validHostNameRegex =
-    /^([^-][a-zA-Z0-9-]*[^-]?)([.][^-][a-zA-Z0-9-]*[^-]?)+[.]?$/;
+    /^([a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]?)(\.([a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]?))+\.?$/;
 
   // Buttons are disabled until the user fills the required fields
   const [buttonDisabled, setButtonDisabled] = useState(true);
@@ -86,7 +84,7 @@ const AddHost = (props: PropsToAddHost) => {
   const fields = [
     {
       id: "modal-form-host-name",
-      name: "Host name",
+      name: "Host FQDN",
       pfComponent: (
         <>
           <InputWithValidation
@@ -96,11 +94,19 @@ const AddHost = (props: PropsToAddHost) => {
             value={hostName}
             onChange={setHostName}
             isRequired
+            placeholder="e.g. host.example.com"
             rules={[
               {
-                id: "valid-chars",
-                message: "Allowed characters are a-z, A-Z, 0-9, and -",
+                id: "valid-fqdn",
+                message:
+                  "Must be a fully qualified domain name with at least two labels separated by a dot",
                 validate: (value: string) => validHostNameRegex.test(value),
+              },
+              {
+                id: "valid-chars",
+                message:
+                  "Allowed characters: a-z, A-Z, 0-9, hyphen (-), and dot (.) as label separator",
+                validate: (value: string) => /^[a-zA-Z0-9.-]+$/.test(value),
               },
             ]}
           />
@@ -244,10 +250,6 @@ const AddHost = (props: PropsToAddHost) => {
   // Define status flags to determine user added successfully or error
   let isAdditionSuccess = true;
 
-  // Track which button has been clicked ('onAddUser' or 'onAddAndAddAnother')
-  // to better handle the 'retry' function and its behavior
-  let onAddHostClicked = true;
-
   // Add host data
   const addHostData = async () => {
     const newHostPayload = {
@@ -300,32 +302,11 @@ const AddHost = (props: PropsToAddHost) => {
           }
         }
         setAddBtnSpinning(false);
-        setAddAgainBtnSpinning(false);
       }
     });
   };
 
-  const addAndAddAnotherHandler = () => {
-    onAddHostClicked = false;
-    const validation = validateFields();
-    if (validation) {
-      setAddAgainBtnSpinning(true);
-      addHostData().then(() => {
-        if (isAdditionSuccess) {
-          // Do not close the modal, but clean fields
-          cleanAllFields();
-        } else {
-          // Close the modal without cleaning fields
-          if (props.onCloseAddModal !== undefined) {
-            props.onCloseAddModal();
-          }
-        }
-      });
-    }
-  };
-
   const addHostHandler = () => {
-    onAddHostClicked = true;
     const validation = validateFields();
     if (validation) {
       setAddBtnSpinning(true);
@@ -371,12 +352,7 @@ const AddHost = (props: PropsToAddHost) => {
     // Close the error modal
     closeAndCleanErrorParameters();
 
-    // Repeats the same previous operation
-    if (onAddHostClicked) {
-      addHostHandler();
-    } else {
-      addAndAddAnotherHandler();
-    }
+    addHostHandler();
   };
 
   const errorModalActions = [
@@ -412,7 +388,7 @@ const AddHost = (props: PropsToAddHost) => {
     <Button
       data-cy="modal-button-add"
       key="add-new-host"
-      isDisabled={buttonDisabled || addAgainSpinning || addSpinning}
+      isDisabled={buttonDisabled || addSpinning}
       type="submit"
       form="hosts-add-host-modal"
       spinnerAriaValueText="Adding"
@@ -421,17 +397,6 @@ const AddHost = (props: PropsToAddHost) => {
     >
       {addSpinning ? "Adding" : "Add"}
     </Button>,
-    <SecondaryButton
-      dataCy="modal-button-add-and-add-another"
-      key="add-and-add-another-host"
-      isDisabled={buttonDisabled || addAgainSpinning || addSpinning}
-      onClickHandler={addAndAddAnotherHandler}
-      spinnerAriaValueText="Adding again"
-      spinnerAriaLabel="Adding again"
-      isLoading={addAgainSpinning}
-    >
-      {addAgainSpinning ? "Adding" : "Add and add another"}
-    </SecondaryButton>,
     <Button
       data-cy="modal-button-cancel"
       key="cancel-new-host"

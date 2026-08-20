@@ -1,6 +1,7 @@
 import React from "react";
 // PatternFly
 import {
+  Button,
   Flex,
   FlexItem,
   Form,
@@ -13,6 +14,8 @@ import {
 import { SubId, Metadata } from "src/utils/datatypes/globalDataTypes";
 // Hooks
 import useUpdateRoute from "src/hooks/useUpdateRoute";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 import { addAlert } from "src/store/Global/alerts-slice";
 // Redux
 import { useAppDispatch } from "src/store/hooks";
@@ -25,8 +28,8 @@ import { SubidModPayload, useSubidModMutation } from "src/services/rpcSubIds";
 // Components
 import IpaTextInput from "src/components/Form/IpaTextInput";
 import TabLayout from "src/components/layouts/TabLayout";
-import SecondaryButton from "src/components/layouts/SecondaryButton";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import IpaTextContent from "src/components/Form/IpaTextContent";
 
 interface PropsToSubidSettings {
@@ -43,6 +46,9 @@ interface PropsToSubidSettings {
 
 const SubidSettings = (props: PropsToSubidSettings) => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("subordinate-ids-settings");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
   useUpdateRoute({ pathname: "subordinate-ids" });
@@ -73,7 +79,8 @@ const SubidSettings = (props: PropsToSubidSettings) => {
   };
 
   // on Save handler method
-  const onSave = () => {
+  const onSave = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setIsDataLoading(true);
     const modifiedValues = props.modifiedValues();
 
@@ -117,36 +124,40 @@ const SubidSettings = (props: PropsToSubidSettings) => {
     {
       key: 0,
       element: (
-        <SecondaryButton
-          dataCy="subids-tab-settings-button-refresh"
-          onClickHandler={props.onRefresh}
+        <Button
+          variant="secondary"
+          data-cy="subids-tab-settings-button-refresh"
+          onClick={props.onRefresh}
         >
           Refresh
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 1,
       element: (
-        <SecondaryButton
-          dataCy="subids-tab-settings-button-revert"
+        <Button
+          variant="secondary"
+          data-cy="subids-tab-settings-button-revert"
           isDisabled={!props.isModified || isDataLoading}
-          onClickHandler={onRevert}
+          onClick={onRevert}
         >
           Revert
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 2,
       element: (
-        <SecondaryButton
-          dataCy="subids-tab-settings-button-save"
+        <Button
+          variant="primary"
+          data-cy="subids-tab-settings-button-save"
           isDisabled={!props.isModified || isDataLoading}
-          onClickHandler={onSave}
+          type="submit"
+          form="subids-settings-form"
         >
           Save
-        </SecondaryButton>
+        </Button>
       ),
     },
   ];
@@ -161,12 +172,17 @@ const SubidSettings = (props: PropsToSubidSettings) => {
               icon={
                 <OutlinedQuestionCircleIcon className="pf-v6-u-primary-color-100 pf-v6-u-mr-sm" />
               }
+              onClick={() => dispatch(toggleHelpPanel())}
             />
           </SidebarPanel>
           <SidebarContent className="pf-v6-u-mr-xl">
             <Flex direction={{ default: "column", lg: "row" }}>
               <FlexItem flex={{ default: "flex_1" }}>
-                <Form className="pf-v6-u-mb-lg">
+                <Form
+                  className="pf-v6-u-mb-lg"
+                  id="subids-settings-form"
+                  onSubmit={onSave}
+                >
                   <FormGroup label="Unique ID" fieldId="ipauniqueid">
                     <IpaTextInput
                       dataCy="subids-tab-settings-textbox-unique-id"

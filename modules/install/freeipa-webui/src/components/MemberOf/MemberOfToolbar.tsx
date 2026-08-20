@@ -4,7 +4,6 @@ import {
   Button,
   Form,
   FormGroup,
-  Pagination,
   ToggleGroup,
   ToggleGroupItem,
   Toolbar,
@@ -15,14 +14,14 @@ import {
 // Components
 import SearchInputLayout from "../layouts/SearchInputLayout";
 import HelpTextWithIconLayout from "../layouts/HelpTextWithIconLayout";
+import PaginationLayout from "../layouts/PaginationLayout";
 
 export type MembershipDirection = "direct" | "indirect";
 
 interface MemberOfToolbarProps {
   // search
-  searchText: string;
-  onSearchTextChange: (value: string) => void;
-  onSearch: () => void;
+  searchPlaceholder: string;
+  searchAriaLabel: string;
 
   // buttons
   refreshButtonEnabled: boolean;
@@ -40,12 +39,8 @@ interface MemberOfToolbarProps {
   helpIconEnabled?: boolean;
   onHelpIconClick?: () => void;
 
-  // paging
+  // paging — page/perPage come from URL via PaginationLayout
   totalItems: number;
-  perPage: number;
-  page: number;
-  onPageChange?: (page: number) => void;
-  onPerPageChange?: (pageSize: number) => void;
 }
 
 const MemberOfToolbar = (props: MemberOfToolbarProps) => {
@@ -65,13 +60,8 @@ const MemberOfToolbar = (props: MemberOfToolbarProps) => {
           <SearchInputLayout
             dataCy="search"
             name="search"
-            ariaLabel="Search user"
-            placeholder="Search"
-            searchValueData={{
-              searchValue: props.searchText,
-              updateSearchValue: props.onSearchTextChange,
-              submitSearchValue: props.onSearch,
-            }}
+            ariaLabel={props.searchAriaLabel}
+            placeholder={props.searchPlaceholder}
           />
         </ToolbarItem>
         <ToolbarItem
@@ -164,23 +154,19 @@ const MemberOfToolbar = (props: MemberOfToolbarProps) => {
         <ToolbarItem id="help-icon">
           <>
             {props.helpIconEnabled && (
-              <HelpTextWithIconLayout textContent="Help" />
+              <HelpTextWithIconLayout
+                textContent="Help"
+                onClick={props.onHelpIconClick}
+              />
             )}
           </>
         </ToolbarItem>
         {props.totalItems > 0 && (
           <ToolbarItem id="pagination" align={{ default: "alignEnd" }}>
-            <Pagination
-              itemCount={props.totalItems}
-              perPage={props.perPage}
-              page={props.page}
-              onSetPage={(_e, page) =>
-                props.onPageChange ? props.onPageChange(page) : null
-              }
+            <PaginationLayout
+              list={[]}
+              totalCount={props.totalItems}
               widgetId="pagination-options-menu-top"
-              onPerPageSelect={(_e, perPage) =>
-                props.onPerPageChange ? props.onPerPageChange(perPage) : null
-              }
               isCompact
             />
           </ToolbarItem>

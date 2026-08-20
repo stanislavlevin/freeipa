@@ -23,10 +23,12 @@ import SearchInputLayout from "src/components/layouts/SearchInputLayout";
 import PaginationLayout from "src/components/layouts/PaginationLayout";
 // Errors
 import GlobalErrors from "src/components/errors/GlobalErrors";
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
 // Utils
 import { isUserOverrideSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 import IDViewsOverrideUsersTable from "src/pages/IDViews/IDViewsOverrideUsersTable";
 // Modals
 import AddIdOverrideUserModal from "src/components/modals/IdOverrideModals/AddIdOverrideUser";
@@ -37,7 +39,6 @@ import { IDViewOverrideUser } from "src/utils/datatypes/globalDataTypes";
 import {
   IDOverridePayload,
   useGettingIDOverrideUsersQuery,
-  useSearchOverrideEntriesMutation,
 } from "src/services/rpcIdOverrides";
 
 interface PropsToOverrides {
@@ -51,12 +52,10 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
 
   const globalErrors = useApiError([]);
 
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
   const [totalCount, setTotalCount] = useState<number>(0);
   const [usersList, setUsersList] = useState<IDViewOverrideUser[]>([]);
   const [selectedUsers, setSelectedUsersList] = useState<string[]>([]);
-  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
 
   const clearSelectedUsers = () => {
     const emptyList: string[] = [];
@@ -67,10 +66,6 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
     selectedUsers,
     clearSelectedUsers,
   };
-
-  // Page indexes
-  const firstIdx = (page - 1) * perPage;
-  const lastIdx = page * perPage;
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -87,17 +82,11 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
     setIsDeletion(value);
   };
 
-  // Elements selected (per page)
-  //  - This will help to calculate the remaining elements on a specific page (bulk selector)
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    usersList,
+    selectedUsers,
+    (user) => ipaPrimaryKey(user.ipaanchoruuid)
+  );
 
   const selectableTable = usersList.filter(isUserOverrideSelectable);
 
@@ -115,98 +104,28 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
     updateIsDeletion,
   };
 
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
+  // Page indexes
+  const firstIdx = (page - 1) * perPage;
+  const lastIdx = page * perPage;
 
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-
-  const updateShownUsersList = (newShownUsersList: IDViewOverrideUser[]) => {
-    setUsersList(newShownUsersList);
-  };
-
-  // Update search input valie
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
-  const [retrieveEntries] = useSearchOverrideEntriesMutation({});
-
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setTotalCount(0);
-    setSearchIsDisabled(true);
-    retrieveEntries({
-      idView: props.idview,
-      searchValue: searchValue,
-      sizeLimit: 0,
-      startIdx: firstIdx,
-      stopIdx: lastIdx,
-      entryType: "idoverrideuser",
-    } as IDOverridePayload).then((result) => {
-      // Manage new response here
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for override users",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const usersListResult = result.data?.result.results || [];
-          const usersListSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const userList: IDViewOverrideUser[] = [];
-
-          for (let i = 0; i < usersListSize; i++) {
-            userList.push(usersListResult[i].result);
-          }
-          setUsersList(userList);
-          setTotalCount(totalCount);
-          // Show table elements
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
-  // SearchInputLayout
-  const searchValueData = {
+  const dataResponse = useGettingIDOverrideUsersQuery({
+    idView: props.idview,
     searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
-  const dataResponse = useGettingIDOverrideUsersQuery(props.idview);
+    sizeLimit: 0,
+    startIdx: firstIdx,
+    stopIdx: lastIdx,
+    entryType: "idoverrideuser",
+  } as IDOverridePayload);
 
   const {
     data: batchResponse,
-    isLoading: isBatchLoading,
+    isFetching: isBatchFetching,
     error: batchError,
   } = dataResponse;
 
   // Handle data when the API call is finished
   useEffect(() => {
     if (dataResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected on refresh
       setTotalCount(0);
       globalErrors.clear();
@@ -219,9 +138,16 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
       dataResponse.data &&
       batchResponse !== undefined
     ) {
-      setUsersList(batchResponse);
-      setTotalCount(batchResponse.length);
-      setShowTableRows(true);
+      const usersListResult = batchResponse.result.results || [];
+      const usersListSize = batchResponse.result.count || 0;
+      const total = batchResponse.result.totalCount || 0;
+      const userList: IDViewOverrideUser[] = [];
+
+      for (let i = 0; i < usersListSize; i++) {
+        userList.push(usersListResult[i].result);
+      }
+      setUsersList(userList);
+      setTotalCount(total);
     }
     // API response: Error
     if (
@@ -245,21 +171,6 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
   };
 
   // Show table rows
-  const [showTableRows, setShowTableRows] = useState(!isBatchLoading);
-
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  useEffect(() => {
-    dataResponse.refetch();
-  }, [page, perPage]);
-
-  // Show table rows only when data is fully retrieved
-  useEffect(() => {
-    if (showTableRows !== !isBatchLoading) {
-      setShowTableRows(!isBatchLoading);
-    }
-  }, [isBatchLoading]);
-
   // Modals functionality
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -279,17 +190,6 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
     setShowDeleteModal(!showDeleteModal);
   };
 
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownUsersList,
-    totalCount,
-  };
-
   // - 'Delete modal'
   const deleteUsersButtonsData = {
     updateIsDeleteButtonDisabled,
@@ -305,9 +205,7 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
           dataCy="search"
           name="search"
           ariaLabel="Search users"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          placeholder="Search users"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -333,7 +231,7 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
       element: (
         <SecondaryButton
           dataCy="id-views-tab-override-users-button-delete"
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isBatchFetching}
           onClickHandler={onDeleteHandler}
         >
           Delete
@@ -346,7 +244,7 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
         <SecondaryButton
           dataCy="id-views-tab-override-users-button-add"
           onClickHandler={onAddClickHandler}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
         >
           Add
         </SecondaryButton>
@@ -357,7 +255,7 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
       element: (
         <PaginationLayout
           list={props.users}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -383,7 +281,7 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
               <IDViewsOverrideUsersTable
                 elementsList={usersList}
                 shownElementsList={usersList}
-                showTableRows={showTableRows}
+                showTableRows={!isBatchFetching}
                 overrideEntryData={usersTableData}
                 buttonsData={viewsTableButtonsData}
                 paginationData={selectedPerPageData}
@@ -394,7 +292,7 @@ const IDViewsOverrideUsers = (props: PropsToOverrides) => {
       </div>
       <PaginationLayout
         list={usersList}
-        paginationData={paginationData}
+        totalCount={totalCount}
         variant={PaginationVariant.bottom}
         widgetId="pagination-options-menu-bottom"
         className="pf-v6-u-pb-0 pf-v6-u-pr-md"

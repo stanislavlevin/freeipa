@@ -29,7 +29,6 @@ import ConfirmationModal from "src/components/modals/ConfirmationModal";
 // Layouts
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
 import TitleLayout from "src/components/layouts/TitleLayout";
-import SecondaryButton from "src/components/layouts/SecondaryButton";
 import KebabLayout from "src/components/layouts/KebabLayout";
 import ModalWithFormLayout from "src/components/layouts/ModalWithFormLayout";
 import TabLayout from "src/components/layouts/TabLayout";
@@ -77,7 +76,7 @@ const HostsSettings = (props: PropsToHostsSettings) => {
 
   // Update page to show correct links info in Contextual panel
   React.useEffect(() => {
-    props.changeFromPage("active-users-settings");
+    props.changeFromPage("hosts-settings");
   }, [props.changeFromPage]);
 
   // Kebab
@@ -110,7 +109,8 @@ const HostsSettings = (props: PropsToHostsSettings) => {
       data-cy="modal-button-unprovision"
       key="unprov-host"
       variant="danger"
-      onClick={() => onUnprovisionHost(props.host.fqdn ? props.host.fqdn : "")}
+      type="submit"
+      form="unprovision-host-form"
       isDisabled={modalSpinning}
       isLoading={modalSpinning}
       spinnerAriaValueText="Unprovisioning"
@@ -230,7 +230,7 @@ const HostsSettings = (props: PropsToHostsSettings) => {
       data-cy="modal-button-ok"
       key="rebuild-auto-membership"
       variant="primary"
-      onClick={onRebuildAutoMembership}
+      type="submit"
       form="rebuild-auto-membership-modal"
     >
       OK
@@ -360,40 +360,42 @@ const HostsSettings = (props: PropsToHostsSettings) => {
     {
       key: 0,
       element: (
-        <SecondaryButton
-          dataCy="hosts-tab-settings-button-refresh"
-          onClickHandler={props.onRefresh}
+        <Button
+          data-cy="hosts-tab-settings-button-refresh"
+          variant="secondary"
+          onClick={props.onRefresh}
         >
           Refresh
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 1,
       element: (
-        <SecondaryButton
-          dataCy="hosts-tab-settings-button-revert"
+        <Button
+          data-cy="hosts-tab-settings-button-revert"
+          variant="secondary"
           isDisabled={!props.isModified}
-          onClickHandler={onRevert}
+          onClick={onRevert}
         >
           Revert
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 2,
       element: (
-        <SecondaryButton
-          dataCy="hosts-tab-settings-button-save"
+        <Button
+          data-cy="hosts-tab-settings-button-save"
+          variant="primary"
           isDisabled={!props.isModified || isSaving}
-          onClickHandler={onSave}
+          onClick={onSave}
           isLoading={isSaving}
           spinnerAriaValueText="Saving"
-          spinnerAriaLabelledBy="Saving"
           spinnerAriaLabel="Saving"
         >
           {isSaving ? "Saving" : "Save"}
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
@@ -425,7 +427,6 @@ const HostsSettings = (props: PropsToHostsSettings) => {
             isVertical
             label="Jump to section"
             scrollableSelector="#settings-page"
-            offset={220} // for masthead
             expandable={{ default: "expandable", md: "nonExpandable" }}
           >
             <JumpLinksItem key={0} href="#host-settings">
@@ -514,6 +515,7 @@ const HostsSettings = (props: PropsToHostsSettings) => {
           fields={confirmationQuestion}
           show={isMembershipModalOpen}
           onClose={() => setIsMembershipModalOpen(!isMembershipModalOpen)}
+          onSubmit={onRebuildAutoMembership}
           actions={membershipModalActions}
         />
       )}
@@ -541,6 +543,10 @@ const HostsSettings = (props: PropsToHostsSettings) => {
         actions={unprovisionHostModalActions}
         messageText={"Unprovision/disable this host?"}
         messageObj={props.host.fqdn ? props.host.fqdn : ""}
+        formId="unprovision-host-form"
+        onSubmit={() =>
+          onUnprovisionHost(props.host.fqdn ? props.host.fqdn : "")
+        }
       />
     </TabLayout>
   );

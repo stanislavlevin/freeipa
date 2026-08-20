@@ -18,9 +18,9 @@ import { ToolbarItem } from "src/components/layouts/ToolbarLayout";
 // Redux
 import { useAppSelector, useAppDispatch } from "src/store/hooks";
 // Hooks
-import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Layouts
 import TitleLayout from "src/components/layouts/TitleLayout";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
@@ -32,37 +32,34 @@ import UsersTable from "../../components/tables/UsersTable";
 // Components
 import PaginationLayout from "src/components/layouts/PaginationLayout";
 import BulkSelectorPrep from "src/components/BulkSelectorPrep";
-import ContextualHelpPanel from "src/components/ContextualHelpPanel/ContextualHelpPanel";
+
 // Modals
 import DeleteUsers from "src/components/modals/UserModals/DeleteUsers";
 import AddUser from "src/components/modals/UserModals/AddUser";
 import ActivateStageUsers from "src/components/modals/UserModals/ActivateStageUsers";
 // Utils
 import { API_VERSION_BACKUP, isUserSelectable } from "src/utils/utils";
-// Errors
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // RPC client
-import { GenericPayload, useSearchEntriesMutation } from "../../services/rpc";
+import { GenericPayload } from "../../services/rpc";
 import { useGettingStageUserQuery } from "../../services/rpcUsers";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 import GlobalErrors from "src/components/errors/GlobalErrors";
 import ModalErrors from "src/components/errors/ModalErrors";
 
 const StageUsers = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("stage-users");
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({ pathname: "stage-users" });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
+  useUpdateRoute({ pathname: "stage-users" });
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -78,7 +75,6 @@ const StageUsers = () => {
 
   // Main states - what user can define / what we could use in page URL
   const [totalCount, setUsersTotalCount] = useState<number>(0);
-  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
 
   // Page indexes
   const firstUserIdx = (page - 1) * perPage;
@@ -95,14 +91,13 @@ const StageUsers = () => {
 
   const {
     data: batchResponse,
-    isLoading: isBatchLoading,
+    isFetching: isBatchFetching,
     error: batchError,
   } = userDataResponse;
 
   // Handle data when the API call is finished
   useEffect(() => {
     if (userDataResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected users on refresh
       setUsersTotalCount(0);
       globalErrors.clear();
@@ -127,8 +122,6 @@ const StageUsers = () => {
       setUsersTotalCount(totalCount);
       // Update the list of users
       setStageUsersList(usersList);
-      // Show table elements
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -145,21 +138,12 @@ const StageUsers = () => {
 
   // Refresh button handling
   const refreshUsersData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected users on refresh
     setUsersTotalCount(0);
     clearSelectedUsers();
 
     userDataResponse.refetch();
   };
-
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    userDataResponse.refetch();
-  }, []);
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -175,102 +159,6 @@ const StageUsers = () => {
   const updateIsDeletion = (value: boolean) => {
     setIsDeletion(value);
   };
-
-  // Elements selected (per page)
-  //  - This will help to calculate the remaining elements on a specific page (bulk selector)
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-
-  // Users displayed on the first page
-  const updateShownUsersList = (newShownUsersList: User[]) => {
-    setStageUsersList(newShownUsersList);
-  };
-
-  // Filter (Input search)
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
-  // Issue search with filter
-  const [retrieveUser] = useSearchEntriesMutation({});
-
-  // Issue a search using a specific search value
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setUsersTotalCount(0);
-    setSearchIsDisabled(true);
-
-    retrieveUser({
-      searchValue: searchValue,
-      sizeLimit: 0,
-      apiVersion: apiVersion || API_VERSION_BACKUP,
-      startIdx: firstUserIdx,
-      stopIdx: lastUserIdx,
-      entryType: "stage",
-    } as GenericPayload).then((result) => {
-      // Manage new response here
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for stage users",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const usersListResult = result.data?.result.results || [];
-          const usersListSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const usersList: User[] = [];
-
-          for (let i = 0; i < usersListSize; i++) {
-            usersList.push(usersListResult[i].result);
-          }
-
-          setStageUsersList(usersList);
-          setUsersTotalCount(totalCount);
-          // Show table elements
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
-  // Show table rows
-  const [showTableRows, setShowTableRows] = useState(!isBatchLoading);
-
-  // Show table rows only when data is fully retrieved
-  useEffect(() => {
-    if (showTableRows !== !isBatchLoading) {
-      setShowTableRows(!isBatchLoading);
-    }
-  }, [isBatchLoading]);
 
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
 
@@ -353,17 +241,6 @@ const StageUsers = () => {
   const selectableUsersTable = stageUsersList.filter(isUserSelectable); // elements per Table
 
   // Data wrappers
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownUsersList,
-    totalCount,
-  };
-
   // - 'BulkSelectorPrep'
   const usersBulkSelectorData = {
     selected: selectedUsers,
@@ -376,10 +253,11 @@ const StageUsers = () => {
     updateIsDeleteButtonDisabled,
   };
 
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    stageUsersList,
+    selectedUsers.map((item) => ipaPrimaryKey(item.uid)),
+    (item) => ipaPrimaryKey(item.uid)
+  );
 
   // 'DeleteUsers'
   const deleteUsersButtonsData = {
@@ -407,25 +285,6 @@ const StageUsers = () => {
     updateIsDeletion,
   };
 
-  // 'SearchInputLayout'
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
-  // Contextual links panel
-  const [isContextualPanelExpanded, setIsContextualPanelExpanded] =
-    React.useState(false);
-
-  const onOpenContextualPanel = () => {
-    setIsContextualPanelExpanded(!isContextualPanelExpanded);
-  };
-
-  const onCloseContextualPanel = () => {
-    setIsContextualPanelExpanded(false);
-  };
-
   // List of Toolbar items
   const toolbarItems: ToolbarItem[] = [
     {
@@ -446,10 +305,8 @@ const StageUsers = () => {
         <SearchInputLayout
           dataCy="search"
           name="search"
-          ariaLabel="Search user"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          ariaLabel="Search stage users"
+          placeholder="Search stage users"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -464,7 +321,7 @@ const StageUsers = () => {
       element: (
         <SecondaryButton
           onClickHandler={refreshUsersData}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           dataCy="stage-users-button-refresh"
         >
           Refresh
@@ -475,7 +332,7 @@ const StageUsers = () => {
       key: 4,
       element: (
         <SecondaryButton
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isBatchFetching}
           onClickHandler={onDeleteHandler}
           dataCy="stage-users-button-delete"
         >
@@ -488,7 +345,7 @@ const StageUsers = () => {
       element: (
         <SecondaryButton
           onClickHandler={onAddClickHandler}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           dataCy="stage-users-button-add"
         >
           Add
@@ -499,7 +356,7 @@ const StageUsers = () => {
       key: 6,
       element: (
         <SecondaryButton
-          isDisabled={!showTableRows || selectedUsers.length === 0}
+          isDisabled={isBatchFetching || selectedUsers.length === 0}
           onClickHandler={onActivateHandler}
           dataCy="stage-users-button-activate"
         >
@@ -516,7 +373,7 @@ const StageUsers = () => {
       element: (
         <HelpTextWithIconLayout
           textContent="Help"
-          onClick={onOpenContextualPanel}
+          onClick={() => dispatch(toggleHelpPanel())}
         />
       ),
     },
@@ -525,7 +382,7 @@ const StageUsers = () => {
       element: (
         <PaginationLayout
           list={stageUsersList}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -536,11 +393,7 @@ const StageUsers = () => {
 
   // Render 'Stage users'
   return (
-    <ContextualHelpPanel
-      fromPage="stage-users"
-      isExpanded={isContextualPanelExpanded}
-      onClose={onCloseContextualPanel}
-    >
+    <>
       <div>
         <PageSection hasBodyWrapper={false}>
           <TitleLayout
@@ -565,7 +418,7 @@ const StageUsers = () => {
                     <UsersTable
                       shownElementsList={stageUsersList}
                       from="stage-users"
-                      showTableRows={showTableRows}
+                      showTableRows={!isBatchFetching}
                       usersData={usersTableData}
                       buttonsData={usersTableButtonsData}
                       paginationData={selectedPerPageData}
@@ -580,7 +433,7 @@ const StageUsers = () => {
             >
               <PaginationLayout
                 list={stageUsersList}
-                paginationData={paginationData}
+                totalCount={totalCount}
                 variant={PaginationVariant.bottom}
                 widgetId="pagination-options-menu-bottom"
               />
@@ -594,7 +447,6 @@ const StageUsers = () => {
         <AddUser
           show={showAddModal}
           from="stage-users"
-          setShowTableRows={setShowTableRows}
           handleModalToggle={onAddModalToggle}
           onOpenAddModal={onAddClickHandler}
           onCloseAddModal={onCloseAddModal}
@@ -615,7 +467,7 @@ const StageUsers = () => {
           onSuccess={refreshUsersData}
         />
       </div>
-    </ContextualHelpPanel>
+    </>
   );
 };
 

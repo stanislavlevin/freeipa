@@ -14,31 +14,32 @@ import {
 // Data types
 import { CertificateMapping } from "src/utils/datatypes/globalDataTypes";
 // Hooks
-import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Redux
 import { useAppDispatch, useAppSelector } from "src/store/hooks";
 // RPC
-import {
-  useGetCertMapRuleEntriesQuery,
-  useSearchCertMapRuleEntriesMutation,
-} from "src/services/rpcCertMapping";
+import { useGetCertMapRuleEntriesQuery } from "src/services/rpcCertMapping";
 // Utils
 import { isCertMapSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 import { apiToCertificateMapping } from "src/utils/certMappingUtils";
 // React router
 import { useNavigate } from "react-router";
 // Components
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
 import ToolbarLayout, {
   ToolbarItem,
 } from "src/components/layouts/ToolbarLayout";
 import SearchInputLayout from "src/components/layouts/SearchInputLayout";
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import PaginationLayout from "src/components/layouts/PaginationLayout";
 import TitleLayout from "src/components/layouts/TitleLayout";
 import GlobalErrors from "src/components/errors/GlobalErrors";
@@ -50,17 +51,16 @@ import EnableDisableMultipleRulesModal from "src/components/modals/CertificateMa
 
 const CertificateMappingPage = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("certificate-mapping");
+
+  // Contextual help panel
+
   const navigate = useNavigate();
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({
+  useUpdateRoute({
     pathname: "cert-id-mapping-rules",
   });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -68,8 +68,7 @@ const CertificateMappingPage = () => {
   ) as string;
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   // Handle API calls errors
   const globalErrors = useApiError([]);
@@ -82,7 +81,6 @@ const CertificateMappingPage = () => {
   const [certMapRules, setCertMapRules] = React.useState<CertificateMapping[]>(
     []
   );
-  const [isSearchDisabled, setIsSearchDisabled] = React.useState(false);
   const [totalCount, setTotalCount] = React.useState(0);
 
   // API calls
@@ -94,12 +92,11 @@ const CertificateMappingPage = () => {
     stopIdx: lastUserIdx,
   });
 
-  const { data, isLoading, error } = certMapsResponse;
+  const { data, isFetching, error } = certMapsResponse;
 
   // Handle data when the API call is finished
   React.useEffect(() => {
     if (certMapsResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected elements on refresh
       setTotalCount(0);
       globalErrors.clear();
@@ -123,8 +120,6 @@ const CertificateMappingPage = () => {
       setTotalCount(certMapsResponse.data.result.totalCount);
       // Update the list of elements
       setCertMapRules(elementsList);
-      // Show table elements
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -144,19 +139,13 @@ const CertificateMappingPage = () => {
   const [selectedElements, setSelectedElements] = React.useState<
     CertificateMapping[]
   >([]);
-  const [selectedPerPage, setSelectedPerPage] = React.useState<number>(0);
 
   // Refresh button handling
   const refreshData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected elements on refresh
     setTotalCount(0);
 
-    certMapsResponse.refetch().then(() => {
-      setShowTableRows(true);
-    });
+    certMapsResponse.refetch();
   };
 
   // 'Delete' button state
@@ -227,104 +216,21 @@ const CertificateMappingPage = () => {
     }
   };
 
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    certMapsResponse.refetch();
-  }, []);
+  const selectedPerPageData = getSelectedPerPageData(
+    certMapRules,
+    selectedElements.map((item) => ipaPrimaryKey(item.cn)),
+    (item) => ipaPrimaryKey(item.cn)
+  );
 
   // Show table rows
-  const [showTableRows, setShowTableRows] = React.useState(!isLoading);
-
-  // Show table rows only when data is fully retrieved
-  React.useEffect(() => {
-    if (showTableRows !== !isLoading) {
-      setShowTableRows(!isLoading);
-    }
-  }, [isLoading]);
-
-  // Search API call
-  const [searchEntry] = useSearchCertMapRuleEntriesMutation();
-
-  const submitSearchValue = () => {
-    searchEntry({
-      searchValue: searchValue,
-      apiVersion,
-      sizelimit: 100,
-      startIdx: 0,
-      stopIdx: 200, // Search will consider a max. of elements
-    }).then((result) => {
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for IdPs",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const listResult = result.data?.result.results || [];
-          const listSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const elementsList: CertificateMapping[] = [];
-
-          for (let i = 0; i < listSize; i++) {
-            elementsList.push(listResult[i].result);
-          }
-
-          setTotalCount(totalCount);
-          setCertMapRules(elementsList);
-          setShowTableRows(true);
-        }
-        setIsSearchDisabled(false);
-      }
-    });
-  };
-
   // Data wrappers
   // TODO: Better separation of concerts
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage: setPage,
-    updatePerPage: setPerPage,
-    updateSelectedPerPage: setSelectedPerPage,
-    updateShownElementsList: setCertMapRules,
-    totalCount,
-  };
-
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue: setSearchValue,
-    submitSearchValue,
-  };
-
   // - 'BulkSelectorrep'
   const bulkSelectorData = {
     selected: selectedElements,
     updateSelected: updateSelectedCertMapRules,
     selectableTable: selectableCertMapRulesTable,
     nameAttr: "cn",
-  };
-
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage: setSelectedPerPage,
   };
 
   // Modals functionality
@@ -370,9 +276,7 @@ const CertificateMappingPage = () => {
           dataCy="search"
           name="search"
           ariaLabel="Search certificate mapping rules"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={isSearchDisabled}
+          placeholder="Search certificate mapping rules"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -388,7 +292,7 @@ const CertificateMappingPage = () => {
         <SecondaryButton
           dataCy="certificate-mapping-button-refresh"
           onClickHandler={refreshData}
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
         >
           Refresh
         </SecondaryButton>
@@ -399,7 +303,7 @@ const CertificateMappingPage = () => {
       element: (
         <SecondaryButton
           dataCy="certificate-mapping-button-delete"
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isFetching}
           onClickHandler={() => setShowDeleteModal(true)}
         >
           Delete
@@ -411,7 +315,7 @@ const CertificateMappingPage = () => {
       element: (
         <SecondaryButton
           dataCy="certificate-mapping-button-add"
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
           onClickHandler={() => setShowAddModal(true)}
         >
           Add
@@ -423,7 +327,7 @@ const CertificateMappingPage = () => {
       element: (
         <SecondaryButton
           dataCy="certificate-mapping-button-disable"
-          isDisabled={isDisableButtonDisabled || !showTableRows}
+          isDisabled={isDisableButtonDisabled || isFetching}
           onClickHandler={onDisableOperation}
         >
           Disable
@@ -435,7 +339,7 @@ const CertificateMappingPage = () => {
       element: (
         <SecondaryButton
           dataCy="certificate-mapping-button-enable"
-          isDisabled={isEnableButtonDisabled || !showTableRows}
+          isDisabled={isEnableButtonDisabled || isFetching}
           onClickHandler={onEnableOperation}
         >
           Enable
@@ -448,14 +352,19 @@ const CertificateMappingPage = () => {
     },
     {
       key: 9,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 10,
       element: (
         <PaginationLayout
           list={certMapRules}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -495,7 +404,7 @@ const CertificateMappingPage = () => {
                     columnNames={["Rule name", "Status", "Description"]}
                     hasCheckboxes={true}
                     pathname="cert-id-mapping-rules"
-                    showTableRows={showTableRows}
+                    showTableRows={!isFetching}
                     showLink={true}
                     elementsData={{
                       isElementSelectable: isCertMapSelectable,
@@ -515,10 +424,7 @@ const CertificateMappingPage = () => {
                         setIsDisableButtonDisabled(value),
                       isDisableEnableOp: true,
                     }}
-                    paginationData={{
-                      selectedPerPage,
-                      updateSelectedPerPage: setSelectedPerPage,
-                    }}
+                    paginationData={selectedPerPageData}
                     statusElementName="ipaenabledflag"
                   />
                 )}
@@ -528,7 +434,7 @@ const CertificateMappingPage = () => {
           <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
             <PaginationLayout
               list={certMapRules}
-              paginationData={paginationData}
+              totalCount={totalCount}
               variant={PaginationVariant.bottom}
               widgetId="pagination-options-menu-bottom"
             />
@@ -560,7 +466,6 @@ const CertificateMappingPage = () => {
           setSelectedElements(value.map((cn) => ({ cn }) as CertificateMapping))
         }
         operation={operation}
-        setShowTableRows={setShowTableRows}
         onRefresh={refreshData}
       />
     </div>

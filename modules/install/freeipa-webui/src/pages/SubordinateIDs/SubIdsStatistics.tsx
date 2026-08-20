@@ -13,13 +13,16 @@ import { Td, Th, Tr } from "@patternfly/react-table";
 import { ToolbarItem } from "src/components/layouts/ToolbarLayout";
 import PageLayout from "src/components/layouts/PageLayout";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import SkeletonOnTableLayout from "src/components/layouts/Skeleton/SkeletonOnTableLayout";
 // Redux
 import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // RPC
 import { useSubidStatsQuery } from "src/services/rpcSubIds";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 
 interface SubidStats {
   assigned_subids: number;
@@ -31,6 +34,9 @@ interface SubidStats {
 
 const SubIdsStatistics = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("subordinate-id-statistics");
+
+  // Contextual help panel
 
   // States
   const [subidStats, setSubidStats] = React.useState<SubidStats>({
@@ -40,16 +46,13 @@ const SubIdsStatistics = () => {
     rangesize: 0,
     remaining_subids: 0,
   });
-  const [showTableRows, setShowTableRows] = React.useState<boolean>(false);
 
   // API call
   const subidStatsResponse = useSubidStatsQuery();
-  const { data, isLoading, error } = subidStatsResponse;
+  const { data, isFetching, error } = subidStatsResponse;
 
   React.useEffect(() => {
-    setShowTableRows(!isLoading);
-
-    if (!isLoading && error) {
+    if (!isFetching && error) {
       dispatch(
         addAlert({
           name: "Error fetching data",
@@ -59,18 +62,15 @@ const SubIdsStatistics = () => {
       );
     }
 
-    if (!isLoading && data) {
+    if (!isFetching && data) {
       const subidStats = data.result.result;
       setSubidStats(subidStats as unknown as SubidStats);
     }
-  }, [data, isLoading]);
+  }, [data, error, isFetching, dispatch]);
 
   // On refresh
   const onRefresh = () => {
-    setShowTableRows(false);
-    subidStatsResponse.refetch().then(() => {
-      setShowTableRows(true);
-    });
+    subidStatsResponse.refetch();
   };
 
   // List of Toolbar items
@@ -82,7 +82,7 @@ const SubIdsStatistics = () => {
           variant="secondary"
           data-cy="subids-statistics-button-refresh"
           onClick={onRefresh}
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
         >
           Refresh
         </Button>
@@ -94,7 +94,12 @@ const SubIdsStatistics = () => {
     },
     {
       key: 2,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
   ];
 
@@ -141,29 +146,31 @@ const SubIdsStatistics = () => {
   );
 
   return (
-    <PageLayout
-      title="Subordinate ID Statistics"
-      pathname="subordinate-id-statistics"
-      hasAlerts={true}
-      toolbarItems={toolbarItems}
-    >
-      <PageSection hasBodyWrapper={false}>
-        <Grid hasGutter>
-          <GridItem span={12}>
-            <TableLayout
-              ariaLabel={"subordinate id statistics table"}
-              variant="compact"
-              hasBorders={true}
-              classes={"pf-v6-u-mt-md"}
-              tableId={"subid-stats-table"}
-              tableHeader={header}
-              tableBody={!showTableRows ? skeleton : body}
-              isStickyHeader={false}
-            />
-          </GridItem>
-        </Grid>
-      </PageSection>
-    </PageLayout>
+    <>
+      <PageLayout
+        title="Subordinate ID Statistics"
+        pathname="subordinate-id-statistics"
+        hasAlerts={true}
+        toolbarItems={toolbarItems}
+      >
+        <PageSection hasBodyWrapper={false}>
+          <Grid hasGutter>
+            <GridItem span={12}>
+              <TableLayout
+                ariaLabel={"subordinate id statistics table"}
+                variant="compact"
+                hasBorders={true}
+                classes={"pf-v6-u-mt-md"}
+                tableId={"subid-stats-table"}
+                tableHeader={header}
+                tableBody={isFetching ? skeleton : body}
+                isStickyHeader={false}
+              />
+            </GridItem>
+          </Grid>
+        </PageSection>
+      </PageLayout>
+    </>
   );
 };
 

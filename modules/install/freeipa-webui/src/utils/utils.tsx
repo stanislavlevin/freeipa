@@ -13,6 +13,8 @@ import {
   IdRange,
   Metadata,
   Netgroup,
+  Privilege,
+  Role,
   Service,
   SudoCmd,
   SudoCmdGroup,
@@ -27,6 +29,10 @@ import {
   DNSRecord,
   DNSForwardZone,
   Trust,
+  TrustDomain,
+  OtpToken,
+  SELinuxUserMap,
+  AutomountLocation,
 } from "./datatypes/globalDataTypes";
 // Errors
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
@@ -204,6 +210,11 @@ export const isAutomemberUserGroupSelectable = (automember: AutomemberEntry) =>
 
 export const isPwPolicySelectable = (pwPolicy: PwPolicy) => pwPolicy.cn !== "";
 
+export const isRoleSelectable = (role: Role) => role.cn !== "";
+
+export const isPrivilegeSelectable = (privilege: Privilege) =>
+  privilege.cn !== "";
+
 export const isIdpServerSelectable = (idpServer: IDPServer) =>
   idpServer.cn !== "";
 
@@ -225,6 +236,18 @@ export const isDnsServerSelectable = (dnsServerId: string) =>
 export const isIdRangeSelectable = (idRange: IdRange) => idRange.cn !== "";
 
 export const isTrustSelectable = (trust: Trust) => trust.cn !== "";
+
+export const isTrustDomainSelectable = (trustDomain: TrustDomain) =>
+  trustDomain.cn !== "";
+
+export const isAutomountLocationSelectable = (location: AutomountLocation) =>
+  location.cn !== "";
+
+export const isOtpTokenSelectable = (otpToken: OtpToken) =>
+  otpToken.ipatokenuniqueid !== "";
+
+export const isSelinuxUserMapSelectable = (map: SELinuxUserMap) =>
+  map.cn !== "";
 
 /**
  * Write JSX error messages into 'apiErrorsJsx' array

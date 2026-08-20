@@ -20,6 +20,7 @@ import { useAppSelector, useAppDispatch } from "src/store/hooks";
 // Layouts
 import TitleLayout from "src/components/layouts/TitleLayout";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import ToolbarLayout from "src/components/layouts/ToolbarLayout";
 import SearchInputLayout from "src/components/layouts/SearchInputLayout";
@@ -33,41 +34,37 @@ import AddSudoRule from "src/components/modals/SudoModals/AddSudoRule";
 import DeleteSudoRule from "src/components/modals/SudoModals/DeleteSudoRule";
 import DisableEnableSudoRules from "src/components/modals/SudoModals/DisableEnableSudoRules";
 // Hooks
-import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Utils
 import { API_VERSION_BACKUP, isSudoRuleSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // RPC client
-import { GenericPayload, useSearchEntriesMutation } from "src/services/rpc";
+import { GenericPayload } from "src/services/rpc";
 import { useGettingSudoRulesQuery } from "src/services/rpcSudoRules";
 // Errors
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 import GlobalErrors from "src/components/errors/GlobalErrors";
 import ModalErrors from "src/components/errors/ModalErrors";
 
 const SudoRules = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("sudo-rules");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({ pathname: "sudo-rules" });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
+  useUpdateRoute({ pathname: "sudo-rules" });
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
     (state) => state.global.environment.api_version
   ) as string;
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
 
   const [rulesList, setRulesList] = useState<SudoRule[]>([]);
 
@@ -76,11 +73,9 @@ const SudoRules = () => {
   const modalErrors = useApiError([]);
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   const [totalCount, setRulesTotalCount] = useState<number>(0);
-  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
 
   // Page indexes
   const firstIdx = (page - 1) * perPage;
@@ -88,7 +83,7 @@ const SudoRules = () => {
 
   // Derived states - what we get from API
   const rulesDataResponse = useGettingSudoRulesQuery({
-    searchValue: "",
+    searchValue: searchValue,
     sizeLimit: 0,
     apiVersion: apiVersion || API_VERSION_BACKUP,
     startIdx: firstIdx,
@@ -97,14 +92,13 @@ const SudoRules = () => {
 
   const {
     data: batchResponse,
-    isLoading: isBatchLoading,
+    isFetching: isBatchFetching,
     error: batchError,
   } = rulesDataResponse;
 
   // Handle data when the API call is finished
   useEffect(() => {
     if (rulesDataResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected users on refresh
       setRulesTotalCount(0);
       globalErrors.clear();
@@ -129,8 +123,6 @@ const SudoRules = () => {
       setRulesTotalCount(totalCount);
       // Update the list
       setRulesList(rulesList);
-      // Show table elements
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -147,17 +139,10 @@ const SudoRules = () => {
 
   // Refresh button handling
   const refreshRulesData = () => {
-    setShowTableRows(false);
     setRulesTotalCount(0);
     clearSelectedRules();
     rulesDataResponse.refetch();
   };
-
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    rulesDataResponse.refetch();
-  }, [page, perPage]);
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -195,106 +180,12 @@ const SudoRules = () => {
     setIsDisableEnableOp(value);
   };
 
-  // Elements selected (per page)
-  //  - This will help to calculate the remaining elements on a specific page (bulk selector)
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-
-  // Rules displayed on the first page
-  const updateShownRulesList = (newShownRulesList: SudoRule[]) => {
-    setRulesList(newShownRulesList);
-  };
-
-  // Update search input valie
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
   const [selectedRules, setSelectedRules] = useState<SudoRule[]>([]);
 
   const clearSelectedRules = () => {
     const emptyList: SudoRule[] = [];
     setSelectedRules(emptyList);
   };
-
-  const [retrieveRules] = useSearchEntriesMutation({});
-
-  // Issue a search using a specific search value
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setSearchIsDisabled(true);
-    setRulesTotalCount(0);
-    retrieveRules({
-      searchValue: searchValue,
-      sizeLimit: 0,
-      apiVersion: apiVersion || API_VERSION_BACKUP,
-      startIdx: firstIdx,
-      stopIdx: lastIdx,
-      entryType: "sudorule",
-    } as GenericPayload).then((result) => {
-      // Manage new response here
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for sudo rules",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const rulesListResult = result.data?.result.results || [];
-          const rulesListSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const rulesList: SudoRule[] = [];
-
-          for (let i = 0; i < rulesListSize; i++) {
-            rulesList.push(rulesListResult[i].result);
-          }
-
-          setRulesTotalCount(totalCount);
-          setRulesList(rulesList);
-          // Show table elements
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
-  // Show table rows
-  const [showTableRows, setShowTableRows] = useState(!isBatchLoading);
-
-  // Show table rows only when data is fully retrieved
-  useEffect(() => {
-    if (showTableRows !== !isBatchLoading) {
-      setShowTableRows(!isBatchLoading);
-    }
-  }, [isBatchLoading]);
 
   // Modals functionality
   const [showAddModal, setShowAddModal] = useState(false);
@@ -383,19 +274,14 @@ const SudoRules = () => {
     }
   };
 
+  const selectedPerPageData = getSelectedPerPageData(
+    rulesList,
+    selectedRules.map((item) => ipaPrimaryKey(item.cn)),
+    (item) => ipaPrimaryKey(item.cn)
+  );
+
   // Data wrappers
   // TODO: Better separation of concerts
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownRulesList,
-    totalCount,
-  };
-
   // - 'BulkSelectorSudoRulesPrep'
   const rulesBulkSelectorData = {
     selected: selectedRules,
@@ -409,11 +295,6 @@ const SudoRules = () => {
     updateIsEnableButtonDisabled,
     updateIsDisableButtonDisabled,
     updateIsDisableEnableOp,
-  };
-
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
   };
 
   // 'DeleteRules'
@@ -453,13 +334,6 @@ const SudoRules = () => {
     updateIsDisableEnableOp,
   };
 
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
   // List of Toolbar items
   const toolbarItems: ToolbarItem[] = [
     {
@@ -480,10 +354,8 @@ const SudoRules = () => {
         <SearchInputLayout
           dataCy="search"
           name="search"
-          ariaLabel="Search rules"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          ariaLabel="Search sudo rules"
+          placeholder="Search sudo rules"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -498,7 +370,7 @@ const SudoRules = () => {
       element: (
         <SecondaryButton
           onClickHandler={refreshRulesData}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           dataCy="sudo-rules-button-refresh"
         >
           Refresh
@@ -509,7 +381,7 @@ const SudoRules = () => {
       key: 4,
       element: (
         <SecondaryButton
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isBatchFetching}
           onClickHandler={onDeleteHandler}
           dataCy="sudo-rules-button-delete"
         >
@@ -522,7 +394,7 @@ const SudoRules = () => {
       element: (
         <SecondaryButton
           onClickHandler={onAddClickHandler}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           dataCy="sudo-rules-button-add"
         >
           Add
@@ -533,7 +405,7 @@ const SudoRules = () => {
       key: 6,
       element: (
         <SecondaryButton
-          isDisabled={isDisableButtonDisabled || !showTableRows}
+          isDisabled={isDisableButtonDisabled || isBatchFetching}
           onClickHandler={() => onEnableDisableHandler(true)}
           dataCy="sudo-rules-button-disable"
         >
@@ -545,7 +417,7 @@ const SudoRules = () => {
       key: 7,
       element: (
         <SecondaryButton
-          isDisabled={isEnableButtonDisabled || !showTableRows}
+          isDisabled={isEnableButtonDisabled || isBatchFetching}
           onClickHandler={() => onEnableDisableHandler(false)}
           dataCy="sudo-rules-button-enable"
         >
@@ -559,14 +431,19 @@ const SudoRules = () => {
     },
     {
       key: 10,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 11,
       element: (
         <PaginationLayout
           list={rulesList}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -576,72 +453,80 @@ const SudoRules = () => {
   ];
 
   return (
-    <div>
-      <PageSection hasBodyWrapper={false}>
-        <TitleLayout id="sudorules title" headingLevel="h1" text="Sudo rules" />
-      </PageSection>
-      <PageSection hasBodyWrapper={false} isFilled={false}>
-        <Flex direction={{ default: "column" }}>
-          <FlexItem>
-            <ToolbarLayout toolbarItems={toolbarItems} />
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto" }}>
-            <OuterScrollContainer>
-              <InnerScrollContainer
-                style={{ height: "60vh", overflow: "auto" }}
-              >
-                {batchError !== undefined && batchError ? (
-                  <GlobalErrors errors={globalErrors.getAll()} />
-                ) : (
-                  <SudoRulesTable
-                    shownElementsList={rulesList}
-                    showTableRows={showTableRows}
-                    rulesData={rulesTableData}
-                    buttonsData={rulesTableButtonsData}
-                    paginationData={selectedPerPageData}
-                    searchValue={searchValue}
-                  />
-                )}
-              </InnerScrollContainer>
-            </OuterScrollContainer>
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
-            <PaginationLayout
-              list={rulesList}
-              paginationData={paginationData}
-              variant={PaginationVariant.bottom}
-              widgetId="pagination-options-menu-bottom"
-            />
-          </FlexItem>
-        </Flex>
-      </PageSection>
-      <AddSudoRule
-        show={showAddModal}
-        handleModalToggle={onAddModalToggle}
-        onOpenAddModal={onAddClickHandler}
-        onCloseAddModal={onCloseAddModal}
-        onRefresh={refreshRulesData}
-      />
-      <DeleteSudoRule
-        show={showDeleteModal}
-        handleModalToggle={onDeleteModalToggle}
-        selectedRulesData={selectedRulesData}
-        buttonsData={deleteRulesButtonsData}
-        onRefresh={refreshRulesData}
-      />
-      <DisableEnableSudoRules
-        show={showEnableDisableModal}
-        handleModalToggle={onEnableDisableModalToggle}
-        optionSelected={enableDisableOptionSelected}
-        selectedRulesData={selectedRulesData}
-        buttonsData={disableEnableButtonsData}
-        onRefresh={refreshRulesData}
-      />
-      <ModalErrors
-        errors={modalErrors.getAll()}
-        dataCy="sudo-rules-modal-error"
-      />
-    </div>
+    <>
+      <div>
+        <PageSection hasBodyWrapper={false}>
+          <TitleLayout
+            id="sudorules title"
+            headingLevel="h1"
+            text="Sudo rules"
+          />
+        </PageSection>
+        <PageSection hasBodyWrapper={false} isFilled={false}>
+          <Flex direction={{ default: "column" }}>
+            <FlexItem>
+              <ToolbarLayout toolbarItems={toolbarItems} />
+            </FlexItem>
+            <FlexItem style={{ flex: "0 0 auto" }}>
+              <OuterScrollContainer>
+                <InnerScrollContainer
+                  style={{ height: "60vh", overflow: "auto" }}
+                >
+                  {batchError !== undefined && batchError ? (
+                    <GlobalErrors errors={globalErrors.getAll()} />
+                  ) : (
+                    <SudoRulesTable
+                      shownElementsList={rulesList}
+                      showTableRows={!isBatchFetching}
+                      rulesData={rulesTableData}
+                      buttonsData={rulesTableButtonsData}
+                      paginationData={selectedPerPageData}
+                      searchValue={searchValue}
+                    />
+                  )}
+                </InnerScrollContainer>
+              </OuterScrollContainer>
+            </FlexItem>
+            <FlexItem
+              style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}
+            >
+              <PaginationLayout
+                list={rulesList}
+                totalCount={totalCount}
+                variant={PaginationVariant.bottom}
+                widgetId="pagination-options-menu-bottom"
+              />
+            </FlexItem>
+          </Flex>
+        </PageSection>
+        <AddSudoRule
+          show={showAddModal}
+          handleModalToggle={onAddModalToggle}
+          onOpenAddModal={onAddClickHandler}
+          onCloseAddModal={onCloseAddModal}
+          onRefresh={refreshRulesData}
+        />
+        <DeleteSudoRule
+          show={showDeleteModal}
+          handleModalToggle={onDeleteModalToggle}
+          selectedRulesData={selectedRulesData}
+          buttonsData={deleteRulesButtonsData}
+          onRefresh={refreshRulesData}
+        />
+        <DisableEnableSudoRules
+          show={showEnableDisableModal}
+          handleModalToggle={onEnableDisableModalToggle}
+          optionSelected={enableDisableOptionSelected}
+          selectedRulesData={selectedRulesData}
+          buttonsData={disableEnableButtonsData}
+          onRefresh={refreshRulesData}
+        />
+        <ModalErrors
+          errors={modalErrors.getAll()}
+          dataCy="sudo-rules-modal-error"
+        />
+      </div>
+    </>
   );
 };
 

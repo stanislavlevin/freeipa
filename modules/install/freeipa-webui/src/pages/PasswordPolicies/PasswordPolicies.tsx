@@ -14,45 +14,44 @@ import {
 // Data types
 import { PwPolicy } from "src/utils/datatypes/globalDataTypes";
 // Hooks
-import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Redux
 import { useAppDispatch, useAppSelector } from "src/store/hooks";
 // Components
-import {
-  useGetPwPoliciesEntriesQuery,
-  useSearchPwdPolicyEntriesMutation,
-} from "src/services/rpcPwdPolicies";
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
+import { useGetPwPoliciesEntriesQuery } from "src/services/rpcPwdPolicies";
 import ToolbarLayout, {
   ToolbarItem,
 } from "src/components/layouts/ToolbarLayout";
 import SearchInputLayout from "src/components/layouts/SearchInputLayout";
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import PaginationLayout from "src/components/layouts/PaginationLayout";
 import TitleLayout from "src/components/layouts/TitleLayout";
 import GlobalErrors from "src/components/errors/GlobalErrors";
 import MainTable from "src/components/tables/MainTable";
 import BulkSelectorPrep from "src/components/BulkSelectorPrep";
 import { isPwPolicySelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // Modals
 import AddModal from "src/components/modals/PwPoliciesModals/AddModal";
 import DeleteModal from "src/components/modals/PwPoliciesModals/DeleteModal";
 
 const PasswordPolicies = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("password-policies");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({ pathname: "password-policies" });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
+  useUpdateRoute({ pathname: "password-policies" });
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -60,8 +59,7 @@ const PasswordPolicies = () => {
   ) as string;
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   // Handle API calls errors
   const globalErrors = useApiError([]);
@@ -72,8 +70,6 @@ const PasswordPolicies = () => {
 
   // States
   const [pwPolicies, setPwPolicies] = React.useState<PwPolicy[]>([]);
-  const [searchIsDisabled, setSearchIsDisabled] =
-    React.useState<boolean>(false);
   const [totalCount, setTotalCount] = React.useState<number>(0);
 
   // API calls
@@ -85,12 +81,11 @@ const PasswordPolicies = () => {
     stopIdx: lastUserIdx,
   });
 
-  const { data, isLoading, error } = pwPoliciesResponse;
+  const { data, isFetching, error } = pwPoliciesResponse;
 
   // Handle data when the API call is finished
   React.useEffect(() => {
     if (pwPoliciesResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected elements on refresh
       setTotalCount(0);
       globalErrors.clear();
@@ -115,8 +110,6 @@ const PasswordPolicies = () => {
       setTotalCount(totalCount);
       // Update the list of elements
       setPwPolicies(elementsList);
-      // Show table elements
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -135,11 +128,6 @@ const PasswordPolicies = () => {
   const [selectedElements, setSelectedElements] = React.useState<PwPolicy[]>(
     []
   );
-  const [selectedPerPage, setSelectedPerPage] = React.useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
 
   const clearSelectedElements = () => {
     const emptyList: PwPolicy[] = [];
@@ -148,15 +136,10 @@ const PasswordPolicies = () => {
 
   // Refresh button handling
   const refreshData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected elements on refresh
     setTotalCount(0);
 
-    pwPoliciesResponse.refetch().then(() => {
-      setShowTableRows(true);
-    });
+    pwPoliciesResponse.refetch();
   };
 
   // 'Delete' button state
@@ -222,114 +205,17 @@ const PasswordPolicies = () => {
     }
   };
 
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    pwPoliciesResponse.refetch();
-  }, []);
+  const selectedPerPageData = getSelectedPerPageData(
+    pwPolicies,
+    selectedElements.map((item) => ipaPrimaryKey(item.cn)),
+    (item) => ipaPrimaryKey(item.cn)
+  );
 
   // Show table rows
-  const [showTableRows, setShowTableRows] = React.useState(!isLoading);
-
-  // Show table rows only when data is fully retrieved
-  React.useEffect(() => {
-    if (showTableRows !== !isLoading) {
-      setShowTableRows(!isLoading);
-    }
-  }, [isLoading]);
-
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-
-  // Elements displayed on the first page
-  const updateShownElementsList = (newShownElementsList: PwPolicy[]) => {
-    setPwPolicies(newShownElementsList);
-  };
-
-  // Update search input valie
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
-  // Search API call
-  const [searchEntry] = useSearchPwdPolicyEntriesMutation();
-
-  const submitSearchValue = () => {
-    searchEntry({
-      searchValue: searchValue,
-      apiVersion,
-      sizelimit: 100,
-      startIdx: 0,
-      stopIdx: 200, // Search will consider a max. of elements
-    }).then((result) => {
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for subordinate IDs",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const listResult = result.data?.result.results || [];
-          const listSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const elementsList: PwPolicy[] = [];
-
-          for (let i = 0; i < listSize; i++) {
-            elementsList.push(listResult[i].result);
-          }
-
-          setTotalCount(totalCount);
-          setPwPolicies(elementsList);
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
   // Data wrappers
   // TODO: Better separation of concerts
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownElementsList,
-    totalCount,
-  };
-
   const buttonsData = {
     updateIsDeleteButtonDisabled,
-  };
-
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
   };
 
   // - 'BulkSelectorrep'
@@ -338,11 +224,6 @@ const PasswordPolicies = () => {
     updateSelected: updateSelectedPwPolicies,
     selectableTable: selectablePwPoliciesTable,
     nameAttr: "cn",
-  };
-
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
   };
 
   // Modals functionality
@@ -385,10 +266,8 @@ const PasswordPolicies = () => {
         <SearchInputLayout
           dataCy="search"
           name="search"
-          ariaLabel="Search subIds"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchIsDisabled}
+          ariaLabel="Search password policies"
+          placeholder="Search password policies"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -404,7 +283,7 @@ const PasswordPolicies = () => {
         <SecondaryButton
           dataCy="password-policies-button-refresh"
           onClickHandler={refreshData}
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
         >
           Refresh
         </SecondaryButton>
@@ -415,7 +294,7 @@ const PasswordPolicies = () => {
       element: (
         <SecondaryButton
           dataCy="password-policies-button-delete"
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isFetching}
           onClickHandler={onOpenDeleteModal}
         >
           Delete
@@ -427,7 +306,7 @@ const PasswordPolicies = () => {
       element: (
         <SecondaryButton
           dataCy="password-policies-button-add"
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
           onClickHandler={onOpenAddModal}
         >
           Add
@@ -440,14 +319,19 @@ const PasswordPolicies = () => {
     },
     {
       key: 7,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 8,
       element: (
         <PaginationLayout
           list={pwPolicies}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -458,90 +342,91 @@ const PasswordPolicies = () => {
 
   // Render component
   return (
-    <div>
-      <PageSection hasBodyWrapper={false}>
-        <TitleLayout
-          id="Password policies page"
-          headingLevel="h1"
-          text="Password policies"
+    <>
+      <div>
+        <PageSection hasBodyWrapper={false}>
+          <TitleLayout
+            id="Password policies page"
+            headingLevel="h1"
+            text="Password policies"
+          />
+        </PageSection>
+        <PageSection hasBodyWrapper={false} isFilled={false}>
+          <Flex direction={{ default: "column" }}>
+            <FlexItem>
+              <ToolbarLayout toolbarItems={toolbarItems} />
+            </FlexItem>
+            <FlexItem style={{ flex: "0 0 auto" }}>
+              <OuterScrollContainer>
+                <InnerScrollContainer
+                  style={{ height: "60vh", overflow: "auto" }}
+                >
+                  {error !== undefined && error ? (
+                    <GlobalErrors errors={globalErrors.getAll()} />
+                  ) : (
+                    <MainTable
+                      tableTitle="Password policies table"
+                      shownElementsList={pwPolicies}
+                      pk="cn"
+                      keyNames={["cn", "cospriority"]}
+                      columnNames={["Group", "Priority"]}
+                      hasCheckboxes={true}
+                      pathname="password-policies"
+                      showTableRows={!isFetching}
+                      showLink={true}
+                      elementsData={{
+                        isElementSelectable: isPwPolicySelectable,
+                        selectedElements,
+                        selectableElementsTable: selectablePwPoliciesTable,
+                        setElementsSelected: setPwPoliciesSelected,
+                        clearSelectedElements,
+                      }}
+                      buttonsData={{
+                        updateIsDeleteButtonDisabled,
+                        isDeletion,
+                        updateIsDeletion,
+                      }}
+                      paginationData={selectedPerPageData}
+                    />
+                  )}
+                </InnerScrollContainer>
+              </OuterScrollContainer>
+            </FlexItem>
+            <FlexItem
+              style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}
+            >
+              <PaginationLayout
+                list={pwPolicies}
+                totalCount={totalCount}
+                variant={PaginationVariant.bottom}
+                widgetId="pagination-options-menu-bottom"
+              />
+            </FlexItem>
+          </Flex>
+        </PageSection>
+        <AddModal
+          isOpen={showAddModal}
+          onCloseModal={onCloseAddModal}
+          onRefresh={refreshData}
+          title="Add password policy"
         />
-      </PageSection>
-      <PageSection hasBodyWrapper={false} isFilled={false}>
-        <Flex direction={{ default: "column" }}>
-          <FlexItem>
-            <ToolbarLayout toolbarItems={toolbarItems} />
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto" }}>
-            <OuterScrollContainer>
-              <InnerScrollContainer
-                style={{ height: "60vh", overflow: "auto" }}
-              >
-                {error !== undefined && error ? (
-                  <GlobalErrors errors={globalErrors.getAll()} />
-                ) : (
-                  <MainTable
-                    tableTitle="Password policies table"
-                    shownElementsList={pwPolicies}
-                    pk="cn"
-                    keyNames={["cn", "cospriority"]}
-                    columnNames={["Group", "Priority"]}
-                    hasCheckboxes={true}
-                    pathname="password-policies"
-                    showTableRows={showTableRows}
-                    showLink={true}
-                    elementsData={{
-                      isElementSelectable: isPwPolicySelectable,
-                      selectedElements,
-                      selectableElementsTable: selectablePwPoliciesTable,
-                      setElementsSelected: setPwPoliciesSelected,
-                      clearSelectedElements,
-                    }}
-                    buttonsData={{
-                      updateIsDeleteButtonDisabled,
-                      isDeletion,
-                      updateIsDeletion,
-                    }}
-                    paginationData={{
-                      selectedPerPage,
-                      updateSelectedPerPage,
-                    }}
-                  />
-                )}
-              </InnerScrollContainer>
-            </OuterScrollContainer>
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
-            <PaginationLayout
-              list={pwPolicies}
-              paginationData={paginationData}
-              variant={PaginationVariant.bottom}
-              widgetId="pagination-options-menu-bottom"
-            />
-          </FlexItem>
-        </Flex>
-      </PageSection>
-      <AddModal
-        isOpen={showAddModal}
-        onCloseModal={onCloseAddModal}
-        onRefresh={refreshData}
-        title="Add password policy"
-      />
-      <DeleteModal
-        show={showDeleteModal}
-        onClose={onCloseDeleteModal}
-        selectedData={{
-          selectedElements,
-          clearSelectedElements,
-        }}
-        buttonsData={{
-          updateIsDeleteButtonDisabled,
-          updateIsDeletion,
-        }}
-        columnNames={["Group", "Priority"]}
-        keyNames={["cn", "cospriority"]}
-        onRefresh={refreshData}
-      />
-    </div>
+        <DeleteModal
+          show={showDeleteModal}
+          onClose={onCloseDeleteModal}
+          selectedData={{
+            selectedElements,
+            clearSelectedElements,
+          }}
+          buttonsData={{
+            updateIsDeleteButtonDisabled,
+            updateIsDeletion,
+          }}
+          columnNames={["Group", "Priority"]}
+          keyNames={["cn", "cospriority"]}
+          onRefresh={refreshData}
+        />
+      </div>
+    </>
   );
 };
 

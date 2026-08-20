@@ -21,7 +21,6 @@ interface EnableDisableDnsForwardZonesModalProps {
   elementsList: string[];
   setElementsList: (elementsList: string[]) => void;
   operation: "enable" | "disable";
-  setShowTableRows: (value: boolean) => void;
   onRefresh: () => void;
 }
 
@@ -38,7 +37,6 @@ const EnableDisableDnsForwardZonesModal = (
   const onEnableDisable = () => {
     const operation = props.operation === "enable" ? enableRule : disableRule;
 
-    props.setShowTableRows(false);
     operation(props.elementsList).then((response) => {
       if ("data" in response) {
         const { data } = response;
@@ -50,7 +48,7 @@ const EnableDisableDnsForwardZonesModal = (
         if (data?.result) {
           dispatch(
             addAlert({
-              name: "success",
+              name: props.operation + "-dnsforwardzones-success",
               title: "DNS forward zone status changed",
               variant: "success",
             })
@@ -61,28 +59,26 @@ const EnableDisableDnsForwardZonesModal = (
           props.onRefresh();
           onClose();
         }
-        props.setShowTableRows(true);
       }
     });
   };
 
   const onClose = () => {
-    props.setShowTableRows(true);
     props.setElementsList([]);
     props.onClose();
   };
 
   const onCloseWithoutClearingElements = () => {
-    props.setShowTableRows(true);
     props.onClose();
   };
 
   const modalActions: JSX.Element[] = [
     <Button
-      data-cy="modal-button-ok"
+      data-cy={"modal-button-" + props.operation}
       key={props.operation + "-dnsforwardzones"}
       variant="primary"
-      onClick={onEnableDisable}
+      type="submit"
+      form="enable-disable-dns-forward-zones-modal"
     >
       OK
     </Button>,
@@ -104,6 +100,8 @@ const EnableDisableDnsForwardZonesModal = (
       isOpen={props.isOpen}
       onClose={onClose}
       actions={modalActions}
+      formId="enable-disable-dns-forward-zones-modal"
+      onSubmit={onEnableDisable}
       messageText={
         "Are you sure you want to " +
         props.operation +

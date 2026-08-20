@@ -17,7 +17,9 @@ import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 import { useDnsConfigData } from "src/hooks/useDnsConfigData";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 // RPC
 import {
   DnsGlobalConfigPayload,
@@ -32,6 +34,7 @@ import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import { NotFound } from "src/components/errors/PageErrors";
 import DataSpinner from "src/components/layouts/DataSpinner";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import PageWithGrayBorderLayout from "src/components/layouts/PageWithGrayBorderLayout";
 import IpaCheckbox from "src/components/Form/IpaCheckbox";
 import IpaTextInput from "src/components/Form/IpaTextInput";
@@ -43,6 +46,9 @@ import ModalWithFormLayout from "src/components/layouts/ModalWithFormLayout";
 
 const DnsGlobalConfig = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("dns-global-config");
+
+  // Contextual help panel
 
   // API calls
   const dnsConfigData = useDnsConfigData();
@@ -51,14 +57,9 @@ const DnsGlobalConfig = () => {
     useDnsGlobalConfigUpdateSystemDnsRecordsMutation();
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({
+  useUpdateRoute({
     pathname: "dns-global-config",
   });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
 
   // States
   const [isDataLoading, setIsDataLoading] = React.useState(false);
@@ -211,7 +212,6 @@ const DnsGlobalConfig = () => {
         <Button
           variant="primary"
           data-cy="dns-global-config-button-save"
-          onClick={onSave}
           isDisabled={!dnsConfigData.modified || isDataLoading}
           form="dns-global-config-form"
           type="submit"
@@ -254,126 +254,138 @@ const DnsGlobalConfig = () => {
   }
 
   return (
-    <PageWithGrayBorderLayout
-      id="dns-global-config-page"
-      pageTitle="DNS Global Configuration"
-      toolbarItems={toolbarItems}
-    >
-      <>
-        <Sidebar isPanelRight className="pf-v6-u-mb-0">
-          <SidebarPanel variant="sticky">
-            <HelpTextWithIconLayout
-              textContent="Help"
-              icon={
-                <OutlinedQuestionCircleIcon className="pf-v6-u-primary-color-100 pf-v6-u-mr-sm" />
-              }
-            />
-          </SidebarPanel>
-          <SidebarContent className="pf-v6-u-mr-xl">
-            <Flex>
-              <FlexItem>
-                <Form id="dns-global-config-form">
-                  <FormGroup label="Allow PTR sync" fieldId="idnsallowsyncptr">
-                    <IpaCheckbox
-                      ipaObject={ipaObject}
-                      objectName="dnsconfig"
-                      onChange={recordOnChange}
-                      text=""
-                      name="idnsallowsyncptr"
-                      value={String(ipaObject.dnsforwarders)}
-                      metadata={dnsConfigData.metadata}
-                      dataCy="dns-global-config-checkbox-allow-ptr-sync"
-                    />
-                  </FormGroup>
-                  <FormGroup label="Global forwarders" fieldId="idnsforwarders">
-                    <IpaTextboxList
-                      dataCy="dns-global-config-textbox-forwarders"
-                      ipaObject={ipaObject}
-                      setIpaObject={recordOnChange}
-                      name="idnsforwarders"
-                      ariaLabel={"Forwarders text input"}
-                    />
-                  </FormGroup>
-                  <FormGroup label="Forward policy" role="idnsforwardpolicy">
-                    <IpaForwardPolicy
-                      name={"idnsforwardpolicy"}
-                      ariaLabel={"Forward policy radio group"}
-                      ipaObject={ipaObject}
-                      onChange={recordOnChange}
-                      metadata={dnsConfigData.metadata}
-                      objectName="dnsconfig"
-                    />
-                  </FormGroup>
-                  <FormGroup
-                    label="IPA DNSSec key master"
-                    role="dnssec_key_master_server"
-                  >
-                    <IpaTextInput
-                      dataCy="dns-global-config-textbox-dnssec-key-master"
-                      ipaObject={ipaObject}
-                      metadata={dnsConfigData.metadata}
-                      objectName="dnsconfig"
-                      onChange={recordOnChange}
-                      name="dnssec_key_master_server"
-                      ariaLabel={"IPA DNSSec key master text input"}
-                    />
-                  </FormGroup>
-                  <FormGroup label="IPA DNS servers" role="dns_server_server">
-                    <IpaTextInput
-                      dataCy="dns-global-config-textbox-dns-servers"
-                      ipaObject={ipaObject}
-                      metadata={dnsConfigData.metadata}
-                      objectName="dnsconfig"
-                      onChange={recordOnChange}
-                      name="dns_server_server"
-                      ariaLabel={"IPA DNS servers text input"}
-                    />
-                  </FormGroup>
-                </Form>
-              </FlexItem>
-            </Flex>
-          </SidebarContent>
-        </Sidebar>
-        <ModalWithFormLayout
-          dataCy="dns-global-config-modal-update-system-dns-records"
-          variantType="medium"
-          modalPosition="top"
-          offPosition="76px"
-          title="Confirmation"
-          formId="dns-global-config-modal-update-system-dns-records"
-          fields={[
-            {
-              id: "question-text",
-              pfComponent: (
-                <Content component="p">
-                  Are you sure you want to update the system DNS records?
-                </Content>
-              ),
-            },
-          ]}
-          show={showUpdateSystemDnsRecordsModal}
-          onClose={() => setShowUpdateSystemDnsRecordsModal(false)}
-          actions={[
-            <Button
-              variant="primary"
-              onClick={onUpdateSystemDnsRecords}
-              data-cy="dns-global-config-modal-update-system-dns-records-update"
-              key="update"
-            >
-              Update
-            </Button>,
-            <Button
-              variant="secondary"
-              onClick={() => setShowUpdateSystemDnsRecordsModal(false)}
-              data-cy="dns-global-config-modal-update-system-dns-records-cancel"
-              key="cancel"
-            >
-              Cancel
-            </Button>,
-          ]}
-        />
-      </>
-    </PageWithGrayBorderLayout>
+    <>
+      <PageWithGrayBorderLayout
+        id="dns-global-config-page"
+        pageTitle="DNS Global Configuration"
+        toolbarItems={toolbarItems}
+      >
+        <>
+          <Sidebar isPanelRight className="pf-v6-u-mb-0">
+            <SidebarPanel variant="sticky">
+              <HelpTextWithIconLayout
+                textContent="Help"
+                onClick={() => dispatch(toggleHelpPanel())}
+                icon={
+                  <OutlinedQuestionCircleIcon className="pf-v6-u-primary-color-100 pf-v6-u-mr-sm" />
+                }
+              />
+            </SidebarPanel>
+            <SidebarContent className="pf-v6-u-mr-xl">
+              <Flex>
+                <FlexItem>
+                  <Form id="dns-global-config-form" onSubmit={onSave}>
+                    <FormGroup
+                      label="Allow PTR sync"
+                      fieldId="idnsallowsyncptr"
+                    >
+                      <IpaCheckbox
+                        ipaObject={ipaObject}
+                        objectName="dnsconfig"
+                        onChange={recordOnChange}
+                        text=""
+                        name="idnsallowsyncptr"
+                        value={String(ipaObject.dnsforwarders)}
+                        metadata={dnsConfigData.metadata}
+                        dataCy="dns-global-config-checkbox-allow-ptr-sync"
+                      />
+                    </FormGroup>
+                    <FormGroup
+                      label="Global forwarders"
+                      fieldId="idnsforwarders"
+                    >
+                      <IpaTextboxList
+                        dataCy="dns-global-config-textbox-forwarders"
+                        ipaObject={ipaObject}
+                        onChange={recordOnChange}
+                        objectName="dnsconfig"
+                        metadata={dnsConfigData.metadata}
+                        name="idnsforwarders"
+                        ariaLabel={"Forwarders text input"}
+                      />
+                    </FormGroup>
+                    <FormGroup label="Forward policy" role="idnsforwardpolicy">
+                      <IpaForwardPolicy
+                        dataCy="dns-global-config"
+                        name={"idnsforwardpolicy"}
+                        ariaLabel={"Forward policy radio group"}
+                        ipaObject={ipaObject}
+                        onChange={recordOnChange}
+                        metadata={dnsConfigData.metadata}
+                        objectName="dnsconfig"
+                      />
+                    </FormGroup>
+                    <FormGroup
+                      label="IPA DNSSec key master"
+                      role="dnssec_key_master_server"
+                    >
+                      <IpaTextInput
+                        dataCy="dns-global-config-textbox-dnssec-key-master"
+                        ipaObject={ipaObject}
+                        metadata={dnsConfigData.metadata}
+                        objectName="dnsconfig"
+                        onChange={recordOnChange}
+                        name="dnssec_key_master_server"
+                        ariaLabel={"IPA DNSSec key master text input"}
+                      />
+                    </FormGroup>
+                    <FormGroup label="IPA DNS servers" role="dns_server_server">
+                      <IpaTextInput
+                        dataCy="dns-global-config-textbox-dns-servers"
+                        ipaObject={ipaObject}
+                        metadata={dnsConfigData.metadata}
+                        objectName="dnsconfig"
+                        onChange={recordOnChange}
+                        name="dns_server_server"
+                        ariaLabel={"IPA DNS servers text input"}
+                      />
+                    </FormGroup>
+                  </Form>
+                </FlexItem>
+              </Flex>
+            </SidebarContent>
+          </Sidebar>
+          <ModalWithFormLayout
+            dataCy="dns-global-config-modal-update-system-dns-records"
+            variantType="medium"
+            modalPosition="top"
+            offPosition="76px"
+            title="Confirmation"
+            formId="dns-global-config-modal-update-system-dns-records"
+            fields={[
+              {
+                id: "question-text",
+                pfComponent: (
+                  <Content component="p">
+                    Are you sure you want to update the system DNS records?
+                  </Content>
+                ),
+              },
+            ]}
+            show={showUpdateSystemDnsRecordsModal}
+            onClose={() => setShowUpdateSystemDnsRecordsModal(false)}
+            actions={[
+              <Button
+                variant="primary"
+                onClick={onUpdateSystemDnsRecords}
+                data-cy="dns-global-config-modal-update-system-dns-records-update"
+                key="update"
+              >
+                Update
+              </Button>,
+              <Button
+                variant="secondary"
+                onClick={() => setShowUpdateSystemDnsRecordsModal(false)}
+                data-cy="dns-global-config-modal-update-system-dns-records-cancel"
+                key="cancel"
+              >
+                Cancel
+              </Button>,
+            ]}
+          />
+        </>
+      </PageWithGrayBorderLayout>
+    </>
   );
 };
 

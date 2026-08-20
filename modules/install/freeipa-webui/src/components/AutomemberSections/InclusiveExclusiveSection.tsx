@@ -200,30 +200,12 @@ const InclusiveExclusiveSection = (props: PropsToInclusiveExclusiveSection) => {
     });
   };
 
-  // Pagination prep
-  const updateSelectedPerPage = () => {
-    // Nothing to do since we are not using bulk selector comp
-    return;
-  };
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-  // Entries displayed on the first page
-  const updateShownElementsList = (newShownEntriesList: Condition[]) => {
-    setShownElements(newShownEntriesList);
-  };
-
   // Pagination data required by the Table Layout
   const paginationData = {
     page,
     perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList,
+    onUpdatePage: setPage,
+    onUpdatePerPage: setPerPage,
     totalCount: tableEntryList.length,
   };
 
@@ -285,45 +267,6 @@ const InclusiveExclusiveSection = (props: PropsToInclusiveExclusiveSection) => {
     });
   };
 
-  // On add and add another
-  const onAddAnotherOption = () => {
-    setSpinningOnAdd(true);
-    const payload: AddConditionPayload = {
-      automemberId: props.entityId,
-      automemberType: props.automemberType,
-      conditionType: props.conditionType,
-      key: key,
-      automemberregex: expression,
-    };
-
-    addCondition(payload).then((response) => {
-      if ("data" in response) {
-        const responseData = response.data;
-        if (responseData?.result) {
-          dispatch(
-            addAlert({
-              name: "add-automember-condition-success",
-              title: "Automember condition added",
-              variant: "success",
-            })
-          );
-          props.onRefresh();
-          resetValues();
-        } else if (responseData?.error) {
-          dispatch(
-            addAlert({
-              name: "add-automember-condition-error",
-              title:
-                "Failed to add Automember condition: " + responseData.error,
-              variant: "danger",
-            })
-          );
-        }
-      }
-      setSpinningOnAdd(false);
-    });
-  };
-
   const addModalFields: Field[] = [
     {
       id: "attribute",
@@ -370,19 +313,6 @@ const InclusiveExclusiveSection = (props: PropsToInclusiveExclusiveSection) => {
       isDisabled={expression === "" || spinningOnAdd}
     >
       {spinningOnAdd ? "Adding" : "Add"}
-    </Button>,
-    <Button
-      data-cy="modal-button-add-and-add-another"
-      key="add-another-inclusive"
-      variant="primary"
-      form={"add-another" + props.conditionType + "option-modal"}
-      spinnerAriaValueText="Adding"
-      spinnerAriaLabel="Adding"
-      isLoading={spinningOnAdd}
-      isDisabled={expression === "" || spinningOnAdd}
-      onClick={onAddAnotherOption}
-    >
-      {spinningOnAdd ? "Adding" : "Add and add another"}
     </Button>,
     <Button
       data-cy="modal-button-cancel"

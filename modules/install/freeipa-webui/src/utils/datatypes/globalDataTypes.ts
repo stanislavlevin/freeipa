@@ -2,6 +2,11 @@
 
 import { ValidatedOptions } from "@patternfly/react-core";
 
+export interface SearchDataResultType<T> {
+  elementsList: T[];
+  totalCount: number;
+}
+
 export interface User {
   [key: string]: unknown; // to fulfill Record<string, unknown> type
   // identity
@@ -204,6 +209,25 @@ export interface Role {
   cn: string;
   description: string;
   dn: string;
+  member_user: string[];
+  member_group: string[];
+  member_host: string[];
+  member_hostgroup: string[];
+  member_service: string[];
+  member_idoverrideuser: string[];
+  member_sysaccount: string[];
+  memberof_privilege: string[];
+}
+
+export interface SysAccount {
+  uid: string;
+  dn: string;
+  description: string;
+}
+
+export interface Privilege {
+  cn: string;
+  description: string;
 }
 
 export interface HBACRulesOld {
@@ -474,17 +498,16 @@ export interface IDPServer {
 
 export interface IdRange {
   cn: string;
-  //the 4 following fields are numbers but are returned as strings
-  ipabaseid?: string;
-  ipaidrangesize?: string;
-  ipabaserid?: string;
-  ipasecondarybaserid?: string;
-
-  ipanttrusteddomainsid?: string;
-  ipanttrusteddomainname?: string;
-  iparangetype?: string;
-  ipaautoprivategroups?: string;
-  dn?: string;
+  ipabaseid: number;
+  ipaidrangesize: number;
+  ipabaserid: number;
+  ipasecondarybaserid: number;
+  ipanttrusteddomainsid: string;
+  ipanttrusteddomainname: string;
+  iparangetype: string;
+  ipaautoprivategroups: string;
+  iparangetyperaw: string;
+  dn: string;
 }
 
 export interface Metadata {
@@ -649,6 +672,12 @@ export interface SubId {
   description?: string;
   ipasubuidcount?: string;
   ipasubgidcount?: string;
+  dn: string;
+}
+
+export interface OtpTokenType {
+  ipatokenuniqueid: string;
+  type: string;
   dn: string;
 }
 
@@ -1098,6 +1127,13 @@ export interface DnsConfig {
 
 export interface Trust {
   cn: string;
+  dn: string;
+  gidnumber: string;
+  homedirectory: string;
+  ipanttrustposixoffset: string;
+  ipanttrustpartner: string;
+  uid: string;
+  uidnumber: string;
   ipantflatname: string;
   ipanttrusteddomainsid: string;
   ipantsidblacklistincoming: string[];
@@ -1108,7 +1144,71 @@ export interface Trust {
   ipantadditionalsuffixes: string[];
 }
 
+export interface GlobalTrustConfig {
+  cn: string;
+  ipantsecurityidentifier: string;
+  ipantflatname: string;
+  ipantdomainguid: string;
+  ipantfallbackprimarygroup: string;
+  ad_trust_agent_server: string[];
+  ad_trust_controller_server: string[];
+}
+export interface TrustDomain {
+  cn: string;
+  dn: string;
+  ipantflatname: string;
+  ipanttrusteddomainsid: string;
+  domain_enabled: boolean;
+}
+
+export interface SELinuxUserMap {
+  cn: string;
+  ipaselinuxuser: string;
+  seealso: string;
+  usercategory: string;
+  hostcategory: string;
+  description: string;
+  ipaenabledflag: boolean;
+  memberuser_user: string;
+  memberuser_group: string;
+  memberhost_host: string;
+  memberhost_hostgroup: string;
+  memberuser: string[];
+  memberhost: string[];
+  dn: string;
+}
+
 export type RangeType = "detect" | "ad-domain" | "ad-domain-posix";
+
+export type AlgorithmType = "sha1" | "sha256" | "sha384" | "sha512";
+export type OtpTokenTypeValue = "totp" | "hotp";
+export type OtpTokenDigits = "6" | "8";
+
+export interface OtpToken {
+  ipatokenuniqueid: string;
+  type: OtpTokenTypeValue;
+  description: string;
+  ipatokenowner: string;
+  managedby_user: string[];
+  ipatokendisabled: boolean;
+  ipatokennotbefore: Date | string; // datetime
+  ipatokennotafter: Date | string; // datetime
+  ipatokenvendor: string;
+  ipatokenmodel: string;
+  ipatokenserial: string;
+  ipatokenotpkey: string; // bytes
+  ipatokenotpalgorithm: AlgorithmType; // Default: 'sha1'
+  ipatokenotpdigits: OtpTokenDigits; // Default: 6
+  ipatokentotpclockoffset: number; // Default: 0 | Minimum value: -2147483648 | Maximum value: 2147483647
+  ipatokentotptimestep: number; // Default: 30 | Minimum value: 5 | Maximum value: 2147483647
+  ipatokenhotpcounter: number; // Default: 0 | Minimum value: 0 | Maximum value: 2147483647
+  uri: string;
+}
+
+export interface AutomountLocation {
+  cn: string;
+  dn: string;
+}
 
 export type ErrorValidationData = {
   isError: boolean;
@@ -1122,3 +1222,38 @@ export const DEFAULT_ERROR_VALIDATION_DATA: ErrorValidationData = {
   message: "",
   pfError: ValidatedOptions.default,
 };
+
+export type TopologyDirection = "both" | "left-right" | "right-left";
+export type TopologyEnabled = "on" | "off";
+
+export interface TopologySegment {
+  cn: string;
+  iparepltoposegmentleftnode: string;
+  iparepltoposegmentrightnode: string;
+  iparepltoposegmentdirection: TopologyDirection;
+  nsds5replicastripattrs: string;
+  nsds5replicatedattributelist: string;
+  nsds5replicatedattributelisttotal: string;
+  nsds5replicatimeout: number; // Maximum value: 2147483647
+  nsds5replicaenabled: TopologyEnabled;
+  suffixType: string;
+}
+
+export interface TopologySuffix {
+  cn: string;
+  iparepltopoconfroot: string;
+  dn: string;
+}
+
+export interface IpaServer {
+  cn: string;
+  iparepltopomanagedsuffix: string[];
+  iparepltopomanagedsuffix_topologysuffix: TopologySuffix[];
+  ipamindomainlevel: number; // Minimum value: -2147483648 | Maximum value: 2147483647
+  ipamaxdomainlevel: number; // Minimum value: -2147483648 | Maximum value: 2147483647
+  ipalocation_location: string; // Type: DNSName
+  ipaserviceweight: number; // Maximum value: 65535
+  service_relative_weight: string;
+  enabled_role_servrole: string[];
+  dn: string;
+}

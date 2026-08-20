@@ -2,7 +2,9 @@ import {
   api,
   Command,
   getBatchCommand,
+  getCommand,
   BatchRPCResponse,
+  FindRPCResponse,
   useGettingGenericQuery,
 } from "./rpc";
 import { apiToRole } from "src/utils/rolesUtils";
@@ -10,18 +12,37 @@ import { API_VERSION_BACKUP } from "../utils/utils";
 import { Role } from "../utils/datatypes/globalDataTypes";
 
 /**
- * Roles-related endpoints: addToRoles, removeFromRoles, getRolesInfoByName
+ * Roles-related endpoints: addToRoles, removeFromRoles, getRolesInfoByName, addRole, deleteRoles
  *
  * API commands:
+ * - role_find: https://freeipa.readthedocs.io/en/latest/api/role_find.html
+ * - role_show: https://freeipa.readthedocs.io/en/latest/api/role_show.html
+ * - role_add: https://freeipa.readthedocs.io/en/latest/api/role_add.html
+ * - role_del: https://freeipa.readthedocs.io/en/latest/api/role_del.html
  * - role_add_member: https://freeipa.readthedocs.io/en/latest/api/role_add_member.html
  * - role_remove_member: https://freeipa.readthedocs.io/en/latest/api/role_remove_member.html
- * - role_show: https://freeipa.readthedocs.io/en/latest/api/role_show.html
  */
 
 interface RoleShowPayload {
   roleNamesList: string[];
   no_members?: boolean;
   version: string;
+}
+
+interface RoleAddPayload {
+  cn: string;
+  description?: string;
+}
+
+export interface RoleMemberPayload {
+  entryName: string;
+  entityType: string;
+  idsToAdd: string[];
+}
+
+interface RolePrivilegePayload {
+  roleCn: string;
+  privileges: string[];
 }
 
 const extendedApi = api.injectEndpoints({
@@ -102,18 +123,187 @@ const extendedApi = api.injectEndpoints({
         return roleList;
       },
     }),
+    /**
+     * Add a new role via `role_add`
+     * @param {RoleAddPayload} - Payload with role cn and optional description
+     * @returns {FindRPCResponse} - Response from API
+     */
+    addRole: build.mutation<FindRPCResponse, RoleAddPayload>({
+      query: (payload) => {
+        const params: Record<string, unknown> = {
+          version: API_VERSION_BACKUP,
+        };
+        if (payload.description) {
+          params.description = payload.description;
+        }
+        return getCommand({
+          method: "role_add",
+          params: [[payload.cn], params],
+        });
+      },
+    }),
+    /**
+     * Delete roles via batch `role_del`
+     * @param {Role[]} - Array of roles to delete
+     * @returns {BatchRPCResponse} - Batch response
+     */
+    deleteRoles: build.mutation<BatchRPCResponse, Role[]>({
+      query: (roles) => {
+        const commands: Command[] = roles.map((role) => ({
+          method: "role_del",
+          params: [[role.cn], {}],
+        }));
+        return getBatchCommand(commands, API_VERSION_BACKUP);
+      },
+    }),
+    /**
+     * Modify an existing role via `role_mod`
+     * @param {Partial<Role>} - Role data to modify (must include cn)
+     * @returns {FindRPCResponse} - Response from API
+     */
+    saveRole: build.mutation<FindRPCResponse, Partial<Role>>({
+      query: (role) => {
+        const params = {
+          version: API_VERSION_BACKUP,
+          ...role,
+        };
+        delete params.cn;
+        return getCommand({
+          method: "role_mod",
+          params: [[role.cn], params],
+        });
+      },
+    }),
+    /**
+     * Get a single role by cn (with members)
+     * @param {string} cn - Role cn
+     * @returns {Role} - Role data with members
+     */
+    getRoleById: build.query<Role, string>({
+      query: (cn) => {
+        return getCommand({
+          method: "role_show",
+          params: [[cn], { all: true, rights: true }],
+        });
+      },
+      transformResponse: (response: FindRPCResponse): Role => {
+        return apiToRole(response.result.result);
+      },
+    }),
+    /**
+     * Add members to a role
+     * @param {RoleMemberPayload} - Payload with role name, entity type, and IDs to add
+     * @returns {FindRPCResponse} - Response from API
+     */
+    addAsMemberRole: build.mutation<FindRPCResponse, RoleMemberPayload>({
+      query: (payload) => {
+        const params: Record<string, unknown> = {
+          version: API_VERSION_BACKUP,
+          [payload.entityType]: payload.idsToAdd,
+        };
+        return getCommand({
+          method: "role_add_member",
+          params: [[payload.entryName], params],
+        });
+      },
+    }),
+    /**
+     * Remove members from a role
+     * @param {RoleMemberPayload} - Payload with role name, entity type, and IDs to remove
+     * @returns {FindRPCResponse} - Response from API
+     */
+    removeAsMemberRole: build.mutation<FindRPCResponse, RoleMemberPayload>({
+      query: (payload) => {
+        const params: Record<string, unknown> = {
+          version: API_VERSION_BACKUP,
+          [payload.entityType]: payload.idsToAdd,
+        };
+        return getCommand({
+          method: "role_remove_member",
+          params: [[payload.entryName], params],
+        });
+      },
+    }),
+    /**
+     * Get available privileges via `privilege_find`
+     * @param {string} searchValue - Search value for filtering privileges
+     * @returns {FindRPCResponse} - Response from API
+     */
+    getPrivileges: build.query<FindRPCResponse, string>({
+      query: (searchValue) =>
+        getCommand({
+          method: "privilege_find",
+          params: [
+            [searchValue],
+            { no_members: true, version: API_VERSION_BACKUP },
+          ],
+        }),
+    }),
+    /**
+     * Add privilege to a role via `role_add_privilege`
+     * @param {RolePrivilegePayload} - Payload with role cn and privileges to add
+     * @returns {FindRPCResponse} - Response from API
+     */
+    addPrivilegeToRole: build.mutation<FindRPCResponse, RolePrivilegePayload>({
+      query: (payload) =>
+        getCommand({
+          method: "role_add_privilege",
+          params: [
+            [payload.roleCn],
+            { privilege: payload.privileges, version: API_VERSION_BACKUP },
+          ],
+        }),
+    }),
+    /**
+     * Remove privilege from a role via `role_remove_privilege`
+     * @param {RolePrivilegePayload} - Payload with role cn and privileges to remove
+     * @returns {FindRPCResponse} - Response from API
+     */
+    removePrivilegeFromRole: build.mutation<
+      FindRPCResponse,
+      RolePrivilegePayload
+    >({
+      query: (payload) =>
+        getCommand({
+          method: "role_remove_privilege",
+          params: [
+            [payload.roleCn],
+            { privilege: payload.privileges, version: API_VERSION_BACKUP },
+          ],
+        }),
+    }),
   }),
   overrideExisting: false,
 });
 
-export const useGettingRolesQuery = (payloadData, options) => {
+export const useGettingRolesQuery = (payloadData, options?) => {
   payloadData["objName"] = "role";
   payloadData["objAttr"] = "cn";
   return useGettingGenericQuery(payloadData, options);
+};
+
+export const useRoleShowQuery = (roleId: string) => {
+  return useGetRolesInfoByNameQuery(
+    {
+      roleNamesList: [roleId],
+      no_members: true,
+      version: API_VERSION_BACKUP,
+    },
+    { skip: !roleId }
+  );
 };
 
 export const {
   useAddToRolesMutation,
   useRemoveFromRolesMutation,
   useGetRolesInfoByNameQuery,
+  useAddRoleMutation,
+  useDeleteRolesMutation,
+  useSaveRoleMutation,
+  useGetRoleByIdQuery,
+  useAddAsMemberRoleMutation,
+  useRemoveAsMemberRoleMutation,
+  useGetPrivilegesQuery,
+  useAddPrivilegeToRoleMutation,
+  useRemovePrivilegeFromRoleMutation,
 } = extendedApi;

@@ -49,8 +49,6 @@ const AddDnsZoneModal = (props: PropsToAddModal) => {
   // States
   const [isAddButtonSpinning, setIsAddButtonSpinning] =
     React.useState<boolean>(false);
-  const [isAddAnotherButtonSpinning, setIsAddAnotherButtonSpinning] =
-    React.useState<boolean>(false);
   const [dnsZoneName, setDnsZoneName] = React.useState<string>("");
   const [reverseZoneIp, setReverseZoneIp] = React.useState<string>("");
   const [skipOverlapCheck, setSkipOverlapCheck] =
@@ -71,9 +69,8 @@ const AddDnsZoneModal = (props: PropsToAddModal) => {
   };
 
   // Add DNS zone handler
-  const onAddDnsZone = (keepModalOpen: boolean) => {
+  const onAddDnsZone = () => {
     setIsAddButtonSpinning(true);
-    setIsAddAnotherButtonSpinning(true);
 
     const payload: AddDnsZonePayload = {
       idnsname: dnsZoneName,
@@ -108,15 +105,11 @@ const AddDnsZoneModal = (props: PropsToAddModal) => {
           clearFields();
           // Update data
           props.onRefresh();
-          // 'Add and add another' will keep the modal open
-          if (!keepModalOpen) {
-            props.onClose();
-          }
+          props.onClose();
         }
       }
       // Reset button spinners
       setIsAddButtonSpinning(false);
-      setIsAddAnotherButtonSpinning(false);
     });
   };
 
@@ -129,9 +122,14 @@ const AddDnsZoneModal = (props: PropsToAddModal) => {
   const zoneNameLabel = <b>Zone name</b>;
   const reverseZoneLabel = <b>Reverse zone</b>;
 
+  const onFormSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onAddDnsZone();
+  };
+
   // Form fields
   const formFields = (
-    <Form id="add-modal-form-zone-name">
+    <Form onSubmit={onFormSubmit} id="add-modal-form-zone-name">
       <Flex
         direction={{ default: "column" }}
         className="pf-v6-u-ml-lg pf-v6-u-mb-md"
@@ -228,16 +226,13 @@ const AddDnsZoneModal = (props: PropsToAddModal) => {
     <Button
       data-cy="modal-button-add"
       key="add-new"
-      variant="secondary"
+      type="submit"
       isDisabled={
         isAddButtonSpinning ||
         (isZoneNameRadioChecked && dnsZoneName === "") ||
         (isReverseZoneIpRadioChecked && reverseZoneIp === "")
       }
-      form="add-modal-form"
-      onClick={() => {
-        onAddDnsZone(false);
-      }}
+      form="add-modal-form-zone-name"
     >
       {isAddButtonSpinning ? (
         <>
@@ -246,29 +241,6 @@ const AddDnsZoneModal = (props: PropsToAddModal) => {
         </>
       ) : (
         "Add"
-      )}
-    </Button>,
-    <Button
-      data-cy="modal-button-add-and-add-another"
-      key="add-new-another"
-      variant="secondary"
-      isDisabled={
-        isAddAnotherButtonSpinning ||
-        (isZoneNameRadioChecked && dnsZoneName === "") ||
-        (isReverseZoneIpRadioChecked && reverseZoneIp === "")
-      }
-      form="add-another-modal-form"
-      onClick={() => {
-        onAddDnsZone(true);
-      }}
-    >
-      {isAddAnotherButtonSpinning ? (
-        <>
-          <Spinner size="sm" className="pf-v6-u-mr-sm" />
-          {"Adding"}
-        </>
-      ) : (
-        "Add and add another"
       )}
     </Button>,
     <Button

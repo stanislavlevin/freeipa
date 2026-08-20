@@ -66,6 +66,22 @@ export interface KwError {
   };
 }
 
+export type ErrorRPCResponse = {
+  result: null;
+  error: ErrorResult;
+  id: null;
+  principal: string;
+  version: string;
+};
+
+export type ValidResponse<T> = {
+  result: T;
+  error: null;
+  id: null;
+  principal: string;
+  version: string;
+};
+
 // 'FindRPCResponse' type
 //   - Has 'result' > 'result' structure
 export interface FindRPCResponse {
@@ -214,6 +230,9 @@ export const getBatchCommand = (commandData: Command[], apiVersion: string) => {
 export const api = createApi({
   reducerPath: "api",
   baseQuery: fetchBaseQuery({ baseUrl: "/" }), // TODO: Global settings!
+  // We want to always refetch, because we've managed to mess up
+  // the caching logic and this is easier than fixing it :)
+  keepUnusedDataFor: 0,
   tagTypes: [
     "ObjectMetadata",
     "FullUser",
@@ -273,9 +292,13 @@ export const api = createApi({
       transformResponse: (response: ShowRPCResponse): Metadata =>
         response.result,
       providesTags: ["ObjectMetadata"],
+      keepUnusedDataFor: 3600,
     }),
     // Basic find/show query: Hosts, Services, ...
-    gettingGeneric: build.query<BatchRPCResponse, GenericPayload>({
+    gettingGeneric: build.query<
+      BatchRPCResponse,
+      Omit<GenericPayload, "method">
+    >({
       async queryFn(payloadData, _queryApi, _extraOptions, fetchWithBQ) {
         const {
           searchValue,
@@ -292,6 +315,9 @@ export const api = createApi({
           objAttr,
         } = payloadData;
         let objName = payloadData.objName;
+
+        // startIdx cannot contain negative values
+        const startIdxValue = Math.max(startIdx, 0);
 
         if (objAttr === undefined || objName === undefined) {
           return {
@@ -398,7 +424,7 @@ export const api = createApi({
         const idResponseData = getGroupIDsResult.data as FindRPCResponse;
         const ids: string[] = [];
         const itemsCount = idResponseData.result.result.length as number;
-        for (let i = startIdx; i < itemsCount && i < stopIdx; i++) {
+        for (let i = startIdxValue; i < itemsCount && i < stopIdx; i++) {
           let id;
           if (objName === "host") {
             id = idResponseData.result.result[i] as fqdnType;
@@ -433,7 +459,10 @@ export const api = createApi({
               } as FetchBaseQueryError,
             };
           }
-          ids.push(id[objAttr][0] as string);
+
+          if (id !== undefined) {
+            ids.push(id[objAttr][0] as string);
+          }
         }
 
         // 2ND CALL - GET PARTIAL INFO

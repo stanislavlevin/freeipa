@@ -16,6 +16,8 @@ import { DnsServer, Metadata } from "src/utils/datatypes/globalDataTypes";
 import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import useUpdateRoute from "src/hooks/useUpdateRoute";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 import { addAlert } from "src/store/Global/alerts-slice";
 // Utils
 import { dnsServerAsRecord } from "src/utils/dnsServersUtils";
@@ -30,6 +32,7 @@ import {
 import IpaTextInput from "src/components/Form/IpaTextInput/IpaTextInput";
 import TabLayout from "src/components/layouts/TabLayout";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import IpaTextboxList from "src/components/Form/IpaTextboxList/IpaTextboxList";
 import IpaForwardPolicy from "src/components/Form/IpaForwardPolicy";
 
@@ -48,6 +51,9 @@ interface DnsServersSettingsProps {
 
 const DnsServersSettings = (props: DnsServersSettingsProps) => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("dns-servers-settings");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
   useUpdateRoute({ pathname: props.pathname });
@@ -186,71 +192,77 @@ const DnsServersSettings = (props: DnsServersSettingsProps) => {
   ];
 
   return (
-    <TabLayout id="settings-page" toolbarItems={toolbarFields}>
-      <Sidebar isPanelRight>
-        <SidebarPanel variant="sticky">
-          <HelpTextWithIconLayout
-            textContent="Help"
-            icon={
-              <OutlinedQuestionCircleIcon className="pf-v6-u-primary-color-100 pf-v6-u-mr-sm" />
-            }
-          />
-        </SidebarPanel>
-        <SidebarContent className="pf-v6-u-mr-xl">
-          <Flex direction={{ default: "column", lg: "row" }}>
-            <FlexItem flex={{ default: "flex_1" }}>
-              <Form
-                className="pf-v6-u-mb-lg"
-                id="dns-servers-tab-settings-form"
-                onSubmit={onSave}
-              >
-                <FormGroup label="SOA name" role="idnssoamname">
-                  <IpaTextInput
-                    dataCy="dns-servers-tab-settings-textbox-idnssoamname"
-                    name={"idnssoamname"}
-                    ariaLabel={"SOA name text input"}
-                    ipaObject={ipaObject}
-                    onChange={recordOnChange}
-                    objectName="dnsserver"
-                    metadata={props.metadata}
-                  />
-                </FormGroup>
-                <FormGroup label="Server name" role="idnsserverid">
-                  <IpaTextInput
-                    dataCy="dns-servers-tab-settings-textbox-idnsserverid"
-                    name={"idnsserverid"}
-                    ariaLabel={"Server name text input"}
-                    ipaObject={ipaObject}
-                    onChange={recordOnChange}
-                    objectName="dnsserver"
-                    metadata={props.metadata}
-                  />
-                </FormGroup>
-                <FormGroup label="Forwarders" role="idnsforwarders">
-                  <IpaTextboxList
-                    dataCy="dns-servers-tab-settings-textbox-idnsforwarders"
-                    ipaObject={ipaObject}
-                    setIpaObject={recordOnChange}
-                    name="idnsforwarders"
-                    ariaLabel={"Forwarders text input"}
-                  />
-                </FormGroup>
-                <FormGroup label="Forward policy" role="idnsforwardpolicy">
-                  <IpaForwardPolicy
-                    name={"idnsforwardpolicy"}
-                    ariaLabel={"Forward policy radio group"}
-                    ipaObject={ipaObject}
-                    onChange={recordOnChange}
-                    metadata={props.metadata}
-                    objectName="dnsserver"
-                  />
-                </FormGroup>
-              </Form>
-            </FlexItem>
-          </Flex>
-        </SidebarContent>
-      </Sidebar>
-    </TabLayout>
+    <>
+      <TabLayout id="settings-page" toolbarItems={toolbarFields}>
+        <Sidebar isPanelRight>
+          <SidebarPanel variant="sticky">
+            <HelpTextWithIconLayout
+              textContent="Help"
+              onClick={() => dispatch(toggleHelpPanel())}
+              icon={
+                <OutlinedQuestionCircleIcon className="pf-v6-u-primary-color-100 pf-v6-u-mr-sm" />
+              }
+            />
+          </SidebarPanel>
+          <SidebarContent className="pf-v6-u-mr-xl">
+            <Flex direction={{ default: "column", lg: "row" }}>
+              <FlexItem flex={{ default: "flex_1" }}>
+                <Form
+                  className="pf-v6-u-mb-lg"
+                  id="dns-servers-tab-settings-form"
+                  onSubmit={onSave}
+                >
+                  <FormGroup label="SOA name" role="idnssoamname">
+                    <IpaTextInput
+                      dataCy="dns-servers-tab-settings-textbox-idnssoamname"
+                      name={"idnssoamname"}
+                      ariaLabel={"SOA name text input"}
+                      ipaObject={ipaObject}
+                      onChange={recordOnChange}
+                      objectName="dnsserver"
+                      metadata={props.metadata}
+                    />
+                  </FormGroup>
+                  <FormGroup label="Server name" role="idnsserverid">
+                    <IpaTextInput
+                      dataCy="dns-servers-tab-settings-textbox-idnsserverid"
+                      name={"idnsserverid"}
+                      ariaLabel={"Server name text input"}
+                      ipaObject={ipaObject}
+                      onChange={recordOnChange}
+                      objectName="dnsserver"
+                      metadata={props.metadata}
+                    />
+                  </FormGroup>
+                  <FormGroup label="Forwarders" role="idnsforwarders">
+                    <IpaTextboxList
+                      dataCy="dns-servers-tab-settings-textbox-idnsforwarders"
+                      ipaObject={ipaObject}
+                      onChange={recordOnChange}
+                      objectName="dnsserver"
+                      metadata={props.metadata}
+                      name="idnsforwarders"
+                      ariaLabel={"Forwarders text input"}
+                    />
+                  </FormGroup>
+                  <FormGroup label="Forward policy" role="idnsforwardpolicy">
+                    <IpaForwardPolicy
+                      dataCy="dns-servers-tab-settings"
+                      name={"idnsforwardpolicy"}
+                      ariaLabel={"Forward policy radio group"}
+                      ipaObject={ipaObject}
+                      onChange={recordOnChange}
+                      metadata={props.metadata}
+                      objectName="dnsserver"
+                    />
+                  </FormGroup>
+                </Form>
+              </FlexItem>
+            </Flex>
+          </SidebarContent>
+        </Sidebar>
+      </TabLayout>
+    </>
   );
 };
 

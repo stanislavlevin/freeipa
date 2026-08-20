@@ -28,40 +28,37 @@ import UsersTable from "../../components/tables/UsersTable";
 // Components
 import PaginationLayout from "src/components/layouts/PaginationLayout";
 import BulkSelectorPrep from "src/components/BulkSelectorPrep";
-import ContextualHelpPanel from "src/components/ContextualHelpPanel/ContextualHelpPanel";
+
 // Modals
 import DeleteUsers from "src/components/modals/UserModals/DeleteUsers";
 import StagePreservedUsers from "src/components/modals/UserModals/StagePreservedUsers";
 import RestorePreservedUsers from "src/components/modals/UserModals/RestorePreservedUsers";
 // Hooks
-import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
-// Errors
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Utils
 import { API_VERSION_BACKUP, isUserSelectable } from "src/utils/utils";
-import { GenericPayload, useSearchEntriesMutation } from "../../services/rpc";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
+import { GenericPayload } from "../../services/rpc";
 import { useGettingPreservedUserQuery } from "../../services/rpcUsers";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 import GlobalErrors from "src/components/errors/GlobalErrors";
 import ModalErrors from "src/components/errors/ModalErrors";
 
 const PreservedUsers = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("preserved-users");
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({ pathname: "preserved-users" });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
+  useUpdateRoute({ pathname: "preserved-users" });
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -77,7 +74,6 @@ const PreservedUsers = () => {
 
   // Main states - what user can define / what we could use in page URL
   const [totalCount, setUsersTotalCount] = useState<number>(0);
-  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
 
   // Page indexes
   const firstUserIdx = (page - 1) * perPage;
@@ -94,14 +90,13 @@ const PreservedUsers = () => {
 
   const {
     data: batchResponse,
-    isLoading: isBatchLoading,
+    isFetching: isBatchFetching,
     error: batchError,
   } = userDataResponse;
 
   // Handle data when the API call is finished
   useEffect(() => {
     if (userDataResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected users on refresh
       setUsersTotalCount(0);
       globalErrors.clear();
@@ -126,8 +121,6 @@ const PreservedUsers = () => {
       setUsersTotalCount(totalCount);
       // Update the list of users
       setPreservedUsersList(usersList);
-      // Show table elements
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -144,21 +137,12 @@ const PreservedUsers = () => {
 
   // Refresh button handling
   const refreshUsersData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected users on refresh
     setUsersTotalCount(0);
     clearSelectedUsers();
 
     userDataResponse.refetch();
   };
-
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    userDataResponse.refetch();
-  }, []);
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -175,102 +159,7 @@ const PreservedUsers = () => {
     setIsDeletion(value);
   };
 
-  // Elements selected (per page)
-  //  - This will help to calculate the remaining elements on a specific page (bulk selector)
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-
-  // Users displayed on the first page
-  const updateShownUsersList = (newShownUsersList: User[]) => {
-    setPreservedUsersList(newShownUsersList);
-  };
-
-  // Filter (Input search)
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
-  // Issue search with filter
-  const [retrieveUser] = useSearchEntriesMutation({});
-
-  // Issue a search using a specific search value
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setUsersTotalCount(0);
-    setSearchIsDisabled(true);
-
-    retrieveUser({
-      searchValue: searchValue,
-      sizeLimit: 0,
-      apiVersion: apiVersion || API_VERSION_BACKUP,
-      startIdx: firstUserIdx,
-      stopIdx: lastUserIdx,
-      entryType: "preserved",
-    } as GenericPayload).then((result) => {
-      // Manage new response here
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for preserved users",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const usersListResult = result.data?.result.results || [];
-          const usersListSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const usersList: User[] = [];
-
-          for (let i = 0; i < usersListSize; i++) {
-            usersList.push(usersListResult[i].result);
-          }
-
-          setPreservedUsersList(usersList);
-          setUsersTotalCount(totalCount);
-          // Show table elements
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
   // Show table rows
-  const [showTableRows, setShowTableRows] = useState(!isBatchLoading);
-
-  // Show table rows only when data is fully retrieved
-  useEffect(() => {
-    if (showTableRows !== !isBatchLoading) {
-      setShowTableRows(!isBatchLoading);
-    }
-  }, [isBatchLoading]);
-
   // Table-related shared functionality
   // - Selectable checkboxes on table
   const selectableUsersTable = preservedUsersList.filter(isUserSelectable); // elements per Table
@@ -348,17 +237,6 @@ const PreservedUsers = () => {
   };
 
   // Data wrappers
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownUsersList,
-    totalCount,
-  };
-
   // - 'BulkSelectorPrep'
   const usersBulkSelectorData = {
     selected: selectedUsers,
@@ -372,10 +250,11 @@ const PreservedUsers = () => {
     updateIsDeleteButtonDisabled,
   };
 
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    preservedUsersList,
+    selectedUsers.map((item) => ipaPrimaryKey(item.uid)),
+    (item) => ipaPrimaryKey(item.uid)
+  );
 
   // 'DeleteUsers'
   const deleteUsersButtonsData = {
@@ -403,25 +282,6 @@ const PreservedUsers = () => {
     updateIsDeletion,
   };
 
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
-  // Contextual links panel
-  const [isContextualPanelExpanded, setIsContextualPanelExpanded] =
-    React.useState(false);
-
-  const onOpenContextualPanel = () => {
-    setIsContextualPanelExpanded(!isContextualPanelExpanded);
-  };
-
-  const onCloseContextualPanel = () => {
-    setIsContextualPanelExpanded(false);
-  };
-
   // List of Toolbar items
   const toolbarItems: ToolbarItem[] = [
     {
@@ -442,10 +302,8 @@ const PreservedUsers = () => {
         <SearchInputLayout
           dataCy="search"
           name="search"
-          ariaLabel="Search user"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          ariaLabel="Search preserved users"
+          placeholder="Search preserved users"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -460,7 +318,7 @@ const PreservedUsers = () => {
       element: (
         <SecondaryButton
           onClickHandler={refreshUsersData}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           dataCy="preserved-users-button-refresh"
         >
           Refresh
@@ -471,7 +329,7 @@ const PreservedUsers = () => {
       key: 4,
       element: (
         <SecondaryButton
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isBatchFetching}
           onClickHandler={onDeleteHandler}
           dataCy="preserved-users-button-delete"
         >
@@ -483,7 +341,7 @@ const PreservedUsers = () => {
       key: 5,
       element: (
         <SecondaryButton
-          isDisabled={!showTableRows || selectedUsers.length === 0}
+          isDisabled={isBatchFetching || selectedUsers.length === 0}
           onClickHandler={onRestoreHandler}
           dataCy="preserved-users-button-restore"
         >
@@ -495,7 +353,7 @@ const PreservedUsers = () => {
       key: 6,
       element: (
         <SecondaryButton
-          isDisabled={!showTableRows || selectedUsers.length === 0}
+          isDisabled={isBatchFetching || selectedUsers.length === 0}
           onClickHandler={onStageHandler}
           dataCy="preserved-users-button-stage"
         >
@@ -512,7 +370,7 @@ const PreservedUsers = () => {
       element: (
         <HelpTextWithIconLayout
           textContent="Help"
-          onClick={onOpenContextualPanel}
+          onClick={() => dispatch(toggleHelpPanel())}
         />
       ),
     },
@@ -521,7 +379,7 @@ const PreservedUsers = () => {
       element: (
         <PaginationLayout
           list={preservedUsersList}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -532,11 +390,7 @@ const PreservedUsers = () => {
 
   // Render 'Preserved users'
   return (
-    <ContextualHelpPanel
-      fromPage="preserved-users"
-      isExpanded={isContextualPanelExpanded}
-      onClose={onCloseContextualPanel}
-    >
+    <>
       <div>
         <PageSection hasBodyWrapper={false}>
           <TitleLayout
@@ -561,7 +415,7 @@ const PreservedUsers = () => {
                     <UsersTable
                       shownElementsList={preservedUsersList}
                       from="preserved-users"
-                      showTableRows={showTableRows}
+                      showTableRows={!isBatchFetching}
                       usersData={usersTableData}
                       buttonsData={usersTableButtonsData}
                       paginationData={selectedPerPageData}
@@ -576,7 +430,7 @@ const PreservedUsers = () => {
             >
               <PaginationLayout
                 list={preservedUsersList}
-                paginationData={paginationData}
+                totalCount={totalCount}
                 variant={PaginationVariant.bottom}
                 widgetId="pagination-options-menu-bottom"
               />
@@ -610,7 +464,7 @@ const PreservedUsers = () => {
           onSuccess={refreshUsersData}
         />
       </div>
-    </ContextualHelpPanel>
+    </>
   );
 };
 

@@ -1,6 +1,6 @@
 import React from "react";
 // PatternFly
-import { Pagination, PaginationVariant } from "@patternfly/react-core";
+import { PaginationVariant } from "@patternfly/react-core";
 // Data types
 import {
   HBACService,
@@ -9,13 +9,16 @@ import {
 // Components
 import MemberOfToolbar from "./MemberOfToolbar";
 import MemberTable from "src/components/tables/MembershipTable";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
 import MemberOfAddModal, { AvailableItems } from "./MemberOfAddModal";
 import MemberOfDeleteModal from "./MemberOfDeleteModal";
+
 // Redux
 import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // RPC
 import { ErrorResult } from "src/services/rpc";
 import {
@@ -38,8 +41,7 @@ interface MemberOfHbacServicesProps {
 const MemberOfHbacServices = (props: MemberOfHbacServicesProps) => {
   const dispatch = useAppDispatch();
 
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, setPage, perPage, searchValue } = useListPageSearchParams();
 
   const [hbacGroupsSelected, setHbacGroupsSelected] = React.useState<string[]>(
     []
@@ -123,9 +125,9 @@ const MemberOfHbacServices = (props: MemberOfHbacServicesProps) => {
 
   // Load available HBAC services, delay the search for opening the modal
   const hbacGroupsQuery = useGettingHbacServiceGroupQuery({
-    search: adderSearchValue,
+    searchValue: adderSearchValue,
     apiVersion: API_VERSION_BACKUP,
-    sizelimit: 100,
+    sizeLimit: 100,
     startIdx: 0,
     stopIdx: 100,
   });
@@ -255,9 +257,8 @@ const MemberOfHbacServices = (props: MemberOfHbacServicesProps) => {
   return (
     <>
       <MemberOfToolbar
-        searchText={searchValue}
-        onSearchTextChange={setSearchValue}
-        onSearch={() => {}}
+        searchPlaceholder="Search HBAC service groups"
+        searchAriaLabel="Search HBAC service groups"
         refreshButtonEnabled={isRefreshButtonEnabled}
         onRefreshButtonClick={props.onRefreshData}
         deleteButtonEnabled={hbacGroupsSelected.length > 0}
@@ -265,11 +266,8 @@ const MemberOfHbacServices = (props: MemberOfHbacServicesProps) => {
         addButtonEnabled={isAddButtonEnabled}
         onAddButtonClick={() => setShowAddModal(true)}
         helpIconEnabled={true}
+        onHelpIconClick={() => dispatch(toggleHelpPanel())}
         totalItems={memberof_hbacsvcgroup.length}
-        perPage={perPage}
-        page={page}
-        onPerPageChange={setPerPage}
-        onPageChange={setPage}
       />
       <MemberTable
         entityList={hbacGroups}
@@ -282,15 +280,12 @@ const MemberOfHbacServices = (props: MemberOfHbacServicesProps) => {
         showTableRows={showTableRows}
       />
       {memberof_hbacsvcgroup.length > 0 && (
-        <Pagination
-          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-          itemCount={memberof_hbacsvcgroup.length}
-          widgetId="pagination-options-menu-bottom"
-          perPage={perPage}
-          page={page}
+        <PaginationLayout
+          list={[]}
+          totalCount={memberof_hbacsvcgroup.length}
           variant={PaginationVariant.bottom}
-          onSetPage={(_e, page) => setPage(page)}
-          onPerPageSelect={(_e, perPage) => setPerPage(perPage)}
+          widgetId="pagination-options-menu-bottom"
+          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
         />
       )}
       <MemberOfAddModal

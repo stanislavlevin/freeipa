@@ -34,7 +34,6 @@ import UsersTable from "../../components/tables/UsersTable";
 // Components
 import PaginationLayout from "../../components/layouts/PaginationLayout";
 import BulkSelectorPrep from "src/components/BulkSelectorPrep";
-import ContextualHelpPanel from "src/components/ContextualHelpPanel/ContextualHelpPanel";
 // Modals
 import AddUser from "src/components/modals/UserModals/AddUser";
 import DeleteUsers from "src/components/modals/UserModals/DeleteUsers";
@@ -43,10 +42,15 @@ import DisableEnableUsers from "src/components/modals/UserModals/DisableEnableUs
 import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Utils
 import { API_VERSION_BACKUP, isUserSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // RPC client
-import { GenericPayload, useSearchEntriesMutation } from "src/services/rpc";
+import { GenericPayload } from "src/services/rpc";
 import {
   useGettingActiveUserQuery,
   useAutoMemberRebuildUsersMutation,
@@ -55,19 +59,16 @@ import {
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { SerializedError } from "@reduxjs/toolkit";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 import GlobalErrors from "src/components/errors/GlobalErrors";
 import ModalErrors from "src/components/errors/ModalErrors";
 
 const ActiveUsers = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("active-users");
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({ pathname: "active-users" });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
+  useUpdateRoute({ pathname: "active-users" });
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -80,8 +81,7 @@ const ActiveUsers = () => {
   const [executeAutoMemberRebuild] = useAutoMemberRebuildUsersMutation();
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   // Handle API calls errors
   const globalErrors = useApiError([]);
@@ -89,10 +89,10 @@ const ActiveUsers = () => {
 
   // Main states - what user can define / what we could use in page URL
   const [totalCount, setUsersTotalCount] = useState<number>(0);
-  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
 
   // Page indexes
-  const firstUserIdx = (page - 1) * perPage;
+  // - Ensure 'firstUserIdx' is always >= 0
+  const firstUserIdx = Math.max(0, (page - 1) * perPage);
   const lastUserIdx = page * perPage;
 
   // Derived states - what we get from API
@@ -106,14 +106,13 @@ const ActiveUsers = () => {
 
   const {
     data: batchResponse,
-    isLoading: isBatchLoading,
+    isFetching: isBatchFetching,
     error: batchError,
   } = userDataResponse;
 
   // Handle data when the API call is finished
   useEffect(() => {
     if (userDataResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected users on refresh
       setUsersTotalCount(0);
       globalErrors.clear();
@@ -138,8 +137,6 @@ const ActiveUsers = () => {
       setUsersTotalCount(totalCount);
       // Update the list of users
       setActiveUsersList(usersList);
-      // Show table elements
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -156,21 +153,12 @@ const ActiveUsers = () => {
 
   // Refresh button handling
   const refreshUsersData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected users on refresh
     setUsersTotalCount(0);
     clearSelectedUsers();
 
     userDataResponse.refetch();
   };
-
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    userDataResponse.refetch();
-  }, []);
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -210,108 +198,12 @@ const ActiveUsers = () => {
     setIsDisableEnableOp(value);
   };
 
-  // Elements selected (per page)
-  //  - This will help to calculate the remaining elements on a specific page (bulk selector)
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-
-  // Users displayed on the first page
-  const updateShownUsersList = (newShownUsersList: User[]) => {
-    setActiveUsersList(newShownUsersList);
-  };
-
-  // Update search input valie
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
 
   const clearSelectedUsers = () => {
     const emptyList: User[] = [];
     setSelectedUsers(emptyList);
   };
-
-  const [retrieveUser] = useSearchEntriesMutation({});
-
-  // Issue a search using a specific search value
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setSearchIsDisabled(true);
-    setUsersTotalCount(0);
-
-    // Make search via API call
-    retrieveUser({
-      searchValue: searchValue,
-      sizeLimit: 0,
-      apiVersion: apiVersion || API_VERSION_BACKUP,
-      startIdx: firstUserIdx,
-      stopIdx: lastUserIdx,
-      entryType: "user",
-    } as GenericPayload).then((result) => {
-      // Manage new response here
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for users",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const usersListResult = result.data?.result.results || [];
-          const usersListSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const usersList: User[] = [];
-
-          for (let i = 0; i < usersListSize; i++) {
-            usersList.push(usersListResult[i].result);
-          }
-
-          setUsersTotalCount(totalCount);
-          setActiveUsersList(usersList);
-          // Show table elements
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
-  // Show table rows
-  const [showTableRows, setShowTableRows] = useState(!isBatchLoading);
-
-  // Show table rows only when data is fully retrieved
-  useEffect(() => {
-    if (showTableRows !== !isBatchLoading) {
-      setShowTableRows(!isBatchLoading);
-    }
-  }, [isBatchLoading]);
 
   // [API call] 'Rebuild auto membership'
   const onRebuildAutoMembership = () => {
@@ -375,7 +267,7 @@ const ActiveUsers = () => {
       data-cy="modal-button-ok"
       key="rebuild-auto-membership"
       variant="primary"
-      onClick={onRebuildAutoMembership}
+      type="submit"
       form="rebuild-auto-membership-modal"
     >
       OK
@@ -528,17 +420,6 @@ const ActiveUsers = () => {
 
   // Data wrappers
   // TODO: Better separation of concerts
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownUsersList,
-    totalCount,
-  };
-
   // - 'BulkSelectorUsersPrep'
   const usersBulkSelectorData = {
     selected: selectedUsers,
@@ -554,10 +435,11 @@ const ActiveUsers = () => {
     updateIsDisableEnableOp,
   };
 
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    activeUsersList,
+    selectedUsers.map((item) => ipaPrimaryKey(item.uid)),
+    (item) => ipaPrimaryKey(item.uid)
+  );
 
   // 'DeleteUsers'
   const deleteUsersButtonsData = {
@@ -596,25 +478,6 @@ const ActiveUsers = () => {
     updateIsDisableEnableOp,
   };
 
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
-  // Contextual links panel
-  const [isContextualPanelExpanded, setIsContextualPanelExpanded] =
-    React.useState(false);
-
-  const onOpenContextualPanel = () => {
-    setIsContextualPanelExpanded(!isContextualPanelExpanded);
-  };
-
-  const onCloseContextualPanel = () => {
-    setIsContextualPanelExpanded(false);
-  };
-
   // List of Toolbar items
   const toolbarItems: ToolbarItem[] = [
     {
@@ -635,10 +498,9 @@ const ActiveUsers = () => {
         <SearchInputLayout
           dataCy="search"
           name="search"
-          ariaLabel="Search user"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          ariaLabel="Search users"
+          placeholder="Search users"
+          isDisabled={isBatchFetching}
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -654,7 +516,7 @@ const ActiveUsers = () => {
         <SecondaryButton
           dataCy="active-users-button-refresh"
           onClickHandler={refreshUsersData}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
         >
           Refresh
         </SecondaryButton>
@@ -665,7 +527,7 @@ const ActiveUsers = () => {
       element: (
         <SecondaryButton
           dataCy="active-users-button-delete"
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isBatchFetching}
           onClickHandler={onDeleteHandler}
         >
           Delete
@@ -678,7 +540,7 @@ const ActiveUsers = () => {
         <SecondaryButton
           dataCy="active-users-button-add"
           onClickHandler={onAddClickHandler}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
         >
           Add
         </SecondaryButton>
@@ -689,7 +551,7 @@ const ActiveUsers = () => {
       element: (
         <SecondaryButton
           dataCy="active-users-button-disable"
-          isDisabled={isDisableButtonDisabled || !showTableRows}
+          isDisabled={isDisableButtonDisabled || isBatchFetching}
           onClickHandler={() => onEnableDisableHandler(true)}
         >
           Disable
@@ -701,7 +563,7 @@ const ActiveUsers = () => {
       element: (
         <SecondaryButton
           dataCy="active-users-button-enable"
-          isDisabled={isEnableButtonDisabled || !showTableRows}
+          isDisabled={isEnableButtonDisabled || isBatchFetching}
           onClickHandler={() => onEnableDisableHandler(false)}
         >
           Enable
@@ -717,8 +579,8 @@ const ActiveUsers = () => {
           onKebabToggle={onKebabToggle}
           idKebab="main-dropdown-kebab"
           isKebabOpen={kebabIsOpen}
-          dropdownItems={showTableRows ? dropdownItems : []}
-          isDisabled={!showTableRows}
+          dropdownItems={isBatchFetching ? [] : dropdownItems}
+          isDisabled={isBatchFetching}
         />
       ),
     },
@@ -731,7 +593,7 @@ const ActiveUsers = () => {
       element: (
         <HelpTextWithIconLayout
           textContent="Help"
-          onClick={onOpenContextualPanel}
+          onClick={() => dispatch(toggleHelpPanel())}
         />
       ),
     },
@@ -740,7 +602,7 @@ const ActiveUsers = () => {
       element: (
         <PaginationLayout
           list={activeUsersList}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -751,105 +613,95 @@ const ActiveUsers = () => {
 
   // Render 'Active users'
   return (
-    <ContextualHelpPanel
-      fromPage="active-users"
-      isExpanded={isContextualPanelExpanded}
-      onClose={onCloseContextualPanel}
-    >
-      <div>
-        <PageSection
-          hasBodyWrapper={false}
-          variant={PageSectionVariants.default}
-        >
-          <TitleLayout
-            id="active users title"
-            headingLevel="h1"
-            text="Active Users"
-          />
-        </PageSection>
-        <PageSection hasBodyWrapper={false} isFilled={false}>
-          <Flex direction={{ default: "column" }}>
-            <FlexItem>
-              <ToolbarLayout toolbarItems={toolbarItems} />
-            </FlexItem>
-            <FlexItem>
-              <OuterScrollContainer>
-                <InnerScrollContainer>
-                  {batchError !== undefined && batchError ? (
-                    <GlobalErrors errors={globalErrors.getAll()} />
-                  ) : (
-                    <UsersTable
-                      shownElementsList={activeUsersList}
-                      from="active-users"
-                      showTableRows={showTableRows}
-                      usersData={usersTableData}
-                      buttonsData={usersTableButtonsData}
-                      paginationData={selectedPerPageData}
-                      searchValue={searchValue}
-                    />
-                  )}
-                </InnerScrollContainer>
-              </OuterScrollContainer>
-            </FlexItem>
-            <FlexItem
-              style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}
-            >
-              <PaginationLayout
-                list={activeUsersList}
-                paginationData={paginationData}
-                variant={PaginationVariant.bottom}
-                widgetId="pagination-options-menu-bottom"
-              />
-            </FlexItem>
-          </Flex>
-        </PageSection>
-        <AddUser
-          show={showAddModal}
-          from="active-users"
-          handleModalToggle={onAddModalToggle}
-          onOpenAddModal={onAddClickHandler}
-          onCloseAddModal={onCloseAddModal}
-          onRefresh={refreshUsersData}
+    <div>
+      <PageSection hasBodyWrapper={false} variant={PageSectionVariants.default}>
+        <TitleLayout
+          id="active users title"
+          headingLevel="h1"
+          text="Active Users"
         />
-        <DeleteUsers
-          show={showDeleteModal}
-          from="active-users"
-          handleModalToggle={onDeleteModalToggle}
-          selectedUsersData={selectedUsersData}
-          buttonsData={deleteUsersButtonsData}
-          onRefresh={refreshUsersData}
-          onCloseDeleteModal={onCloseDeleteModal}
-          onOpenDeleteModal={onOpenDeleteModal}
+      </PageSection>
+      <PageSection hasBodyWrapper={false} isFilled={false}>
+        <Flex direction={{ default: "column" }}>
+          <FlexItem>
+            <ToolbarLayout toolbarItems={toolbarItems} />
+          </FlexItem>
+          <FlexItem>
+            <OuterScrollContainer>
+              <InnerScrollContainer>
+                {batchError !== undefined && batchError ? (
+                  <GlobalErrors errors={globalErrors.getAll()} />
+                ) : (
+                  <UsersTable
+                    shownElementsList={activeUsersList}
+                    from="active-users"
+                    showTableRows={!isBatchFetching}
+                    usersData={usersTableData}
+                    buttonsData={usersTableButtonsData}
+                    paginationData={selectedPerPageData}
+                    searchValue={searchValue}
+                  />
+                )}
+              </InnerScrollContainer>
+            </OuterScrollContainer>
+          </FlexItem>
+          <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
+            <PaginationLayout
+              list={activeUsersList}
+              totalCount={totalCount}
+              variant={PaginationVariant.bottom}
+              widgetId="pagination-options-menu-bottom"
+            />
+          </FlexItem>
+        </Flex>
+      </PageSection>
+      <AddUser
+        show={showAddModal}
+        from="active-users"
+        handleModalToggle={onAddModalToggle}
+        onOpenAddModal={onAddClickHandler}
+        onCloseAddModal={onCloseAddModal}
+        onRefresh={refreshUsersData}
+      />
+      <DeleteUsers
+        show={showDeleteModal}
+        from="active-users"
+        handleModalToggle={onDeleteModalToggle}
+        selectedUsersData={selectedUsersData}
+        buttonsData={deleteUsersButtonsData}
+        onRefresh={refreshUsersData}
+        onCloseDeleteModal={onCloseDeleteModal}
+        onOpenDeleteModal={onOpenDeleteModal}
+      />
+      <DisableEnableUsers
+        show={showEnableDisableModal}
+        from="active-users"
+        handleModalToggle={onEnableDisableModalToggle}
+        optionSelected={enableDisableOptionSelected}
+        selectedUsersData={selectedUsersData}
+        buttonsData={disableEnableButtonsData}
+        onRefresh={refreshUsersData}
+      />
+      <ModalErrors
+        errors={modalErrors.getAll()}
+        dataCy="active-users-modal-error"
+      />
+      {isMembershipModalOpen && (
+        <ModalWithFormLayout
+          dataCy="rebuild-auto-membership-modal"
+          variantType="medium"
+          modalPosition="top"
+          offPosition="76px"
+          title="Confirmation"
+          formId="rebuild-auto-membership-modal"
+          fields={confirmationQuestion}
+          show={isMembershipModalOpen}
+          onClose={() => setIsMembershipModalOpen(!isMembershipModalOpen)}
+          onSubmit={onRebuildAutoMembership}
+          actions={membershipModalActions}
         />
-        <DisableEnableUsers
-          show={showEnableDisableModal}
-          from="active-users"
-          handleModalToggle={onEnableDisableModalToggle}
-          optionSelected={enableDisableOptionSelected}
-          selectedUsersData={selectedUsersData}
-          buttonsData={disableEnableButtonsData}
-          onRefresh={refreshUsersData}
-        />
-        <ModalErrors
-          errors={modalErrors.getAll()}
-          dataCy="active-users-modal-error"
-        />
-        {isMembershipModalOpen && (
-          <ModalWithFormLayout
-            dataCy="rebuild-auto-membership-modal"
-            variantType="medium"
-            modalPosition="top"
-            offPosition="76px"
-            title="Confirmation"
-            formId="rebuild-auto-membership-modal"
-            fields={confirmationQuestion}
-            show={isMembershipModalOpen}
-            onClose={() => setIsMembershipModalOpen(!isMembershipModalOpen)}
-            actions={membershipModalActions}
-          />
-        )}
-      </div>
-    </ContextualHelpPanel>
+      )}
+    </div>
   );
 };
 

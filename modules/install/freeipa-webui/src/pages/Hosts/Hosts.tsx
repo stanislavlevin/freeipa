@@ -27,7 +27,7 @@ import ModalWithFormLayout from "src/components/layouts/ModalWithFormLayout";
 // Components
 import BulkSelectorPrep from "src/components/BulkSelectorPrep";
 import PaginationLayout from "src/components/layouts/PaginationLayout";
-import ContextualHelpPanel from "src/components/ContextualHelpPanel/ContextualHelpPanel";
+
 // Tables
 import HostsTable from "./HostsTable";
 // Modal
@@ -39,18 +39,24 @@ import { useAppDispatch, useAppSelector } from "src/store/hooks";
 import { Host } from "src/utils/datatypes/globalDataTypes";
 // Utils
 import { API_VERSION_BACKUP, isHostSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Errors
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { SerializedError } from "@reduxjs/toolkit";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 import GlobalErrors from "src/components/errors/GlobalErrors";
 import ModalErrors from "src/components/errors/ModalErrors";
 // RPC client
-import { GenericPayload, useSearchEntriesMutation } from "../../services/rpc";
+import { GenericPayload } from "../../services/rpc";
 import {
   useGettingHostQuery,
   useAutoMemberRebuildHostsMutation,
@@ -58,18 +64,13 @@ import {
 
 const Hosts = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("hosts");
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({ pathname: "hosts" });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
+  useUpdateRoute({ pathname: "hosts" });
 
   // Define 'executeCommand' to execute simple commands (via Mutation)
   const [executeAutoMemberRebuild] = useAutoMemberRebuildHostsMutation();
@@ -87,19 +88,7 @@ const Hosts = () => {
   const modalErrors = useApiError([]);
 
   // Table comps
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
   const [totalCount, setHostsTotalCount] = useState<number>(0);
-  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -114,10 +103,6 @@ const Hosts = () => {
 
   const updateIsDeletion = (value: boolean) => {
     setIsDeletion(value);
-  };
-
-  const updateShownHostsList = (newShownHostsList: Host[]) => {
-    setHostsList(newShownHostsList);
   };
 
   // Button disabled due to error
@@ -138,14 +123,13 @@ const Hosts = () => {
 
   const {
     data: batchResponse,
-    isLoading: isBatchLoading,
+    isFetching: isBatchFetching,
     error: batchError,
   } = hostDataResponse;
 
   // Handle data when the API call is finished
   useEffect(() => {
     if (hostDataResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected users on refresh
       setHostsTotalCount(0);
       globalErrors.clear();
@@ -170,8 +154,6 @@ const Hosts = () => {
 
       setHostsList(hostsList);
       setHostsTotalCount(totalCount);
-      // Show table elements
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -186,26 +168,13 @@ const Hosts = () => {
     }
   }, [hostDataResponse]);
 
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  useEffect(() => {
-    hostDataResponse.refetch();
-  }, []);
-
   // Refresh button handling
   const refreshHostsData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected hosts on refresh
     setHostsTotalCount(0);
     clearSelectedHosts();
 
     hostDataResponse.refetch();
-  };
-
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
   };
 
   const [selectedHosts, setSelectedHostsList] = useState<Host[]>([]);
@@ -214,66 +183,7 @@ const Hosts = () => {
     setSelectedHostsList(emptyList);
   };
 
-  const [retrieveHost] = useSearchEntriesMutation({});
-
-  // Issue a search using a specific search value
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setHostsTotalCount(0);
-    setSearchIsDisabled(true);
-    retrieveHost({
-      searchValue: searchValue,
-      sizeLimit: 0,
-      apiVersion: apiVersion || API_VERSION_BACKUP,
-      startIdx: firstHostIdx,
-      stopIdx: lastHostIdx,
-      entryType: "host",
-    } as GenericPayload).then((result) => {
-      // Manage new response here
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for hosts",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const hostsListResult = result.data?.result.results || [];
-          const hostsListSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const hostsList: Host[] = [];
-
-          for (let i = 0; i < hostsListSize; i++) {
-            hostsList.push(hostsListResult[i].result);
-          }
-
-          setHostsList(hostsList);
-          setHostsTotalCount(totalCount);
-          // Show table elements
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
   // Show table rows
-  const [showTableRows, setShowTableRows] = useState(!isBatchLoading);
-
   const updateSelectedHosts = (hosts: Host[], isSelected: boolean) => {
     let newSelectedHosts: Host[] = [];
     if (isSelected) {
@@ -316,13 +226,6 @@ const Hosts = () => {
       updateSelectedHosts([host], isSelecting);
     }
   };
-
-  // Show table rows only when data is fully retrieved
-  useEffect(() => {
-    if (showTableRows !== !isBatchLoading) {
-      setShowTableRows(!isBatchLoading);
-    }
-  }, [isBatchLoading]);
 
   // Dropdown kebab
   const [kebabIsOpen, setKebabIsOpen] = useState(false);
@@ -472,17 +375,6 @@ const Hosts = () => {
   const selectableHostsTable = hostsList.filter(isHostSelectable); // elements per Table
 
   // Data wrappers
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownHostsList,
-    totalCount,
-  };
-
   // - 'BulkSelectorPrep'
   const hostsBulkSelectorData = {
     selected: selectedHosts,
@@ -495,10 +387,11 @@ const Hosts = () => {
     updateIsDeleteButtonDisabled,
   };
 
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    hostsList,
+    selectedHosts.map((item) => ipaPrimaryKey(item.fqdn)),
+    (item) => ipaPrimaryKey(item.fqdn)
+  );
 
   // - 'DeleteHosts'
   const deleteHostsButtonsData = {
@@ -526,24 +419,7 @@ const Hosts = () => {
     updateIsDeletion,
   };
 
-  // - 'SearchInputLayout'
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
   // Contextual links panel
-  const [isContextualPanelExpanded, setIsContextualPanelExpanded] =
-    React.useState(false);
-
-  const onOpenContextualPanel = () => {
-    setIsContextualPanelExpanded(!isContextualPanelExpanded);
-  };
-
-  const onCloseContextualPanel = () => {
-    setIsContextualPanelExpanded(false);
-  };
 
   // List of toolbar items
   const toolbarItems: ToolbarItem[] = [
@@ -566,9 +442,7 @@ const Hosts = () => {
           dataCy="search"
           name="search"
           ariaLabel="Search hosts"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          placeholder="Search hosts"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -583,7 +457,7 @@ const Hosts = () => {
       element: (
         <SecondaryButton
           onClickHandler={refreshHostsData}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           dataCy="hosts-button-refresh"
         >
           Refresh
@@ -594,7 +468,7 @@ const Hosts = () => {
       key: 4,
       element: (
         <SecondaryButton
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isBatchFetching}
           onClickHandler={onDeleteHandler}
           dataCy="hosts-button-delete"
         >
@@ -607,7 +481,7 @@ const Hosts = () => {
       element: (
         <SecondaryButton
           onClickHandler={onAddClickHandler}
-          isDisabled={!showTableRows || isDisabledDueError}
+          isDisabled={isBatchFetching || isDisabledDueError}
           dataCy="hosts-button-add"
         >
           Add
@@ -622,9 +496,9 @@ const Hosts = () => {
           onKebabToggle={onKebabToggle}
           idKebab="main-dropdown-kebab"
           isKebabOpen={kebabIsOpen}
-          dropdownItems={!showTableRows ? [] : dropdownItems}
+          dropdownItems={isBatchFetching ? [] : dropdownItems}
           dataCy="hosts-kebab"
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
         />
       ),
     },
@@ -637,7 +511,7 @@ const Hosts = () => {
       element: (
         <HelpTextWithIconLayout
           textContent="Help"
-          onClick={onOpenContextualPanel}
+          onClick={() => dispatch(toggleHelpPanel())}
         />
       ),
     },
@@ -646,7 +520,7 @@ const Hosts = () => {
       element: (
         <PaginationLayout
           list={hostsList}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -656,11 +530,7 @@ const Hosts = () => {
   ];
 
   return (
-    <ContextualHelpPanel
-      fromPage="hosts"
-      isExpanded={isContextualPanelExpanded}
-      onClose={onCloseContextualPanel}
-    >
+    <>
       <div>
         <PageSection hasBodyWrapper={false}>
           <TitleLayout id="Hosts title" headingLevel="h1" text="Hosts" />
@@ -681,7 +551,7 @@ const Hosts = () => {
                     <HostsTable
                       elementsList={hostsList}
                       shownElementsList={hostsList}
-                      showTableRows={showTableRows}
+                      showTableRows={!isBatchFetching}
                       hostsData={hostsTableData}
                       buttonsData={hostsTableButtonsData}
                       paginationData={selectedPerPageData}
@@ -696,7 +566,7 @@ const Hosts = () => {
             >
               <PaginationLayout
                 list={hostsList}
-                paginationData={paginationData}
+                totalCount={totalCount}
                 variant={PaginationVariant.bottom}
                 widgetId="pagination-options-menu-bottom"
               />
@@ -733,7 +603,7 @@ const Hosts = () => {
           onRefresh={refreshHostsData}
         />
       </div>
-    </ContextualHelpPanel>
+    </>
   );
 };
 

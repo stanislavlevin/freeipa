@@ -1,12 +1,14 @@
 import React from "react";
 // PatternFly
-import { Pagination, PaginationVariant } from "@patternfly/react-core";
+import { PaginationVariant } from "@patternfly/react-core";
 // Components
 import MemberOfToolbar from "../MemberOf/MemberOfToolbar";
 import MemberOfAddModal, { AvailableItems } from "../MemberOf/MemberOfAddModal";
 import MemberOfDeleteModal from "../MemberOf/MemberOfDeleteModal";
 import MemberTable from "src/components/tables/MembershipTable";
 import { MembershipDirection } from "src/components/MemberOf/MemberOfToolbar";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
+
 // Data types
 import { UserGroup } from "src/utils/datatypes/globalDataTypes";
 // Redux
@@ -14,6 +16,7 @@ import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Utils
 import { API_VERSION_BACKUP, paginate } from "src/utils/utils";
 // RPC
@@ -28,6 +31,10 @@ import {
   useAddAsMemberNGMutation,
   useRemoveAsMemberNGMutation,
 } from "src/services/rpcNetgroups";
+import {
+  useAddAsMemberRoleMutation,
+  useRemoveAsMemberRoleMutation,
+} from "src/services/rpcRoles";
 import { apiToGroup } from "src/utils/groupUtils";
 
 interface PropsToMembersUsergroups {
@@ -53,9 +60,7 @@ const MembersUserGroups = (props: PropsToMembersUsergroups) => {
     page,
     setPage,
     perPage,
-    setPerPage,
     searchValue,
-    setSearchValue,
     membershipDirection,
     setMembershipDirection,
   } = useListPageSearchParams();
@@ -113,10 +118,6 @@ const MembersUserGroups = (props: PropsToMembersUsergroups) => {
   }, [props.entity, membershipDirection, searchValue, page, perPage]);
 
   React.useEffect(() => {
-    setMembershipDirection(props.direction);
-  }, [props.entity]);
-
-  React.useEffect(() => {
     if (userGroupNamesToLoad.length > 0) {
       fullUserGroupsQuery.refetch();
     }
@@ -162,13 +163,21 @@ const MembersUserGroups = (props: PropsToMembersUsergroups) => {
 
   // Add new member to 'UserGroup'
   // API calls
-  let [addMembers] = useAddAsMemberMutation();
+  const [addMembersUG] = useAddAsMemberMutation();
+  const [addMembersNG] = useAddAsMemberNGMutation();
+  const [addMembersRole] = useAddAsMemberRoleMutation();
+  const [removeMembersUG] = useRemoveAsMemberMutation();
+  const [removeMembersNG] = useRemoveAsMemberNGMutation();
+  const [removeMembersRole] = useRemoveAsMemberRoleMutation();
+
+  let addMembers = addMembersUG;
+  let removeMembers = removeMembersUG;
   if (props.from === "netgroup") {
-    [addMembers] = useAddAsMemberNGMutation();
-  }
-  let [removeMembers] = useRemoveAsMemberMutation();
-  if (props.from === "netgroup") {
-    [removeMembers] = useRemoveAsMemberNGMutation();
+    addMembers = addMembersNG;
+    removeMembers = removeMembersNG;
+  } else if (props.from === "roles") {
+    addMembers = addMembersRole;
+    removeMembers = removeMembersRole;
   }
   const [adderSearchValue, setAdderSearchValue] = React.useState("");
   const [availableUserGroups, setAvailableUserGroups] = React.useState<
@@ -180,9 +189,9 @@ const MembersUserGroups = (props: PropsToMembersUsergroups) => {
 
   // Load available user groups, delay the search for opening the modal
   const userGroupsQuery = useGettingGroupsQuery({
-    search: adderSearchValue,
+    searchValue: adderSearchValue,
     apiVersion: API_VERSION_BACKUP,
-    sizelimit: 100,
+    sizeLimit: 100,
     startIdx: 0,
     stopIdx: 100,
   });
@@ -329,9 +338,8 @@ const MembersUserGroups = (props: PropsToMembersUsergroups) => {
     <>
       {membershipDisabled ? (
         <MemberOfToolbar
-          searchText={searchValue}
-          onSearchTextChange={setSearchValue}
-          onSearch={() => {}}
+          searchPlaceholder="Search user groups"
+          searchAriaLabel="Search user groups"
           refreshButtonEnabled={isRefreshButtonEnabled}
           onRefreshButtonClick={props.onRefreshData}
           deleteButtonEnabled={
@@ -343,17 +351,13 @@ const MembersUserGroups = (props: PropsToMembersUsergroups) => {
           addButtonEnabled={isAddButtonEnabled}
           onAddButtonClick={() => setShowAddModal(true)}
           helpIconEnabled={true}
+          onHelpIconClick={() => dispatch(toggleHelpPanel())}
           totalItems={userGroupNames.length}
-          perPage={perPage}
-          page={page}
-          onPerPageChange={setPerPage}
-          onPageChange={setPage}
         />
       ) : (
         <MemberOfToolbar
-          searchText={searchValue}
-          onSearchTextChange={setSearchValue}
-          onSearch={() => {}}
+          searchPlaceholder="Search user groups"
+          searchAriaLabel="Search user groups"
           refreshButtonEnabled={isRefreshButtonEnabled}
           onRefreshButtonClick={props.onRefreshData}
           deleteButtonEnabled={
@@ -368,11 +372,8 @@ const MembersUserGroups = (props: PropsToMembersUsergroups) => {
           membershipDirection={membershipDirection}
           onMembershipDirectionChange={setMembershipDirection}
           helpIconEnabled={true}
+          onHelpIconClick={() => dispatch(toggleHelpPanel())}
           totalItems={userGroupNames.length}
-          perPage={perPage}
-          page={page}
-          onPerPageChange={setPerPage}
-          onPageChange={setPage}
         />
       )}
       <MemberTable
@@ -393,15 +394,12 @@ const MembersUserGroups = (props: PropsToMembersUsergroups) => {
         }
         showTableRows={showTableRows}
       />
-      <Pagination
-        className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-        itemCount={userGroupNames.length}
-        widgetId="pagination-options-menu-bottom"
-        perPage={perPage}
-        page={page}
+      <PaginationLayout
+        list={[]}
+        totalCount={userGroupNames.length}
         variant={PaginationVariant.bottom}
-        onSetPage={(_e, page) => setPage(page)}
-        onPerPageSelect={(_e, perPage) => setPerPage(perPage)}
+        widgetId="pagination-options-menu-bottom"
+        className="pf-v6-u-pb-0 pf-v6-u-pr-md"
       />
       {showAddModal && (
         <MemberOfAddModal

@@ -162,11 +162,12 @@ const DualListTableLayoutInner = (props: DualListProps) => {
 
   // Issue a search using a specific search value
   const [retrieveIDs] = useGetIDListMutation({});
-  const submitSearchValue = () => {
+  const submitSearchValue = (value?: string) => {
+    const search = value ?? searchValue;
     setSearchIsDisabled(true);
     if (props.availableOptions === undefined) {
       retrieveIDs({
-        searchValue: props.availableOptions || searchValue,
+        searchValue: props.availableOptions || search,
         sizeLimit: 200,
         startIdx: 0,
         stopIdx: 200,
@@ -189,15 +190,15 @@ const DualListTableLayoutInner = (props: DualListProps) => {
     }
   };
 
-  function doSearch() {
+  function doSearch(value: string) {
+    setSearchValue(value);
     setStatus("searching");
-    submitSearchValue();
+    submitSearchValue(value);
   }
 
   const searchValueData = {
     searchValue: searchValue,
-    updateSearchValue: setSearchValue,
-    submitSearchValue: doSearch,
+    onSubmit: doSearch,
   };
 
   const onButtonClick = () => {
@@ -231,8 +232,8 @@ const DualListTableLayoutInner = (props: DualListProps) => {
       dataCy="modal-button-add"
       key={"dual-list-" + props.target}
       isDisabled={chosenOptions.length === 0 || props.spinning}
-      form="modal-form"
-      onClickHandler={onButtonClick}
+      type="submit"
+      form={"dual-list-" + props.target + "-modal"}
       spinnerAriaValueText={props.addSpinningBtnName}
       spinnerAriaLabel={props.addSpinningBtnName}
       isLoading={props.spinning}
@@ -295,7 +296,7 @@ const DualListTableLayoutInner = (props: DualListProps) => {
   const getListItems = (status: Status): ReactNode[] => {
     switch (status) {
       case "toSearch":
-        return [searchItem(doSearch)];
+        return [searchItem(() => doSearch(searchValue))];
       case "searching":
         return [searchingItem()];
       case "empty":
@@ -469,6 +470,7 @@ const DualListTableLayoutInner = (props: DualListProps) => {
       fields={fields}
       show={props.showModal}
       onClose={props.onCloseModal}
+      onSubmit={onButtonClick}
       actions={modalActions}
     />
   );

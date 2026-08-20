@@ -1,11 +1,12 @@
 import React from "react";
 // PatternFly
-import { Pagination, PaginationVariant } from "@patternfly/react-core";
+import { PaginationVariant } from "@patternfly/react-core";
 // Components
 import MemberOfToolbar from "../MemberOf/MemberOfToolbar";
 import MemberOfAddModal, { AvailableItems } from "../MemberOf/MemberOfAddModal";
 import MemberOfDeleteModal from "../MemberOf/MemberOfDeleteModal";
 import MemberTable from "src/components/tables/MembershipTable";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
 // Data types
 import { UserGroup } from "src/utils/datatypes/globalDataTypes";
 // Redux
@@ -42,8 +43,7 @@ const ManagersUserGroups = (props: PropsToManagersUsergroups) => {
   const dispatch = useAppDispatch();
 
   // Get parameters from URL
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, setPage, perPage, searchValue } = useListPageSearchParams();
 
   // Other states
   const [userGroupsSelected, setUserGroupsSelected] = React.useState<string[]>(
@@ -150,9 +150,9 @@ const ManagersUserGroups = (props: PropsToManagersUsergroups) => {
 
   // Load available user groups, delay the search for opening the modal
   const userGroupsQuery = useGettingGroupsQuery({
-    search: adderSearchValue,
+    searchValue: adderSearchValue,
     apiVersion: API_VERSION_BACKUP,
-    sizelimit: 100,
+    sizeLimit: 100,
     startIdx: 0,
     stopIdx: 100,
   });
@@ -282,9 +282,8 @@ const ManagersUserGroups = (props: PropsToManagersUsergroups) => {
   return (
     <>
       <MemberOfToolbar
-        searchText={searchValue}
-        onSearchTextChange={setSearchValue}
-        onSearch={() => {}}
+        searchPlaceholder="Search user groups"
+        searchAriaLabel="Search user groups"
         refreshButtonEnabled={isRefreshButtonEnabled}
         onRefreshButtonClick={props.onRefreshData}
         deleteButtonEnabled={userGroupsSelected.length > 0}
@@ -294,10 +293,6 @@ const ManagersUserGroups = (props: PropsToManagersUsergroups) => {
         membershipDirectionEnabled={false}
         helpIconEnabled={true}
         totalItems={props.manager_groups.length}
-        perPage={perPage}
-        page={page}
-        onPerPageChange={setPerPage}
-        onPageChange={setPage}
       />
       <MemberTable
         entityList={managers}
@@ -309,15 +304,12 @@ const ManagersUserGroups = (props: PropsToManagersUsergroups) => {
         onCheckItemsChange={setUserGroupsSelected}
         showTableRows={showTableRows}
       />
-      <Pagination
-        className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-        itemCount={managers.length}
-        widgetId="pagination-options-menu-bottom"
-        perPage={perPage}
-        page={page}
+      <PaginationLayout
+        list={[]}
+        totalCount={managers.length}
         variant={PaginationVariant.bottom}
-        onSetPage={(_e, page) => setPage(page)}
-        onPerPageSelect={(_e, perPage) => setPerPage(perPage)}
+        widgetId="pagination-options-menu-bottom"
+        className="pf-v6-u-pb-0 pf-v6-u-pr-md"
       />
       {showAddModal && (
         <MemberOfAddModal

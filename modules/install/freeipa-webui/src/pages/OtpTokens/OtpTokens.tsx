@@ -1,0 +1,477 @@
+import React from "react";
+// PatternFly
+import {
+  Flex,
+  FlexItem,
+  PageSection,
+  PaginationVariant,
+  ToolbarItemVariant,
+} from "@patternfly/react-core";
+import {
+  InnerScrollContainer,
+  OuterScrollContainer,
+} from "@patternfly/react-table";
+// Data types
+import { OtpToken } from "src/utils/datatypes/globalDataTypes";
+// Hooks
+import useUpdateRoute from "src/hooks/useUpdateRoute";
+import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
+// Redux
+import { useAppDispatch, useAppSelector } from "src/store/hooks";
+// RPC
+import { useGetOtpTokensFullDataQuery } from "src/services/rpcOtpTokens";
+// Utils
+import { isOtpTokenSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
+import { apiToOtpToken } from "src/utils/otpTokensUtils";
+// Components
+import ToolbarLayout, {
+  ToolbarItem,
+} from "src/components/layouts/ToolbarLayout";
+import SearchInputLayout from "src/components/layouts/SearchInputLayout";
+import SecondaryButton from "src/components/layouts/SecondaryButton";
+import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
+import PaginationLayout from "src/components/layouts/PaginationLayout";
+import TitleLayout from "src/components/layouts/TitleLayout";
+import GlobalErrors from "src/components/errors/GlobalErrors";
+import MainTable from "src/components/tables/MainTable";
+import BulkSelectorPrep from "src/components/BulkSelectorPrep";
+import AddOtpToken from "src/components/modals/UserModals/AddOtpToken";
+import DeleteOtpTokensModal from "./DeleteOtpTokensModal";
+import EnableDisableOtpTokensModal from "./EnableDisableOtpTokensModal";
+
+const OtpTokens = () => {
+  const dispatch = useAppDispatch();
+  useContextualHelpTopic("otp-tokens");
+
+  // Contextual help panel
+
+  // Update current route data to Redux and highlight the current page in the Nav bar
+  useUpdateRoute({
+    pathname: "otp-tokens",
+  });
+
+  // Retrieve API version from environment data
+  const apiVersion = useAppSelector(
+    (state) => state.global.environment.api_version
+  ) as string;
+
+  // URL parameters: page number, page size, search value
+  const { page, perPage, searchValue } = useListPageSearchParams();
+
+  // Handle API calls errors
+  const globalErrors = useApiError([]);
+
+  // Page indexes
+  const firstUserIdx = (page - 1) * perPage;
+  const lastUserIdx = page * perPage;
+
+  // States
+  const [otpTokens, setOtpTokens] = React.useState<OtpToken[]>([]);
+  const [totalCount, setTotalCount] = React.useState<number>(0);
+
+  // API calls
+  const otpTokensResponse = useGetOtpTokensFullDataQuery({
+    searchValue,
+    apiVersion,
+    sizelimit: 100,
+    startIdx: firstUserIdx,
+    stopIdx: lastUserIdx,
+  });
+
+  const { data, isFetching, error } = otpTokensResponse;
+
+  // Handle data when the API call is finished
+  React.useEffect(() => {
+    if (otpTokensResponse.isFetching) {
+      // Reset selected elements on refresh
+      setTotalCount(0);
+      globalErrors.clear();
+      return;
+    }
+
+    // API response: Error
+    if (otpTokensResponse.isError) {
+      globalErrors.addError(
+        error,
+        "Error when fetching OTP tokens",
+        "otp-tokens-fetch-error"
+      );
+      return;
+    }
+
+    // API response: Success
+    if (
+      otpTokensResponse.isSuccess &&
+      otpTokensResponse.data &&
+      data !== undefined
+    ) {
+      const listResult = data.result.results;
+      const listSize = data.result.count;
+      const elementsList: OtpToken[] = [];
+
+      for (let i = 0; i < listSize; i++) {
+        elementsList.push(apiToOtpToken(listResult[i].result));
+      }
+
+      setOtpTokens(elementsList);
+      setTotalCount(otpTokensResponse.data.result.totalCount);
+    }
+  }, [otpTokensResponse]);
+
+  // Selected elements
+  const [selectedElements, setSelectedElements] = React.useState<OtpToken[]>(
+    []
+  );
+
+  // Refresh button handling
+  const refreshData = () => {
+    // Reset selected elements on refresh
+    setTotalCount(0);
+
+    otpTokensResponse.refetch();
+  };
+
+  // 'Delete' button state
+  const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
+    React.useState<boolean>(true);
+
+  const [isDeletion, setIsDeletion] = React.useState<boolean>(false);
+
+  // 'Enable' button state
+  const [isEnableButtonDisabled, setIsEnableButtonDisabled] =
+    React.useState<boolean>(true);
+
+  // 'Disable' button state
+  const [isDisableButtonDisabled, setIsDisableButtonDisabled] =
+    React.useState<boolean>(true);
+
+  // Table-related shared functionality
+  // - Selectable checkboxes on table
+  const selectableOtpTokensTable = otpTokens.filter(isOtpTokenSelectable);
+
+  // - Manage the selected elements in the table (add/remove)
+  const updateSelectedOtpTokens = (
+    otpTokens: OtpToken[],
+    isSelected: boolean
+  ) => {
+    let newSelectedOtpTokens: OtpToken[] = [];
+    if (isSelected) {
+      newSelectedOtpTokens = JSON.parse(JSON.stringify(selectedElements));
+      for (let i = 0; i < otpTokens.length; i++) {
+        if (
+          selectedElements.find(
+            (selectedOtpToken) =>
+              selectedOtpToken.ipatokenuniqueid ===
+              otpTokens[i].ipatokenuniqueid
+          )
+        ) {
+          continue;
+        }
+        newSelectedOtpTokens.push(otpTokens[i]);
+      }
+    } else {
+      // Remove element
+      for (let i = 0; i < selectedElements.length; i++) {
+        let found = false;
+        for (let ii = 0; ii < otpTokens.length; ii++) {
+          if (
+            selectedElements[i].ipatokenuniqueid ===
+            otpTokens[ii].ipatokenuniqueid
+          ) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          // Keep this valid selected entry
+          newSelectedOtpTokens.push(selectedElements[i]);
+        }
+      }
+    }
+    setSelectedElements(newSelectedOtpTokens);
+    setIsDeleteButtonDisabled(newSelectedOtpTokens.length === 0);
+  };
+
+  // - Helper method to set the selected entries from the table
+  const setOtpTokensSelected = (otpToken: OtpToken, isSelecting = true) => {
+    if (isOtpTokenSelectable(otpToken)) {
+      updateSelectedOtpTokens([otpToken], isSelecting);
+    }
+  };
+
+  const selectedPerPageData = getSelectedPerPageData(
+    otpTokens,
+    selectedElements.map((otpToken) =>
+      ipaPrimaryKey(otpToken.ipatokenuniqueid)
+    ),
+    (otpToken) => ipaPrimaryKey(otpToken.ipatokenuniqueid)
+  );
+
+  // Data wrappers
+  // - 'BulkSelectorrep'
+  const bulkSelectorData = {
+    selected: selectedElements,
+    updateSelected: updateSelectedOtpTokens,
+    selectableTable: selectableOtpTokensTable,
+    nameAttr: "ipatokenuniqueid",
+  };
+
+  // Modals functionality
+  const [showAddModal, setShowAddModal] = React.useState<boolean>(false);
+  const [showDeleteModal, setShowDeleteModal] = React.useState<boolean>(false);
+  const [showEnableDisableModal, setShowEnableDisableModal] =
+    React.useState<boolean>(false);
+  const [operation, setOperation] = React.useState<"enable" | "disable">(
+    "disable"
+  );
+
+  const onEnableOperation = () => {
+    setOperation("enable");
+    setShowEnableDisableModal(true);
+  };
+
+  const onDisableOperation = () => {
+    setOperation("disable");
+    setShowEnableDisableModal(true);
+  };
+
+  // List of Toolbar items
+  const toolbarItems: ToolbarItem[] = [
+    {
+      key: 0,
+      element: (
+        <BulkSelectorPrep
+          list={otpTokens}
+          shownElementsList={otpTokens}
+          elementData={bulkSelectorData}
+          buttonsData={{
+            updateIsDeleteButtonDisabled: setIsDeleteButtonDisabled,
+          }}
+          selectedPerPageData={selectedPerPageData}
+        />
+      ),
+    },
+    {
+      key: 1,
+      element: (
+        <SearchInputLayout
+          dataCy="search"
+          name="search"
+          ariaLabel="Search OTP tokens"
+          placeholder="Search"
+        />
+      ),
+      toolbarItemVariant: ToolbarItemVariant.label,
+      toolbarItemGap: { default: "gapMd" },
+    },
+    {
+      key: 2,
+      toolbarItemVariant: ToolbarItemVariant.separator,
+    },
+    {
+      key: 3,
+      element: (
+        <SecondaryButton
+          dataCy="otp-tokens-button-refresh"
+          onClickHandler={refreshData}
+          isDisabled={isFetching}
+        >
+          Refresh
+        </SecondaryButton>
+      ),
+    },
+    {
+      key: 4,
+      element: (
+        <SecondaryButton
+          isDisabled={isDeleteButtonDisabled || isFetching}
+          dataCy="otp-tokens-button-delete"
+          onClickHandler={() => setShowDeleteModal(true)}
+        >
+          Delete
+        </SecondaryButton>
+      ),
+    },
+    {
+      key: 5,
+      element: (
+        <SecondaryButton
+          isDisabled={isFetching}
+          dataCy="otp-tokens-button-add"
+          onClickHandler={() => setShowAddModal(true)}
+        >
+          Add
+        </SecondaryButton>
+      ),
+    },
+    {
+      key: 6,
+      element: (
+        <SecondaryButton
+          isDisabled={isEnableButtonDisabled || isFetching}
+          dataCy="otp-tokens-button-enable"
+          onClickHandler={onEnableOperation}
+        >
+          Enable
+        </SecondaryButton>
+      ),
+    },
+    {
+      key: 7,
+      element: (
+        <SecondaryButton
+          isDisabled={isDisableButtonDisabled || isFetching}
+          dataCy="otp-tokens-button-disable"
+          onClickHandler={onDisableOperation}
+        >
+          Disable
+        </SecondaryButton>
+      ),
+    },
+    {
+      key: 8,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
+    },
+    {
+      key: 9,
+      element: (
+        <PaginationLayout
+          list={otpTokens}
+          totalCount={totalCount}
+          widgetId="pagination-options-menu-top"
+          isCompact={true}
+        />
+      ),
+      toolbarItemAlignment: { default: "alignEnd" },
+    },
+  ];
+
+  return (
+    <>
+      <div>
+        <PageSection hasBodyWrapper={false}>
+          <TitleLayout
+            id="otp-tokens page"
+            headingLevel="h1"
+            text="OTP tokens"
+          />
+        </PageSection>
+        <PageSection hasBodyWrapper={false} isFilled={false}>
+          <Flex direction={{ default: "column" }}>
+            <FlexItem>
+              <ToolbarLayout toolbarItems={toolbarItems} />
+            </FlexItem>
+            <FlexItem style={{ flex: "0 0 auto" }}>
+              <OuterScrollContainer>
+                <InnerScrollContainer
+                  style={{ height: "55vh", overflow: "auto" }}
+                >
+                  {error !== undefined && error ? (
+                    <GlobalErrors errors={globalErrors.getAll()} />
+                  ) : (
+                    <MainTable
+                      tableTitle="OTP tokens table"
+                      shownElementsList={otpTokens}
+                      pk="ipatokenuniqueid"
+                      keyNames={[
+                        "ipatokenuniqueid",
+                        "ipatokenowner",
+                        "ipatokendisabled",
+                        "description",
+                      ]}
+                      columnNames={[
+                        "Token unique ID",
+                        "Owner",
+                        "Status",
+                        "Description",
+                      ]}
+                      hasCheckboxes={true}
+                      pathname="otp-tokens"
+                      showTableRows={!isFetching}
+                      showLink={true}
+                      elementsData={{
+                        isElementSelectable: isOtpTokenSelectable,
+                        selectedElements,
+                        selectableElementsTable: selectableOtpTokensTable,
+                        setElementsSelected: setOtpTokensSelected,
+                        clearSelectedElements: () => setSelectedElements([]),
+                      }}
+                      buttonsData={{
+                        updateIsDeleteButtonDisabled: (value) =>
+                          setIsDeleteButtonDisabled(value),
+                        isDeletion,
+                        updateIsDeletion: (value) => setIsDeletion(value),
+                        updateIsEnableButtonDisabled: (value) =>
+                          setIsEnableButtonDisabled(value),
+                        updateIsDisableButtonDisabled: (value) =>
+                          setIsDisableButtonDisabled(value),
+                        isDisableEnableOp: true,
+                      }}
+                      paginationData={selectedPerPageData}
+                      statusElementName="ipatokendisabled"
+                      invertStatusValue={true}
+                    />
+                  )}
+                </InnerScrollContainer>
+              </OuterScrollContainer>
+            </FlexItem>
+            <FlexItem
+              style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}
+            >
+              <PaginationLayout
+                list={otpTokens}
+                totalCount={totalCount}
+                variant={PaginationVariant.bottom}
+                widgetId="pagination-options-menu-bottom"
+              />
+            </FlexItem>
+          </Flex>
+        </PageSection>
+        <AddOtpToken
+          uid={undefined}
+          isOpen={showAddModal}
+          setIsOpen={setShowAddModal}
+          onClose={() => setShowAddModal(false)}
+          onRefresh={refreshData}
+        />
+        <DeleteOtpTokensModal
+          from="main"
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          elementsToDelete={selectedElements}
+          clearSelectedElements={() => setSelectedElements([])}
+          columnNames={["Unique ID", "Owner", "Description"]}
+          keyNames={["ipatokenuniqueid", "ipatokenowner", "description"]}
+          onRefresh={refreshData}
+          updateIsDeleteButtonDisabled={setIsDeleteButtonDisabled}
+          updateIsDeletion={setIsDeletion}
+        />
+        <EnableDisableOtpTokensModal
+          isOpen={showEnableDisableModal}
+          onClose={() => setShowEnableDisableModal(false)}
+          elementsList={selectedElements.map(
+            (element) => element.ipatokenuniqueid
+          )}
+          setElementsList={setSelectedElements}
+          operation={operation}
+          onRefresh={refreshData}
+        />
+      </div>
+    </>
+  );
+};
+
+export default OtpTokens;

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 // PatternFly
 import {
+  Button,
   JumpLinks,
   JumpLinksItem,
   Flex,
@@ -21,7 +22,6 @@ import {
 // Layouts
 import TitleLayout from "src/components/layouts/TitleLayout";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
-import SecondaryButton from "src/components/layouts/SecondaryButton";
 import KebabLayout from "src/components/layouts/KebabLayout";
 import TabLayout from "src/components/layouts/TabLayout";
 // Field sections
@@ -84,6 +84,8 @@ interface PropsToUserSettings {
 }
 
 const UserSettings = (props: PropsToUserSettings) => {
+  const showPasswordPolicy = props.from !== "stage-users";
+  const showKerberosTicket = props.from === "active-users";
   const dispatch = useAppDispatch();
 
   // Navigate
@@ -460,36 +462,39 @@ const UserSettings = (props: PropsToUserSettings) => {
     {
       key: 0,
       element: (
-        <SecondaryButton
-          dataCy="user-tab-settings-button-refresh"
-          onClickHandler={props.onRefresh}
+        <Button
+          data-cy="user-tab-settings-button-refresh"
+          variant="secondary"
+          onClick={props.onRefresh}
         >
           Refresh
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 1,
       element: (
-        <SecondaryButton
-          dataCy="user-tab-settings-button-revert"
+        <Button
+          data-cy="user-tab-settings-button-revert"
+          variant="secondary"
           isDisabled={!props.isModified}
-          onClickHandler={onRevert}
+          onClick={onRevert}
         >
           Revert
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 2,
       element: (
-        <SecondaryButton
-          dataCy="user-tab-settings-button-save"
+        <Button
+          data-cy="user-tab-settings-button-save"
+          variant="primary"
           isDisabled={!props.isModified}
-          onClickHandler={onSave}
+          onClick={onSave}
         >
           Save
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
@@ -528,33 +533,38 @@ const UserSettings = (props: PropsToUserSettings) => {
             isVertical
             label="Jump to section"
             scrollableSelector="#settings-page"
-            offset={220} // for masthead
             expandable={{ default: "expandable", md: "nonExpandable" }}
           >
-            <JumpLinksItem key={0} href="#identity-settings">
-              Identity settings
-            </JumpLinksItem>
-            <JumpLinksItem key={1} href="#account-settings">
-              Account settings
-            </JumpLinksItem>
-            <JumpLinksItem key={2} href="#password-policy">
-              Password policy
-            </JumpLinksItem>
-            <JumpLinksItem key={3} href="#kerberos-ticket">
-              Kerberos ticket policy
-            </JumpLinksItem>
-            <JumpLinksItem key={4} href="#contact-settings">
-              Contact settings
-            </JumpLinksItem>
-            <JumpLinksItem key={5} href="#mailing-address">
-              Mailing address
-            </JumpLinksItem>
-            <JumpLinksItem key={6} href="#employee-information">
-              Employee information
-            </JumpLinksItem>
-            <JumpLinksItem key={7} href="#smb-services">
-              User attributes for SMB services
-            </JumpLinksItem>
+            {[
+              <JumpLinksItem key={0} href="#identity-settings">
+                Identity settings
+              </JumpLinksItem>,
+              <JumpLinksItem key={1} href="#account-settings">
+                Account settings
+              </JumpLinksItem>,
+              showPasswordPolicy ? (
+                <JumpLinksItem key={2} href="#password-policy">
+                  Password policy
+                </JumpLinksItem>
+              ) : null,
+              showKerberosTicket ? (
+                <JumpLinksItem key={3} href="#kerberos-ticket">
+                  Kerberos ticket policy
+                </JumpLinksItem>
+              ) : null,
+              <JumpLinksItem key={4} href="#contact-settings">
+                Contact settings
+              </JumpLinksItem>,
+              <JumpLinksItem key={5} href="#mailing-address">
+                Mailing address
+              </JumpLinksItem>,
+              <JumpLinksItem key={6} href="#employee-information">
+                Employee information
+              </JumpLinksItem>,
+              <JumpLinksItem key={7} href="#smb-services">
+                User attributes for SMB services
+              </JumpLinksItem>,
+            ].filter(Boolean)}
           </JumpLinks>
         </SidebarPanel>
         <SidebarContent className="pf-v6-u-mr-xl">
@@ -586,20 +596,30 @@ const UserSettings = (props: PropsToUserSettings) => {
               certData={props.certData}
               from={props.from}
             />
-            <TitleLayout
-              key={2}
-              headingLevel="h2"
-              id="password-policy"
-              text="Password policy"
-            />
-            <UsersPasswordPolicy pwdPolicyData={props.pwPolicyData || []} />
-            <TitleLayout
-              key={3}
-              headingLevel="h2"
-              id="kerberos-ticket"
-              text="Kerberos ticket"
-            />
-            <UsersKerberosTicket krbPolicyData={props.krbPolicyData || []} />
+            {showPasswordPolicy && (
+              <>
+                <TitleLayout
+                  key={2}
+                  headingLevel="h2"
+                  id="password-policy"
+                  text="Password policy"
+                />
+                <UsersPasswordPolicy pwdPolicyData={props.pwPolicyData || []} />
+              </>
+            )}
+            {showKerberosTicket && (
+              <>
+                <TitleLayout
+                  key={3}
+                  headingLevel="h2"
+                  id="kerberos-ticket"
+                  text="Kerberos ticket"
+                />
+                <UsersKerberosTicket
+                  krbPolicyData={props.krbPolicyData || []}
+                />
+              </>
+            )}
             <TitleLayout
               key={4}
               headingLevel="h2"

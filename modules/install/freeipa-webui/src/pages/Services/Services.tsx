@@ -22,7 +22,7 @@ import HelpTextWithIconLayout from "../../components/layouts/HelpTextWithIconLay
 // Components
 import BulkSelectorPrep from "../../components/BulkSelectorPrep";
 import PaginationLayout from "../../components/layouts/PaginationLayout";
-import ContextualHelpPanel from "src/components/ContextualHelpPanel/ContextualHelpPanel";
+
 // Tables
 import ServicesTable from "./ServicesTable";
 // Redux
@@ -31,6 +31,10 @@ import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { Host, Service } from "../../utils/datatypes/globalDataTypes";
 // Utils
 import { API_VERSION_BACKUP, isServiceSelectable } from "../../utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // Modals
 import AddService from "../../components/modals/AddService";
 import DeleteServices from "../../components/modals/DeleteServices";
@@ -38,30 +42,26 @@ import DeleteServices from "../../components/modals/DeleteServices";
 import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Errors
 import useApiError from "../../hooks/useApiError";
 import GlobalErrors from "../../components/errors/GlobalErrors";
 import ModalErrors from "../../components/errors/ModalErrors";
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
 // RPC client
-import { useSearchEntriesMutation, GenericPayload } from "../../services/rpc";
+import { GenericPayload } from "../../services/rpc";
 import { useGetHostsListQuery } from "../../services/rpcHosts";
 import { useGettingServicesQuery } from "../../services/rpcServices";
 
 const Services = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("services");
 
   // Initialize services list (Redux)
   const [servicesList, setServicesList] = useState<Service[]>([]);
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({ pathname: "services" });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
+  useUpdateRoute({ pathname: "services" });
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -69,8 +69,7 @@ const Services = () => {
   ) as string;
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   // Handle API calls errors
   const globalErrors = useApiError([]);
@@ -89,98 +88,17 @@ const Services = () => {
     setIsDeletion(value);
   };
 
-  // Elements selected (per page)
-  //  - This will help to calculate the remaining elements on a specific page (bulk selector)
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
   const [totalCount, setServicesTotalCount] = useState<number>(0);
 
   // Page indexes
   const firstServiceIdx = (page - 1) * perPage;
   const lastServiceIdx = page * perPage;
 
-  // Filter (Input search)
-  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
-
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
   const [selectedServices, setSelectedServicesList] = useState<Service[]>([]);
   const clearSelectedServices = () => {
     const emptyList: Service[] = [];
     setSelectedServicesList(emptyList);
   };
-
-  const [retrieveServices] = useSearchEntriesMutation({});
-
-  // Issue search with filter
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setServicesTotalCount(0);
-    setSearchIsDisabled(true);
-    retrieveServices({
-      searchValue: searchValue,
-      sizeLimit: 0,
-      apiVersion: apiVersion || API_VERSION_BACKUP,
-      startIdx: firstServiceIdx,
-      stopIdx: lastServiceIdx,
-      entryType: "service",
-    } as GenericPayload).then((result) => {
-      // Manage new response here
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for services",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const serviceListResult = result.data?.result.results || [];
-          const serviceListSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const serviceList: Service[] = [];
-
-          for (let i = 0; i < serviceListSize; i++) {
-            serviceList.push(serviceListResult[i].result);
-          }
-
-          setServicesList(serviceList);
-          setServicesTotalCount(totalCount);
-          // Show table elements
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
-  // Show table rows
-  const [showTableRows, setShowTableRows] = useState(false);
 
   // Modals functionality
   const [showAddModal, setShowAddModal] = useState(false);
@@ -292,7 +210,7 @@ const Services = () => {
 
   // Derived states - what we get from API
   const servicesDataResponse = useGettingServicesQuery({
-    searchValue: "",
+    searchValue: searchValue,
     sizeLimit: 0,
     apiVersion: apiVersion || API_VERSION_BACKUP,
     startIdx: firstServiceIdx,
@@ -301,14 +219,13 @@ const Services = () => {
 
   const {
     data: batchResponse,
-    isLoading: isBatchLoading,
+    isFetching: isBatchFetching,
     error: batchError,
   } = servicesDataResponse;
 
   // Handle data when the API call is finished
   useEffect(() => {
     if (servicesDataResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected users on refresh
       setServicesTotalCount(0);
       globalErrors.clear();
@@ -332,8 +249,6 @@ const Services = () => {
 
       setServicesList(servicesList);
       setServicesTotalCount(totalCount);
-      // Show table elements
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -348,24 +263,8 @@ const Services = () => {
     }
   }, [servicesDataResponse]);
 
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  useEffect(() => {
-    servicesDataResponse.refetch();
-  }, []);
-
-  // Show table rows only when data is fully retrieved
-  useEffect(() => {
-    if (showTableRows !== !isBatchLoading) {
-      setShowTableRows(!isBatchLoading);
-    }
-  }, [isBatchLoading]);
-
   // Refresh button handling
   const refreshServicesData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected hosts on refresh
     setServicesTotalCount(0);
     clearSelectedServices();
@@ -374,13 +273,6 @@ const Services = () => {
   };
 
   // Data wrappers
-  // - 'SearchInputLayout'
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
   // - 'BulkSelectorPrep'
   const servicesBulkSelectorData = {
     selected: selectedServices,
@@ -393,21 +285,11 @@ const Services = () => {
     updateIsDeleteButtonDisabled,
   };
 
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
-
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: setHostsList,
-    totalCount,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    servicesList,
+    selectedServices.map((item) => ipaPrimaryKey(item.krbcanonicalname)),
+    (item) => ipaPrimaryKey(item.krbcanonicalname)
+  );
 
   // - 'ServicesTable'
   const servicesTableData = {
@@ -435,18 +317,6 @@ const Services = () => {
     clearSelectedServices,
   };
 
-  // Contextual links panel
-  const [isContextualPanelExpanded, setIsContextualPanelExpanded] =
-    React.useState(false);
-
-  const onOpenContextualPanel = () => {
-    setIsContextualPanelExpanded(!isContextualPanelExpanded);
-  };
-
-  const onCloseContextualPanel = () => {
-    setIsContextualPanelExpanded(false);
-  };
-
   // List of toolbar items
   const toolbarItems: ToolbarItem[] = [
     {
@@ -468,9 +338,7 @@ const Services = () => {
           dataCy="search"
           name="search"
           ariaLabel="Search services"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          placeholder="Search services"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -485,7 +353,7 @@ const Services = () => {
       element: (
         <SecondaryButton
           onClickHandler={refreshServicesData}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           dataCy="services-button-refresh"
         >
           Refresh
@@ -508,7 +376,7 @@ const Services = () => {
       key: 5,
       element: (
         <SecondaryButton
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
           onClickHandler={onAddClickHandler}
           dataCy="services-button-add"
         >
@@ -525,7 +393,7 @@ const Services = () => {
       element: (
         <HelpTextWithIconLayout
           textContent="Help"
-          onClick={onOpenContextualPanel}
+          onClick={() => dispatch(toggleHelpPanel())}
         />
       ),
     },
@@ -534,7 +402,7 @@ const Services = () => {
       element: (
         <PaginationLayout
           list={servicesList}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -545,11 +413,7 @@ const Services = () => {
 
   // Render component
   return (
-    <ContextualHelpPanel
-      fromPage="services"
-      isExpanded={isContextualPanelExpanded}
-      onClose={onCloseContextualPanel}
-    >
+    <>
       <div>
         <PageSection hasBodyWrapper={false}>
           <TitleLayout id="Services title" headingLevel="h1" text="Services" />
@@ -570,7 +434,7 @@ const Services = () => {
                     <ServicesTable
                       elementsList={servicesList}
                       shownElementsList={servicesList}
-                      showTableRows={showTableRows}
+                      showTableRows={!isBatchFetching}
                       servicesData={servicesTableData}
                       buttonsData={servicesTableButtonsData}
                       paginationData={selectedPerPageData}
@@ -585,7 +449,7 @@ const Services = () => {
             >
               <PaginationLayout
                 list={servicesList}
-                paginationData={paginationData}
+                totalCount={totalCount}
                 variant={PaginationVariant.bottom}
                 widgetId="pagination-options-menu-bottom"
               />
@@ -612,7 +476,7 @@ const Services = () => {
           onRefresh={refreshServicesData}
         />
       </div>
-    </ContextualHelpPanel>
+    </>
   );
 };
 

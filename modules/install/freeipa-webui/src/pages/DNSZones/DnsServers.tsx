@@ -15,28 +15,25 @@ import {
   Tr,
 } from "@patternfly/react-table";
 // Hooks
-import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Redux
 import { useAppDispatch, useAppSelector } from "src/store/hooks";
 // RPC
-import {
-  useDnsServersFindQuery,
-  useSearchDnsServersEntriesMutation,
-} from "src/services/rpcDnsServers";
+import { useDnsServersFindQuery } from "src/services/rpcDnsServers";
 // React router
 import { Link } from "react-router";
 // Components
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
 import ToolbarLayout, {
   ToolbarItem,
 } from "src/components/layouts/ToolbarLayout";
 import SearchInputLayout from "src/components/layouts/SearchInputLayout";
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import PaginationLayout from "src/components/layouts/PaginationLayout";
 import TitleLayout from "src/components/layouts/TitleLayout";
 import GlobalErrors from "src/components/errors/GlobalErrors";
@@ -45,16 +42,14 @@ import SkeletonOnTableLayout from "src/components/layouts/Skeleton/SkeletonOnTab
 
 const DnsServers = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("dns-servers");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({
+  useUpdateRoute({
     pathname: "dns-servers",
   });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -62,8 +57,7 @@ const DnsServers = () => {
   ) as string;
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   // Handle API calls errors
   const globalErrors = useApiError([]);
@@ -74,8 +68,6 @@ const DnsServers = () => {
 
   // States
   const [dnsServersId, setDnsServersId] = React.useState<string[]>([]);
-  const [isSearchDisabled, setIsSearchDisabled] =
-    React.useState<boolean>(false);
   const [totalCount, setTotalCount] = React.useState<number>(0);
 
   // API calls
@@ -86,12 +78,11 @@ const DnsServers = () => {
     version: apiVersion,
   });
 
-  const { data, isLoading, error } = dnsServersResponse;
+  const { data, isFetching, error } = dnsServersResponse;
 
   // Handle data when the API call is finished
   React.useEffect(() => {
     if (dnsServersResponse.isFetching) {
-      setShowTableRows(false);
       setTotalCount(0);
       globalErrors.clear();
       return;
@@ -105,97 +96,14 @@ const DnsServers = () => {
     ) {
       setTotalCount(data.data.length || 0);
       setDnsServersId(data.data.slice(firstUserIdx, lastUserIdx) || []);
-      setShowTableRows(true);
     }
   }, [dnsServersResponse]);
 
   // Refresh button handling
   const refreshData = () => {
-    setShowTableRows(false);
     setTotalCount(0);
 
-    dnsServersResponse.refetch().then(() => {
-      setShowTableRows(true);
-    });
-  };
-
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
     dnsServersResponse.refetch();
-  }, []);
-
-  // Show table rows
-  const [showTableRows, setShowTableRows] = React.useState<boolean>(!isLoading);
-
-  // Show table rows only when data is fully retrieved
-  React.useEffect(() => {
-    if (dnsServersResponse.isSuccess && dnsServersResponse.data) {
-      setShowTableRows(true);
-    }
-  }, [dnsServersResponse.isSuccess, dnsServersResponse.data]);
-
-  // Search API call
-  const [searchEntry] = useSearchDnsServersEntriesMutation();
-
-  const submitSearchValue = () => {
-    searchEntry({
-      searchValue: searchValue,
-      pkeyOnly: true,
-      sizeLimit: 100,
-      version: apiVersion,
-    }).then((result) => {
-      if ("data" in result && result.data !== undefined) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for elements",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const dnsServers = result.data || [];
-
-          setTotalCount(totalCount);
-          setDnsServersId(
-            dnsServers.data.slice(firstUserIdx, lastUserIdx) || []
-          );
-          setShowTableRows(true);
-        }
-        setIsSearchDisabled(false);
-      }
-    });
-  };
-
-  // Data wrappers
-  // TODO: Better separation of concerts
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage: setPage,
-    updatePerPage: setPerPage,
-    updateSelectedPerPage: () => {},
-    updateShownElementsList: setDnsServersId,
-    totalCount,
-  };
-
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue: setSearchValue,
-    submitSearchValue,
   };
 
   // List of Toolbar items
@@ -206,10 +114,8 @@ const DnsServers = () => {
         <SearchInputLayout
           dataCy="search"
           name="search"
-          ariaLabel="Search dns servers"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={isSearchDisabled}
+          ariaLabel="Search DNS servers"
+          placeholder="Search DNS servers"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -225,7 +131,7 @@ const DnsServers = () => {
         <SecondaryButton
           dataCy="dns-servers-button-refresh"
           onClickHandler={refreshData}
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
         >
           Refresh
         </SecondaryButton>
@@ -237,14 +143,19 @@ const DnsServers = () => {
     },
     {
       key: 4,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 5,
       element: (
         <PaginationLayout
           list={dnsServersId}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -284,52 +195,56 @@ const DnsServers = () => {
 
   // Render component
   return (
-    <div>
-      <PageSection hasBodyWrapper={false}>
-        <TitleLayout
-          id="DNS servers page"
-          headingLevel="h1"
-          text="DNS servers"
-        />
-      </PageSection>
-      <PageSection hasBodyWrapper={false} isFilled={false}>
-        <Flex direction={{ default: "column" }}>
-          <FlexItem>
-            <ToolbarLayout toolbarItems={toolbarItems} />
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto" }}>
-            <OuterScrollContainer>
-              <InnerScrollContainer
-                style={{ height: "55vh", overflow: "auto" }}
-              >
-                {error !== undefined && error ? (
-                  <GlobalErrors errors={globalErrors.getAll()} />
-                ) : (
-                  <TableLayout
-                    ariaLabel={"DNS servers table"}
-                    variant={"compact"}
-                    hasBorders={true}
-                    classes={"pf-v6-u-mt-md"}
-                    tableId={"dns-servers-table"}
-                    isStickyHeader={true}
-                    tableHeader={header}
-                    tableBody={!showTableRows ? skeleton : body}
-                  />
-                )}
-              </InnerScrollContainer>
-            </OuterScrollContainer>
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
-            <PaginationLayout
-              list={dnsServersId}
-              paginationData={paginationData}
-              variant={PaginationVariant.bottom}
-              widgetId="pagination-options-menu-bottom"
-            />
-          </FlexItem>
-        </Flex>
-      </PageSection>
-    </div>
+    <>
+      <div>
+        <PageSection hasBodyWrapper={false}>
+          <TitleLayout
+            id="DNS servers page"
+            headingLevel="h1"
+            text="DNS servers"
+          />
+        </PageSection>
+        <PageSection hasBodyWrapper={false} isFilled={false}>
+          <Flex direction={{ default: "column" }}>
+            <FlexItem>
+              <ToolbarLayout toolbarItems={toolbarItems} />
+            </FlexItem>
+            <FlexItem style={{ flex: "0 0 auto" }}>
+              <OuterScrollContainer>
+                <InnerScrollContainer
+                  style={{ height: "55vh", overflow: "auto" }}
+                >
+                  {error !== undefined && error ? (
+                    <GlobalErrors errors={globalErrors.getAll()} />
+                  ) : (
+                    <TableLayout
+                      ariaLabel={"DNS servers table"}
+                      variant={"compact"}
+                      hasBorders={true}
+                      classes={"pf-v6-u-mt-md"}
+                      tableId={"dns-servers-table"}
+                      isStickyHeader={true}
+                      tableHeader={header}
+                      tableBody={isFetching ? skeleton : body}
+                    />
+                  )}
+                </InnerScrollContainer>
+              </OuterScrollContainer>
+            </FlexItem>
+            <FlexItem
+              style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}
+            >
+              <PaginationLayout
+                list={dnsServersId}
+                totalCount={totalCount}
+                variant={PaginationVariant.bottom}
+                widgetId="pagination-options-menu-bottom"
+              />
+            </FlexItem>
+          </Flex>
+        </PageSection>
+      </div>
+    </>
   );
 };
 

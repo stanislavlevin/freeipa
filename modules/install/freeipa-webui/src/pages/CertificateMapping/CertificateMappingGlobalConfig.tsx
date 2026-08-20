@@ -1,6 +1,7 @@
 import React from "react";
 // PatternFly
 import {
+  Button,
   Flex,
   FlexItem,
   Form,
@@ -15,6 +16,8 @@ import { useAppDispatch } from "src/store/hooks";
 import { useCertMapConfigData } from "src/hooks/useCertMapConfigData";
 import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // RPC
 import {
   CertMapConfigPayload,
@@ -28,26 +31,24 @@ import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import { NotFound } from "src/components/errors/PageErrors";
 import DataSpinner from "src/components/layouts/DataSpinner";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
-import SecondaryButton from "src/components/layouts/SecondaryButton";
+
 import PageWithGrayBorderLayout from "src/components/layouts/PageWithGrayBorderLayout";
 import IpaCheckbox from "src/components/Form/IpaCheckbox";
 
 const CertificateMappingGlobalConfig = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("certificate-mapping-global-config");
+
+  // Contextual help panel
 
   // API calls
   const certMapConfigData = useCertMapConfigData();
   const [saveConfigInfo] = useCertMapConfigModMutation();
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({
+  useUpdateRoute({
     pathname: "cert-id-mapping-global-config",
   });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
 
   // States
   const [isDataLoading, setIsDataLoading] = React.useState(false);
@@ -72,7 +73,8 @@ const CertificateMappingGlobalConfig = () => {
   };
 
   // on Save handler method
-  const onSave = () => {
+  const onSave = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setIsDataLoading(true);
     const modifiedValues = certMapConfigData.modifiedValues();
 
@@ -115,36 +117,40 @@ const CertificateMappingGlobalConfig = () => {
     {
       key: 0,
       element: (
-        <SecondaryButton
-          dataCy="certificate-mapping-global-config-button-refresh"
-          onClickHandler={certMapConfigData.refetch}
+        <Button
+          variant="secondary"
+          data-cy="certificate-mapping-global-config-button-refresh"
+          onClick={certMapConfigData.refetch}
         >
           Refresh
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 1,
       element: (
-        <SecondaryButton
-          dataCy="certificate-mapping-global-config-button-revert"
+        <Button
+          variant="secondary"
+          data-cy="certificate-mapping-global-config-button-revert"
           isDisabled={!certMapConfigData.modified || isDataLoading}
-          onClickHandler={onRevert}
+          onClick={onRevert}
         >
           Revert
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 2,
       element: (
-        <SecondaryButton
-          dataCy="certificate-mapping-global-config-button-save"
+        <Button
+          variant="primary"
+          data-cy="certificate-mapping-global-config-button-save"
           isDisabled={!certMapConfigData.modified || isDataLoading}
-          onClickHandler={onSave}
+          type="submit"
+          form="certificate-mapping-global-config-form"
         >
           Save
-        </SecondaryButton>
+        </Button>
       ),
     },
   ];
@@ -168,44 +174,51 @@ const CertificateMappingGlobalConfig = () => {
 
   // Return component
   return (
-    <PageWithGrayBorderLayout
-      id="certificate-id-mapping-global-config-page"
-      pageTitle="Certificate Identity Mapping Global Configuration"
-      toolbarItems={toolbarFields}
-    >
-      <Sidebar isPanelRight className="pf-v6-u-mb-0">
-        <SidebarPanel variant="sticky">
-          <HelpTextWithIconLayout
-            textContent="Help"
-            icon={
-              <OutlinedQuestionCircleIcon className="pf-v6-u-primary-color-100 pf-v6-u-mr-sm" />
-            }
-          />
-        </SidebarPanel>
-        <SidebarContent className="pf-v6-u-mr-xl">
-          <Flex direction={{ default: "column", lg: "row" }}>
-            <FlexItem flex={{ default: "flex_1" }}>
-              <Form className="pf-v6-u-mb-lg">
-                <FormGroup fieldId="ipacertmappromptusername" role="group">
-                  <IpaCheckbox
-                    dataCy="certificate-mapping-global-config-checkbox-ipacertmappromptusername"
-                    name="ipacertmappromptusername"
-                    value={String(
-                      certMapConfigData.certMapConfig.ipacertmappromptusername
-                    )}
-                    text="Prompt for the username"
-                    ipaObject={ipaObject}
-                    onChange={recordOnChange}
-                    objectName="certmapconfig"
-                    metadata={certMapConfigData.metadata}
-                  />
-                </FormGroup>
-              </Form>
-            </FlexItem>
-          </Flex>
-        </SidebarContent>
-      </Sidebar>
-    </PageWithGrayBorderLayout>
+    <>
+      <PageWithGrayBorderLayout
+        id="certificate-id-mapping-global-config-page"
+        pageTitle="Certificate Identity Mapping Global Configuration"
+        toolbarItems={toolbarFields}
+      >
+        <Sidebar isPanelRight className="pf-v6-u-mb-0">
+          <SidebarPanel variant="sticky">
+            <HelpTextWithIconLayout
+              textContent="Help"
+              onClick={() => dispatch(toggleHelpPanel())}
+              icon={
+                <OutlinedQuestionCircleIcon className="pf-v6-u-primary-color-100 pf-v6-u-mr-sm" />
+              }
+            />
+          </SidebarPanel>
+          <SidebarContent className="pf-v6-u-mr-xl">
+            <Flex direction={{ default: "column", lg: "row" }}>
+              <FlexItem flex={{ default: "flex_1" }}>
+                <Form
+                  className="pf-v6-u-mb-lg"
+                  id="certificate-mapping-global-config-form"
+                  onSubmit={onSave}
+                >
+                  <FormGroup fieldId="ipacertmappromptusername" role="group">
+                    <IpaCheckbox
+                      dataCy="certificate-mapping-global-config-checkbox-ipacertmappromptusername"
+                      name="ipacertmappromptusername"
+                      value={String(
+                        certMapConfigData.certMapConfig.ipacertmappromptusername
+                      )}
+                      text="Prompt for the username"
+                      ipaObject={ipaObject}
+                      onChange={recordOnChange}
+                      objectName="certmapconfig"
+                      metadata={certMapConfigData.metadata}
+                    />
+                  </FormGroup>
+                </Form>
+              </FlexItem>
+            </Flex>
+          </SidebarContent>
+        </Sidebar>
+      </PageWithGrayBorderLayout>
+    </>
   );
 };
 

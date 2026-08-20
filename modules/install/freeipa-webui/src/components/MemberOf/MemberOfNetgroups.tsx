@@ -1,6 +1,6 @@
 import React from "react";
 // PatternFly
-import { Pagination, PaginationVariant } from "@patternfly/react-core";
+import { PaginationVariant } from "@patternfly/react-core";
 // Data types
 import {
   User,
@@ -11,12 +11,14 @@ import {
 // Components
 import MemberOfToolbar from "./MemberOfToolbar";
 import MemberTable from "src/components/tables/MembershipTable";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
 import { MembershipDirection } from "src/components/MemberOf/MemberOfToolbar";
 // Redux
 import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // RPC
 import { ErrorResult } from "src/services/rpc";
 import {
@@ -53,9 +55,7 @@ const memberOfNetgroups = (props: MemberOfNetgroupsProps) => {
     page,
     setPage,
     perPage,
-    setPerPage,
     searchValue,
-    setSearchValue,
     membershipDirection,
     setMembershipDirection,
   } = useListPageSearchParams();
@@ -128,12 +128,6 @@ const memberOfNetgroups = (props: MemberOfNetgroupsProps) => {
     }
   }, [netgroupNamesToLoad]);
 
-  React.useEffect(() => {
-    if (props.direction) {
-      setMembershipDirection(props.direction);
-    }
-  }, [props.entity]);
-
   // Update netgroups
   React.useEffect(() => {
     if (fullNetgroupsQuery.data && !fullNetgroupsQuery.isFetching) {
@@ -188,9 +182,9 @@ const memberOfNetgroups = (props: MemberOfNetgroupsProps) => {
 
   // Load available netgroups, delay the search for opening the modal
   const netgroupsQuery = useGettingNetgroupsQuery({
-    search: adderSearchValue,
+    searchValue: adderSearchValue,
     apiVersion: API_VERSION_BACKUP,
-    sizelimit: 100,
+    sizeLimit: 100,
     startIdx: 0,
     stopIdx: 100,
   });
@@ -312,9 +306,8 @@ const memberOfNetgroups = (props: MemberOfNetgroupsProps) => {
     <>
       {membershipDisabled ? (
         <MemberOfToolbar
-          searchText={searchValue}
-          onSearchTextChange={setSearchValue}
-          onSearch={() => {}}
+          searchPlaceholder="Search netgroups"
+          searchAriaLabel="Search netgroups"
           refreshButtonEnabled={isRefreshButtonEnabled}
           onRefreshButtonClick={props.onRefreshData}
           deleteButtonEnabled={
@@ -329,17 +322,13 @@ const memberOfNetgroups = (props: MemberOfNetgroupsProps) => {
           membershipDirection={membershipDirection}
           onMembershipDirectionChange={setMembershipDirection}
           helpIconEnabled={true}
+          onHelpIconClick={() => dispatch(toggleHelpPanel())}
           totalItems={netgroupNames.length}
-          perPage={perPage}
-          page={page}
-          onPerPageChange={setPerPage}
-          onPageChange={setPage}
         />
       ) : (
         <MemberOfToolbar
-          searchText={searchValue}
-          onSearchTextChange={setSearchValue}
-          onSearch={() => {}}
+          searchPlaceholder="Search netgroups"
+          searchAriaLabel="Search netgroups"
           refreshButtonEnabled={isRefreshButtonEnabled}
           onRefreshButtonClick={props.onRefreshData}
           deleteButtonEnabled={
@@ -351,11 +340,8 @@ const memberOfNetgroups = (props: MemberOfNetgroupsProps) => {
           addButtonEnabled={isAddButtonEnabled}
           onAddButtonClick={() => setShowAddModal(true)}
           helpIconEnabled={true}
+          onHelpIconClick={() => dispatch(toggleHelpPanel())}
           totalItems={netgroupNames.length}
-          perPage={perPage}
-          page={page}
-          onPerPageChange={setPerPage}
-          onPageChange={setPage}
         />
       )}
       <MemberTable
@@ -377,15 +363,12 @@ const memberOfNetgroups = (props: MemberOfNetgroupsProps) => {
         showTableRows={showTableRows}
       />
       {netgroupNames.length > 0 && (
-        <Pagination
-          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-          itemCount={netgroupNames.length}
-          widgetId="pagination-options-menu-bottom"
-          perPage={perPage}
-          page={page}
+        <PaginationLayout
+          list={[]}
+          totalCount={netgroupNames.length}
           variant={PaginationVariant.bottom}
-          onSetPage={(_e, page) => setPage(page)}
-          onPerPageSelect={(_e, perPage) => setPerPage(perPage)}
+          widgetId="pagination-options-menu-bottom"
+          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
         />
       )}
       <MemberOfAddModal

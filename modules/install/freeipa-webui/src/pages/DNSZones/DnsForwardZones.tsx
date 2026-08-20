@@ -14,19 +14,21 @@ import {
 // Data types
 import { DNSForwardZone } from "src/utils/datatypes/globalDataTypes";
 // Hooks
-import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Redux
 import { useAppDispatch, useAppSelector } from "src/store/hooks";
 // RPC
-import {
-  useGetDnsForwardZonesFullDataQuery,
-  useSearchDnsForwardZonesEntriesMutation,
-} from "src/services/rpcDnsForwardZones";
+import { useGetDnsForwardZonesFullDataQuery } from "src/services/rpcDnsForwardZones";
 // Utils
 import { isDnsForwardZoneSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // Components
 import ToolbarLayout, {
   ToolbarItem,
@@ -34,6 +36,7 @@ import ToolbarLayout, {
 import SearchInputLayout from "src/components/layouts/SearchInputLayout";
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import PaginationLayout from "src/components/layouts/PaginationLayout";
 import TitleLayout from "src/components/layouts/TitleLayout";
 import GlobalErrors from "src/components/errors/GlobalErrors";
@@ -46,16 +49,14 @@ import AddDnsForwardZoneModal from "src/components/modals/DnsZones/AddDnsForward
 
 const DnsForwardZones = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("dns-forward-zones");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({
+  useUpdateRoute({
     pathname: "dns-forward-zones",
   });
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -63,8 +64,7 @@ const DnsForwardZones = () => {
   ) as string;
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   // Handle API calls errors
   const globalErrors = useApiError([]);
@@ -77,8 +77,6 @@ const DnsForwardZones = () => {
   const [dnsForwardZones, setDnsForwardZones] = React.useState<
     DNSForwardZone[]
   >([]);
-  const [isSearchDisabled, setIsSearchDisabled] =
-    React.useState<boolean>(false);
   const [totalCount, setTotalCount] = React.useState<number>(0);
 
   // API calls
@@ -89,12 +87,11 @@ const DnsForwardZones = () => {
     stopIdx: lastUserIdx,
   });
 
-  const { data, isLoading, error } = forwardDnsZonesResponse;
+  const { data, isFetching, error } = forwardDnsZonesResponse;
 
   // Handle data when the API call is finished
   React.useEffect(() => {
     if (forwardDnsZonesResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected elements on refresh
       setTotalCount(0);
       globalErrors.clear();
@@ -117,8 +114,6 @@ const DnsForwardZones = () => {
       setTotalCount(forwardDnsZonesResponse.data.result.totalCount);
       // Update the list of elements
       setDnsForwardZones(elementsList);
-      // Show table elements
-      setShowTableRows(true);
     }
   }, [forwardDnsZonesResponse]);
 
@@ -126,20 +121,14 @@ const DnsForwardZones = () => {
   const [selectedElements, setSelectedElements] = React.useState<
     DNSForwardZone[]
   >([]);
-  const [selectedPerPage, setSelectedPerPage] = React.useState<number>(0);
 
   // Refresh button handling
   const refreshData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected elements on refresh
     setTotalCount(0);
     setSelectedElements([]);
 
-    forwardDnsZonesResponse.refetch().then(() => {
-      setShowTableRows(true);
-    });
+    forwardDnsZonesResponse.refetch();
   };
 
   // 'Delete' button state
@@ -184,83 +173,20 @@ const DnsForwardZones = () => {
     }
   };
 
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    forwardDnsZonesResponse.refetch();
-  }, []);
-
   // Show table rows
-  const [showTableRows, setShowTableRows] = React.useState(!isLoading);
-
-  // Search API call
-  const [searchEntry] = useSearchDnsForwardZonesEntriesMutation();
-
-  const submitSearchValue = () => {
-    searchEntry({
-      searchValue: searchValue,
-      apiVersion,
-      startIdx: 0,
-      stopIdx: 200, // Search will consider a max. of elements
-    }).then((result) => {
-      if ("error" in result && !("data" in result)) {
-        const searchError = result.error;
-        let error: string | undefined = "";
-        if ("error" in searchError) {
-          error = searchError.error;
-        } else if ("message" in searchError) {
-          error = searchError.message;
-        }
-        dispatch(
-          addAlert({
-            name: "submit-search-value-error",
-            title: error || "Error when searching for elements",
-            variant: "danger",
-          })
-        );
-      } else {
-        // Success
-        const dnsForwardZones = result.data?.result || [];
-
-        setTotalCount(dnsForwardZones.length);
-        setDnsForwardZones(dnsForwardZones);
-        setShowTableRows(true);
-      }
-      setIsSearchDisabled(false);
-    });
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    dnsForwardZones,
+    selectedElements.map((dnsZone) => ipaPrimaryKey(dnsZone.idnsname)),
+    (dnsZone) => ipaPrimaryKey(dnsZone.idnsname)
+  );
 
   // Data wrappers
-  // TODO: Better separation of concerns
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage: setPage,
-    updatePerPage: setPerPage,
-    updateSelectedPerPage: setSelectedPerPage,
-    updateShownElementsList: setDnsForwardZones,
-    totalCount,
-  };
-
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue: setSearchValue,
-    submitSearchValue,
-  };
-
   // - 'BulkSelectorPrep'
   const bulkSelectorData = {
     selected: selectedElements,
     updateSelected: updateSelectedDnsZones,
     selectableTable: selectableDnsZonesTable,
     nameAttr: "idnsname",
-  };
-
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage: setSelectedPerPage,
   };
 
   const [showEnableDisableModal, setShowEnableDisableModal] =
@@ -301,10 +227,8 @@ const DnsForwardZones = () => {
       element: (
         <SearchInputLayout
           name="search"
-          ariaLabel="Search dns zones"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={isSearchDisabled}
+          ariaLabel="Search DNS forward zones"
+          placeholder="Search DNS forward zones"
           dataCy={"search"}
         />
       ),
@@ -320,7 +244,7 @@ const DnsForwardZones = () => {
       element: (
         <SecondaryButton
           onClickHandler={refreshData}
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
           dataCy={"dns-forward-zones-refresh"}
         >
           Refresh
@@ -331,8 +255,8 @@ const DnsForwardZones = () => {
       key: 4,
       element: (
         <SecondaryButton
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
-          dataCy={"dns-forward-zones-delete"}
+          isDisabled={isDeleteButtonDisabled || isFetching}
+          dataCy={"dns-forward-zones-button-delete"}
           onClickHandler={() => setShowDeleteForwardZonesModal(true)}
         >
           Delete
@@ -343,7 +267,7 @@ const DnsForwardZones = () => {
       key: 5,
       element: (
         <SecondaryButton
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
           dataCy={"dns-forward-zones-add"}
           onClickHandler={() => setShowAddForwardZoneModal(true)}
         >
@@ -356,7 +280,7 @@ const DnsForwardZones = () => {
       element: (
         <SecondaryButton
           onClickHandler={() => onEnableDisableHandler("disable")}
-          isDisabled={isDisableButtonDisabled || !showTableRows}
+          isDisabled={isDisableButtonDisabled || isFetching}
           dataCy={"dns-forward-zones-disable"}
         >
           Disable
@@ -368,7 +292,7 @@ const DnsForwardZones = () => {
       element: (
         <SecondaryButton
           onClickHandler={() => onEnableDisableHandler("enable")}
-          isDisabled={isEnableButtonDisabled || !showTableRows}
+          isDisabled={isEnableButtonDisabled || isFetching}
           dataCy={"dns-forward-zones-enable"}
         >
           Enable
@@ -381,14 +305,19 @@ const DnsForwardZones = () => {
     },
     {
       key: 9,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 10,
       element: (
         <PaginationLayout
           list={dnsForwardZones}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -399,112 +328,112 @@ const DnsForwardZones = () => {
 
   // Render component
   return (
-    <div>
-      <PageSection hasBodyWrapper={false}>
-        <TitleLayout
-          id="DNS forward zones page"
-          headingLevel="h1"
-          text="DNS forward zones"
+    <>
+      <div>
+        <PageSection hasBodyWrapper={false}>
+          <TitleLayout
+            id="DNS forward zones page"
+            headingLevel="h1"
+            text="DNS forward zones"
+          />
+        </PageSection>
+        <PageSection hasBodyWrapper={false} isFilled={false}>
+          <Flex direction={{ default: "column" }}>
+            <FlexItem>
+              <ToolbarLayout toolbarItems={toolbarItems} />
+            </FlexItem>
+            <FlexItem style={{ flex: "0 0 auto" }}>
+              <OuterScrollContainer>
+                <InnerScrollContainer
+                  style={{ height: "55vh", overflow: "auto" }}
+                >
+                  {error !== undefined && error ? (
+                    <GlobalErrors errors={globalErrors.getAll()} />
+                  ) : (
+                    <MainTable
+                      tableTitle="DNS forward zones table"
+                      shownElementsList={dnsForwardZones}
+                      pk="idnsname"
+                      keyNames={[
+                        "idnsname",
+                        "idnszoneactive",
+                        "idnsforwarders",
+                        "idnsforwardpolicy",
+                      ]}
+                      columnNames={[
+                        "Zone name",
+                        "Status",
+                        "Zone Forwarders",
+                        "Forward policy",
+                      ]}
+                      hasCheckboxes={true}
+                      pathname="dns-forward-zones"
+                      showTableRows={!isFetching}
+                      showLink={true}
+                      elementsData={{
+                        isElementSelectable: isDnsForwardZoneSelectable,
+                        selectedElements,
+                        selectableElementsTable: selectableDnsZonesTable,
+                        setElementsSelected: setDnsZonesSelected,
+                        clearSelectedElements: () => setSelectedElements([]),
+                      }}
+                      buttonsData={{
+                        updateIsDeleteButtonDisabled: (value) =>
+                          setIsDeleteButtonDisabled(value),
+                        isDeletion,
+                        updateIsDeletion: (value) => setIsDeletion(value),
+                        updateIsEnableButtonDisabled: (value) =>
+                          setIsEnableButtonDisabled(value),
+                        updateIsDisableButtonDisabled: (value) =>
+                          setIsDisableButtonDisabled(value),
+                        isDisableEnableOp: true,
+                      }}
+                      paginationData={selectedPerPageData}
+                      statusElementName="idnszoneactive"
+                    />
+                  )}
+                </InnerScrollContainer>
+              </OuterScrollContainer>
+            </FlexItem>
+            <FlexItem
+              style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}
+            >
+              <PaginationLayout
+                list={dnsForwardZones}
+                totalCount={totalCount}
+                variant={PaginationVariant.bottom}
+                widgetId="pagination-options-menu-bottom"
+              />
+            </FlexItem>
+          </Flex>
+        </PageSection>
+        <AddDnsForwardZoneModal
+          isOpen={showAddForwardZoneModal}
+          onClose={() => setShowAddForwardZoneModal(false)}
+          title="Add DNS forward zone"
+          onRefresh={refreshData}
         />
-      </PageSection>
-      <PageSection hasBodyWrapper={false} isFilled={false}>
-        <Flex direction={{ default: "column" }}>
-          <FlexItem>
-            <ToolbarLayout toolbarItems={toolbarItems} />
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto" }}>
-            <OuterScrollContainer>
-              <InnerScrollContainer
-                style={{ height: "55vh", overflow: "auto" }}
-              >
-                {error !== undefined && error ? (
-                  <GlobalErrors errors={globalErrors.getAll()} />
-                ) : (
-                  <MainTable
-                    tableTitle="DNS forward zones table"
-                    shownElementsList={dnsForwardZones}
-                    pk="idnsname"
-                    keyNames={[
-                      "idnsname",
-                      "idnszoneactive",
-                      "idnsforwarders",
-                      "idnsforwardpolicy",
-                    ]}
-                    columnNames={[
-                      "Zone name",
-                      "Status",
-                      "Zone Forwarders",
-                      "Forward policy",
-                    ]}
-                    hasCheckboxes={true}
-                    pathname="dns-forward-zones"
-                    showTableRows={showTableRows}
-                    showLink={true}
-                    elementsData={{
-                      isElementSelectable: isDnsForwardZoneSelectable,
-                      selectedElements,
-                      selectableElementsTable: selectableDnsZonesTable,
-                      setElementsSelected: setDnsZonesSelected,
-                      clearSelectedElements: () => setSelectedElements([]),
-                    }}
-                    buttonsData={{
-                      updateIsDeleteButtonDisabled: (value) =>
-                        setIsDeleteButtonDisabled(value),
-                      isDeletion,
-                      updateIsDeletion: (value) => setIsDeletion(value),
-                      updateIsEnableButtonDisabled: (value) =>
-                        setIsEnableButtonDisabled(value),
-                      updateIsDisableButtonDisabled: (value) =>
-                        setIsDisableButtonDisabled(value),
-                      isDisableEnableOp: true,
-                    }}
-                    paginationData={{
-                      selectedPerPage,
-                      updateSelectedPerPage: setSelectedPerPage,
-                    }}
-                    statusElementName="idnszoneactive"
-                  />
-                )}
-              </InnerScrollContainer>
-            </OuterScrollContainer>
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
-            <PaginationLayout
-              list={dnsForwardZones}
-              paginationData={paginationData}
-              variant={PaginationVariant.bottom}
-              widgetId="pagination-options-menu-bottom"
-            />
-          </FlexItem>
-        </Flex>
-      </PageSection>
-      <AddDnsForwardZoneModal
-        isOpen={showAddForwardZoneModal}
-        onClose={() => setShowAddForwardZoneModal(false)}
-        title="Add DNS forward zone"
-        onRefresh={refreshData}
-      />
-      <DeleteDnsForwardZonesModal
-        isOpen={showDeleteForwardZonesModal}
-        onClose={() => setShowDeleteForwardZonesModal(false)}
-        elementsToDelete={selectedElements}
-        clearSelectedElements={() => setSelectedElements([])}
-        columnNames={["DNS forward zone name"]}
-        keyNames={["idnsname"]}
-        onRefresh={refreshData}
-        updateIsDeleteButtonDisabled={setIsDeleteButtonDisabled}
-        updateIsDeletion={setIsDeletion}
-      />
-      <EnableDisableDnsForwardZonesModal
-        isOpen={showEnableDisableModal}
-        onClose={() => setShowEnableDisableModal(false)}
-        elementsList={selectedElements.map((dnszone) => dnszone.idnsname)}
-        setElementsList={() => {}}
-        operation={operation}
-        setShowTableRows={setShowTableRows}
-        onRefresh={refreshData}
-      />
-    </div>
+        <DeleteDnsForwardZonesModal
+          isOpen={showDeleteForwardZonesModal}
+          onClose={() => setShowDeleteForwardZonesModal(false)}
+          elementsToDelete={selectedElements}
+          clearSelectedElements={() => setSelectedElements([])}
+          columnNames={["DNS forward zone name"]}
+          keyNames={["idnsname"]}
+          onRefresh={refreshData}
+          updateIsDeleteButtonDisabled={setIsDeleteButtonDisabled}
+          updateIsDeletion={setIsDeletion}
+        />
+        <EnableDisableDnsForwardZonesModal
+          isOpen={showEnableDisableModal}
+          onClose={() => setShowEnableDisableModal(false)}
+          elementsList={selectedElements.map((dnszone) => dnszone.idnsname)}
+          setElementsList={() => {}}
+          operation={operation}
+          onRefresh={refreshData}
+        />
+      </div>
+    </>
   );
 };
 

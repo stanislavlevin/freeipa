@@ -42,8 +42,6 @@ const AddModal = (props: PropsToAddModal) => {
   const [subIdsAdded, setSubIdsAdded] = React.useState<string[]>([]);
   const [availableItems, setAvailableItems] = React.useState<string[]>([]);
   const [isAddButtonSpinning, setIsAddButtonSpinning] = React.useState(false);
-  const [isAddAnotherButtonSpinning, setIsAddAnotherButtonSpinning] =
-    React.useState(false);
 
   // Get all the Subordinate IDs to perform the filtering
   // API calls
@@ -114,9 +112,8 @@ const AddModal = (props: PropsToAddModal) => {
   }, [props.isOpen]);
 
   // on Add subordinate ID
-  const onAdd = (keepModalOpen: boolean) => {
+  const onAdd = () => {
     setIsAddButtonSpinning(true);
-    setIsAddAnotherButtonSpinning(true);
 
     generateSubid(selectedItem).then((result) => {
       if ("data" in result) {
@@ -150,13 +147,9 @@ const AddModal = (props: PropsToAddModal) => {
             props.onRefresh();
           }
           subIdsDataResponse.refetch();
-          // 'Add and add another' will keep the modal open
-          if (!keepModalOpen) {
-            props.onCloseModal();
-          }
+          props.onCloseModal();
           // Reset button spinners
           setIsAddButtonSpinning(false);
-          setIsAddAnotherButtonSpinning(false);
         }
       }
     });
@@ -183,6 +176,7 @@ const AddModal = (props: PropsToAddModal) => {
           }))}
           selected={selectedItem}
           onSelectedChange={(selected: string) => setSelectedItem(selected)}
+          noOptionsMessage="No owner available"
         />
       ),
       fieldRequired: true,
@@ -194,26 +188,11 @@ const AddModal = (props: PropsToAddModal) => {
     <Button
       data-cy="modal-button-add"
       key="add-new"
-      variant="secondary"
       isDisabled={isAddButtonSpinning || selectedItem === ""}
+      type="submit"
       form="add-modal-form"
-      onClick={() => {
-        onAdd(false);
-      }}
     >
       Add
-    </Button>,
-    <Button
-      data-cy="modal-button-add-and-add-another"
-      key="add-new-again"
-      variant="secondary"
-      isDisabled={isAddAnotherButtonSpinning || selectedItem === ""}
-      form="add-again-modal-form"
-      onClick={() => {
-        onAdd(true);
-      }}
-    >
-      Add and add again
     </Button>,
     <Button
       data-cy="modal-button-cancel"
@@ -238,6 +217,7 @@ const AddModal = (props: PropsToAddModal) => {
         fields={fields}
         show={props.isOpen}
         onClose={cleanAndCloseModal}
+        onSubmit={() => onAdd()}
         actions={modalActions}
       />
     </>

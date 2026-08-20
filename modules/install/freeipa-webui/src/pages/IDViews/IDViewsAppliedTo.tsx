@@ -22,6 +22,7 @@ import ToolbarLayout, {
   ToolbarItem,
 } from "src/components/layouts/ToolbarLayout";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 // Components
 import PaginationLayout from "src/components/layouts/PaginationLayout";
 import MemberOfDeleteModal from "src/components/MemberOf/MemberOfDeleteModal";
@@ -38,8 +39,10 @@ import { useAppDispatch } from "src/store/hooks";
 import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Errors
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 import ModalErrors from "src/components/errors/ModalErrors";
 // RPC client
 import { ErrorResult } from "../../services/rpc";
@@ -52,6 +55,8 @@ import {
   useUnapplyHostgroupsMutation,
 } from "../../services/rpcIDViews";
 import TabLayout from "src/components/layouts/TabLayout";
+// Utils
+import { getSelectedPerPageData } from "src/utils/selectedPerPage";
 
 interface AppliesToProps {
   idView: IDView;
@@ -60,9 +65,12 @@ interface AppliesToProps {
 
 const IDViewsAppliedTo = (props: AppliesToProps) => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("id-views-applied-to");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({
+  useUpdateRoute({
     pathname: "id-views",
     noBreadcrumb: true,
   });
@@ -73,35 +81,19 @@ const IDViewsAppliedTo = (props: AppliesToProps) => {
   const [executeUnapplyHosts] = useUnapplyHostsMutation();
   const [executeUnapplyHostgroups] = useUnapplyHostgroupsMutation();
 
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
-
   // Initialize views (Redux)
   const [hostsList, setHostsList] = useState<string[]>([]);
   const [shownHostsList, setShownHostsList] = useState<string[]>([]);
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
+  const { page, setPage, perPage, searchValue, setSearchValue } =
     useListPageSearchParams();
 
   // Handle API calls errors
   const modalErrors = useApiError([]);
 
   // Table comps
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
   const [totalCount, setTotalCount] = useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -114,10 +106,6 @@ const IDViewsAppliedTo = (props: AppliesToProps) => {
   const [isUnapply, setIsUnapply] = useState(false);
   const updateIsUnapply = (value: boolean) => {
     setIsUnapply(value);
-  };
-
-  const updateShownHosts = (newShownHostsList: string[]) => {
-    setShownHostsList(newShownHostsList);
   };
 
   // Page indexes
@@ -144,12 +132,6 @@ const IDViewsAppliedTo = (props: AppliesToProps) => {
     }
   }, [idViewFullData, idViewFullDataQuery.isFetching]);
 
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  useEffect(() => {
-    idViewFullDataQuery.refetch();
-  }, [page, perPage]);
-
   // Refresh button handling
   const refreshViewsData = () => {
     setTotalCount(0);
@@ -159,6 +141,7 @@ const IDViewsAppliedTo = (props: AppliesToProps) => {
   };
 
   const updateSearchValue = (value: string) => {
+    setPage(1);
     setSearchValue(value);
   };
 
@@ -177,6 +160,12 @@ const IDViewsAppliedTo = (props: AppliesToProps) => {
     const emptyList: string[] = [];
     setSelectedHosts(emptyList);
   };
+
+  const selectedPerPageData = getSelectedPerPageData(
+    shownHostsList,
+    selectedHosts,
+    (host) => host
+  );
 
   // Unapply functions
   const [showUnapplyHostsModal, setShowUnapplyHostsModal] = useState(false);
@@ -488,22 +477,6 @@ const IDViewsAppliedTo = (props: AppliesToProps) => {
   };
 
   // Data wrappers
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownHosts,
-    totalCount,
-  };
-
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
-
   const hostsTableData = {
     selectedHosts,
     hostsList,
@@ -662,14 +635,19 @@ const IDViewsAppliedTo = (props: AppliesToProps) => {
     },
     {
       key: 7,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 8,
       element: (
         <PaginationLayout
           list={hostsList}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -679,95 +657,97 @@ const IDViewsAppliedTo = (props: AppliesToProps) => {
   ];
 
   return (
-    <div
-      style={{
-        height: `var(--subsettings-calc)`,
-      }}
-    >
-      <TabLayout id="override sections">
-        <PageSection hasBodyWrapper={false} isFilled={false}>
-          <ToolbarLayout toolbarItems={toolbarItems} />
-          <OuterScrollContainer>
-            <InnerScrollContainer>
-              <IDViewsAppliedToTable
-                hosts={hostsList}
-                shownHosts={shownHostsList}
-                hostsData={hostsTableData}
-                buttonsData={viewsTableButtonsData}
-                paginationData={selectedPerPageData}
-              />
-            </InnerScrollContainer>
-          </OuterScrollContainer>
-          <PaginationLayout
-            list={hostsList}
-            paginationData={paginationData}
-            variant={PaginationVariant.bottom}
-            widgetId="pagination-options-menu-bottom"
+    <>
+      <div
+        style={{
+          height: `var(--subsettings-calc)`,
+        }}
+      >
+        <TabLayout id="override sections">
+          <PageSection hasBodyWrapper={false} isFilled={false}>
+            <ToolbarLayout toolbarItems={toolbarItems} />
+            <OuterScrollContainer>
+              <InnerScrollContainer>
+                <IDViewsAppliedToTable
+                  hosts={hostsList}
+                  shownHosts={shownHostsList}
+                  hostsData={hostsTableData}
+                  buttonsData={viewsTableButtonsData}
+                  paginationData={selectedPerPageData}
+                />
+              </InnerScrollContainer>
+            </OuterScrollContainer>
+            <PaginationLayout
+              list={hostsList}
+              totalCount={totalCount}
+              variant={PaginationVariant.bottom}
+              widgetId="pagination-options-menu-bottom"
+            />
+          </PageSection>
+          <ModalErrors
+            errors={modalErrors.getAll()}
+            dataCy="id-views-tab-applied-to-modal-error"
           />
-        </PageSection>
-        <ModalErrors
-          errors={modalErrors.getAll()}
-          dataCy="id-views-tab-applied-to-modal-error"
-        />
-        <DualListLayout
-          entry={""}
-          target={"hostgroup"}
-          showModal={showUnapplyHostGroupModal}
-          onCloseModal={() => setShowUnapplyHostGroupModal(false)}
-          onOpenModal={() => setShowUnapplyHostGroupModal(true)}
-          tableElementsList={[]}
-          action={onUnapplyHostgroups}
-          title={"Un-apply ID Views from hosts of hostgroups"}
-          spinning={applySpinning}
-          addBtnName="Unapply"
-          addSpinningBtnName="Unapplying"
-        />
-        <DualListLayout
-          entry={""}
-          target={"host"}
-          showModal={showApplyHostModal}
-          onCloseModal={() => setShowApplyHostModal(false)}
-          onOpenModal={() => setShowApplyHostModal(true)}
-          tableElementsList={hostsList}
-          action={onApplyHosts}
-          title={"Apply ID view '" + props.idView.cn + "' on hosts"}
-          spinning={applySpinning}
-          addBtnName="Apply"
-          addSpinningBtnName="Applying"
-        />
-        <DualListLayout
-          entry={""}
-          target={"hostgroup"}
-          showModal={showApplyHostGroupModal}
-          onCloseModal={() => setShowApplyHostGroupModal(false)}
-          onOpenModal={() => setShowApplyHostGroupModal(true)}
-          tableElementsList={[]}
-          action={onApplyHostGroups}
-          title={
-            "Apply ID view '" + props.idView.cn + "' on hosts of host groups"
-          }
-          spinning={applySpinning}
-          addBtnName="Apply"
-          addSpinningBtnName="Applying"
-        />
-        {/* Delete confirmation modal - Unapply Hosts*/}
-        <MemberOfDeleteModal
-          showModal={showUnapplyHostsModal}
-          onCloseModal={() => setShowUnapplyHostsModal(false)}
-          title={"Un-apply ID view '" + props.idView.cn + "' from hosts"}
-          onDelete={onUnapplyHosts}
-          spinning={applySpinning}
-        >
-          <DeletedElementsTable
-            mode="passing_id"
-            elementsToDelete={selectedHosts}
-            columnNames={["Hosts"]}
-            elementType="Host"
-            idAttr="fqdn"
+          <DualListLayout
+            entry={""}
+            target={"hostgroup"}
+            showModal={showUnapplyHostGroupModal}
+            onCloseModal={() => setShowUnapplyHostGroupModal(false)}
+            onOpenModal={() => setShowUnapplyHostGroupModal(true)}
+            tableElementsList={[]}
+            action={onUnapplyHostgroups}
+            title={"Un-apply ID Views from hosts of hostgroups"}
+            spinning={applySpinning}
+            addBtnName="Unapply"
+            addSpinningBtnName="Unapplying"
           />
-        </MemberOfDeleteModal>
-      </TabLayout>
-    </div>
+          <DualListLayout
+            entry={""}
+            target={"host"}
+            showModal={showApplyHostModal}
+            onCloseModal={() => setShowApplyHostModal(false)}
+            onOpenModal={() => setShowApplyHostModal(true)}
+            tableElementsList={hostsList}
+            action={onApplyHosts}
+            title={"Apply ID view '" + props.idView.cn + "' on hosts"}
+            spinning={applySpinning}
+            addBtnName="Apply"
+            addSpinningBtnName="Applying"
+          />
+          <DualListLayout
+            entry={""}
+            target={"hostgroup"}
+            showModal={showApplyHostGroupModal}
+            onCloseModal={() => setShowApplyHostGroupModal(false)}
+            onOpenModal={() => setShowApplyHostGroupModal(true)}
+            tableElementsList={[]}
+            action={onApplyHostGroups}
+            title={
+              "Apply ID view '" + props.idView.cn + "' on hosts of host groups"
+            }
+            spinning={applySpinning}
+            addBtnName="Apply"
+            addSpinningBtnName="Applying"
+          />
+          {/* Delete confirmation modal - Unapply Hosts*/}
+          <MemberOfDeleteModal
+            showModal={showUnapplyHostsModal}
+            onCloseModal={() => setShowUnapplyHostsModal(false)}
+            title={"Un-apply ID view '" + props.idView.cn + "' from hosts"}
+            onDelete={onUnapplyHosts}
+            spinning={applySpinning}
+          >
+            <DeletedElementsTable
+              mode="passing_id"
+              elementsToDelete={selectedHosts}
+              columnNames={["Hosts"]}
+              elementType="Host"
+              idAttr="fqdn"
+            />
+          </MemberOfDeleteModal>
+        </TabLayout>
+      </div>
+    </>
   );
 };
 

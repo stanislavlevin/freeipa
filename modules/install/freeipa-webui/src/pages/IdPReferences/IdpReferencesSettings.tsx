@@ -1,6 +1,7 @@
 import React from "react";
 // PatternFly
 import {
+  Button,
   DropdownItem,
   Flex,
   FlexItem,
@@ -18,6 +19,8 @@ import { IDPServer, Metadata } from "src/utils/datatypes/globalDataTypes";
 import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import useUpdateRoute from "src/hooks/useUpdateRoute";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 import { addAlert } from "src/store/Global/alerts-slice";
 // Utils
 import { asRecord } from "src/utils/subIdUtils";
@@ -28,8 +31,8 @@ import { IdpModPayload, useIdpModMutation } from "src/services/rpcIdp";
 // Components
 import IpaTextInput from "src/components/Form/IpaTextInput/IpaTextInput";
 import TabLayout from "src/components/layouts/TabLayout";
-import SecondaryButton from "src/components/layouts/SecondaryButton";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import IpaTextContent from "src/components/Form/IpaTextContent/IpaTextContent";
 import TitleLayout from "src/components/layouts/TitleLayout";
 import IpaPasswordInput from "src/components/Form/IpaPasswordInput";
@@ -51,6 +54,9 @@ interface PropsToIdpRefSettings {
 
 const IdpRefSettings = (props: PropsToIdpRefSettings) => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("idp-references-settings");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
   useUpdateRoute({ pathname: props.pathname });
@@ -103,7 +109,8 @@ const IdpRefSettings = (props: PropsToIdpRefSettings) => {
   };
 
   // on Save handler method
-  const onSave = () => {
+  const onSave = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setIsDataLoading(true);
     const modifiedValues = props.modifiedValues();
 
@@ -172,36 +179,40 @@ const IdpRefSettings = (props: PropsToIdpRefSettings) => {
     {
       key: 0,
       element: (
-        <SecondaryButton
-          dataCy="idp-references-tab-settings-button-refresh"
-          onClickHandler={props.onRefresh}
+        <Button
+          variant="secondary"
+          data-cy="idp-references-tab-settings-button-refresh"
+          onClick={props.onRefresh}
         >
           Refresh
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 1,
       element: (
-        <SecondaryButton
-          dataCy="idp-references-tab-settings-button-revert"
+        <Button
+          variant="secondary"
+          data-cy="idp-references-tab-settings-button-revert"
           isDisabled={!props.isModified || isDataLoading}
-          onClickHandler={onRevert}
+          onClick={onRevert}
         >
           Revert
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 2,
       element: (
-        <SecondaryButton
-          dataCy="idp-references-tab-settings-button-save"
+        <Button
+          variant="primary"
+          data-cy="idp-references-tab-settings-button-save"
           isDisabled={!props.isModified || isDataLoading}
-          onClickHandler={onSave}
+          type="submit"
+          form="idp-references-settings-form"
         >
           Save
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
@@ -223,209 +234,211 @@ const IdpRefSettings = (props: PropsToIdpRefSettings) => {
 
   // Render component
   return (
-    <>
-      <TabLayout id="settings-page" toolbarItems={toolbarFields}>
-        <Sidebar isPanelRight>
-          <SidebarPanel variant="sticky">
-            <HelpTextWithIconLayout
-              textContent="Help"
-              icon={
-                <OutlinedQuestionCircleIcon className="pf-v6-u-primary-color-100 pf-v6-u-mr-sm" />
-              }
-            />
-            <JumpLinks
-              isVertical
-              label="Jump to section"
-              scrollableSelector="#idp-reference-page"
-              offset={220} // for masthead
-              expandable={{ default: "expandable", md: "nonExpandable" }}
-              className="pf-v6-u-mt-md"
-            >
-              <JumpLinksItem key={0} href="#oauth-client-settings">
-                OAuth 2.0 client details
-              </JumpLinksItem>
-              <JumpLinksItem key={1} href="#idp-details">
-                Identity provider details
-              </JumpLinksItem>
-            </JumpLinks>
-          </SidebarPanel>
-          <SidebarContent className="pf-v6-u-mr-xl">
-            <TitleLayout
-              key={0}
-              id="oauth-client-settings"
-              text="OAuth 2.0 client details"
-              headingLevel="h2"
-              className="pf-v6-u-mt-lg pf-v6-u-mb-md"
-            />
-            <Flex direction={{ default: "column", lg: "row" }}>
-              <FlexItem flex={{ default: "flex_1" }}>
-                <Form className="pf-v6-u-mb-lg">
-                  <FormGroup
-                    label="Identity Provider reference name"
-                    role="group"
-                  >
-                    <IpaTextContent
-                      dataCy="idp-references-tab-settings-textbox-cn"
-                      name={"cn"}
-                      ariaLabel={"Identity Provider reference name"}
-                      ipaObject={ipaObject}
-                      objectName="idp"
-                      metadata={props.metadata}
-                    />
-                  </FormGroup>
-                  <FormGroup
-                    label="Client identifier"
-                    fieldId="ipaidpclientid"
-                    isRequired
-                  >
-                    <IpaTextInput
-                      dataCy="idp-references-tab-settings-textbox-ipaidpclientid"
-                      name={"ipaidpclientid"}
-                      ariaLabel={"Client identifier"}
-                      ipaObject={ipaObject}
-                      onChange={recordOnChange}
-                      objectName="idp"
-                      metadata={props.metadata}
-                    />
-                  </FormGroup>
-                  <FormGroup label="Secret" fieldId="ipaidpclientsecret">
-                    <IpaPasswordInput
-                      dataCy="idp-references-tab-settings-textbox-ipaidpclientsecret"
-                      name={"ipaidpclientsecret"}
-                      ariaLabel={"Secret"}
-                      ipaObject={ipaObject}
-                      onChange={recordOnChange}
-                      objectName="idp"
-                      metadata={props.metadata}
-                    />
-                  </FormGroup>
-                </Form>
-              </FlexItem>
-            </Flex>
-            <TitleLayout
-              key={1}
-              headingLevel="h2"
-              id="idp-details"
-              text="Identity provider details"
-              className="pf-v6-u-mt-lg pf-v6-u-mb-md"
-            />
-            <Flex direction={{ default: "column", lg: "row" }}>
-              <FlexItem flex={{ default: "flex_1" }}>
-                <Form className="pf-v6-u-mb-lg">
-                  <FormGroup label="Scope" fieldId="ipaidpscope">
-                    <IpaTextInput
-                      dataCy="idp-references-tab-settings-textbox-ipaidpscope"
-                      name={"ipaidpscope"}
-                      ariaLabel={"Scope"}
-                      ipaObject={ipaObject}
-                      onChange={recordOnChange}
-                      objectName="idp"
-                      metadata={props.metadata}
-                    />
-                  </FormGroup>
-                  <FormGroup
-                    label="External IdP user identifier attribute"
-                    fieldId="ipaidpsub"
-                  >
-                    <IpaTextInput
-                      dataCy="idp-references-tab-settings-textbox-ipaidpsub"
-                      name={"ipaidpsub"}
-                      ariaLabel={"External IdP user identifier attribute"}
-                      ipaObject={ipaObject}
-                      onChange={recordOnChange}
-                      objectName="idp"
-                      metadata={props.metadata}
-                    />
-                  </FormGroup>
-                  <FormGroup
-                    label="Authorization URI"
-                    fieldId="ipaidpauthendpoint"
-                  >
-                    <IpaTextInput
-                      dataCy="idp-references-tab-settings-textbox-ipaidpauthendpoint"
-                      name={"ipaidpauthendpoint"}
-                      ariaLabel={"Authorization URI"}
-                      ipaObject={ipaObject}
-                      onChange={recordOnChange}
-                      objectName="idp"
-                      metadata={props.metadata}
-                    />
-                  </FormGroup>
-                  <FormGroup
-                    label="Device authorization URI"
-                    fieldId="ipaidpdevauthendpoint"
-                  >
-                    <IpaTextInput
-                      dataCy="idp-references-tab-settings-textbox-ipaidpdevauthendpoint"
-                      name={"ipaidpdevauthendpoint"}
-                      ariaLabel={"Device authorization URI"}
-                      ipaObject={ipaObject}
-                      onChange={recordOnChange}
-                      objectName="idp"
-                      metadata={props.metadata}
-                    />
-                  </FormGroup>
-                  <FormGroup label="Token URI" fieldId="ipaidptokenendpoint">
-                    <IpaTextInput
-                      dataCy="idp-references-tab-settings-textbox-ipaidptokenendpoint"
-                      name={"ipaidptokenendpoint"}
-                      ariaLabel={"Token URI"}
-                      ipaObject={ipaObject}
-                      onChange={recordOnChange}
-                      objectName="idp"
-                      metadata={props.metadata}
-                    />
-                  </FormGroup>
-                  <FormGroup
-                    label="User info URI"
-                    fieldId="ipaidpuserinfoendpoint"
-                  >
-                    <IpaTextInput
-                      dataCy="idp-references-tab-settings-textbox-ipaidpuserinfoendpoint"
-                      name={"ipaidpuserinfoendpoint"}
-                      ariaLabel={"User info URI"}
-                      ipaObject={ipaObject}
-                      onChange={recordOnChange}
-                      objectName="idp"
-                      metadata={props.metadata}
-                    />
-                  </FormGroup>
-                  <FormGroup label="JWKS URI" fieldId="ipaidpkeysendpoint">
-                    <IpaTextInput
-                      dataCy="idp-references-tab-settings-textbox-ipaidpkeysendpoint"
-                      name={"ipaidpkeysendpoint"}
-                      ariaLabel={"JWKS URI"}
-                      ipaObject={ipaObject}
-                      onChange={recordOnChange}
-                      objectName="idp"
-                      metadata={props.metadata}
-                    />
-                  </FormGroup>
-                  <FormGroup label="OIDC URL" fieldId="ipaidpissuerurl">
-                    <IpaTextInput
-                      dataCy="idp-references-tab-settings-textbox-ipaidpissuerurl"
-                      name={"ipaidpissuerurl"}
-                      ariaLabel={"OIDC URL"}
-                      ipaObject={ipaObject}
-                      onChange={recordOnChange}
-                      objectName="idp"
-                      metadata={props.metadata}
-                    />
-                  </FormGroup>
-                </Form>
-              </FlexItem>
-            </Flex>
-          </SidebarContent>
-        </Sidebar>
-        <ResetIdpPassword
-          idpId={props.idpRef.cn as string}
-          isOpen={isResetPasswordModalOpen}
-          onClose={() => setIsResetPasswordModalOpen(false)}
-          onIdpRefChange={props.onIdpRefChange}
-          onRefresh={props.onRefresh}
-        />
-      </TabLayout>
-    </>
+    <TabLayout id="settings-page" toolbarItems={toolbarFields}>
+      <Sidebar isPanelRight>
+        <SidebarPanel variant="sticky">
+          <HelpTextWithIconLayout
+            textContent="Help"
+            onClick={() => dispatch(toggleHelpPanel())}
+            icon={
+              <OutlinedQuestionCircleIcon className="pf-v6-u-primary-color-100 pf-v6-u-mr-sm" />
+            }
+          />
+          <JumpLinks
+            isVertical
+            label="Jump to section"
+            scrollableSelector="#idp-reference-page"
+            expandable={{ default: "expandable", md: "nonExpandable" }}
+            className="pf-v6-u-mt-md"
+          >
+            <JumpLinksItem key={0} href="#oauth-client-settings">
+              OAuth 2.0 client details
+            </JumpLinksItem>
+            <JumpLinksItem key={1} href="#idp-details">
+              Identity provider details
+            </JumpLinksItem>
+          </JumpLinks>
+        </SidebarPanel>
+        <SidebarContent className="pf-v6-u-mr-xl">
+          <TitleLayout
+            key={0}
+            id="oauth-client-settings"
+            text="OAuth 2.0 client details"
+            headingLevel="h2"
+            className="pf-v6-u-mt-lg pf-v6-u-mb-md"
+          />
+          <Flex direction={{ default: "column", lg: "row" }}>
+            <FlexItem flex={{ default: "flex_1" }}>
+              <Form
+                className="pf-v6-u-mb-lg"
+                id="idp-references-settings-form"
+                onSubmit={onSave}
+              >
+                <FormGroup
+                  label="Identity Provider reference name"
+                  role="group"
+                >
+                  <IpaTextContent
+                    dataCy="idp-references-tab-settings-textbox-cn"
+                    name={"cn"}
+                    ariaLabel={"Identity Provider reference name"}
+                    ipaObject={ipaObject}
+                    objectName="idp"
+                    metadata={props.metadata}
+                  />
+                </FormGroup>
+                <FormGroup
+                  label="Client identifier"
+                  fieldId="ipaidpclientid"
+                  isRequired
+                >
+                  <IpaTextInput
+                    dataCy="idp-references-tab-settings-textbox-ipaidpclientid"
+                    name={"ipaidpclientid"}
+                    ariaLabel={"Client identifier"}
+                    ipaObject={ipaObject}
+                    onChange={recordOnChange}
+                    objectName="idp"
+                    metadata={props.metadata}
+                  />
+                </FormGroup>
+                <FormGroup label="Secret" fieldId="ipaidpclientsecret">
+                  <IpaPasswordInput
+                    dataCy="idp-references-tab-settings-textbox-ipaidpclientsecret"
+                    name={"ipaidpclientsecret"}
+                    ariaLabel={"Secret"}
+                    ipaObject={ipaObject}
+                    onChange={recordOnChange}
+                    objectName="idp"
+                    metadata={props.metadata}
+                  />
+                </FormGroup>
+              </Form>
+            </FlexItem>
+          </Flex>
+          <TitleLayout
+            key={1}
+            headingLevel="h2"
+            id="idp-details"
+            text="Identity provider details"
+            className="pf-v6-u-mt-lg pf-v6-u-mb-md"
+          />
+          <Flex direction={{ default: "column", lg: "row" }}>
+            <FlexItem flex={{ default: "flex_1" }}>
+              <Form className="pf-v6-u-mb-lg">
+                <FormGroup label="Scope" fieldId="ipaidpscope">
+                  <IpaTextInput
+                    dataCy="idp-references-tab-settings-textbox-ipaidpscope"
+                    name={"ipaidpscope"}
+                    ariaLabel={"Scope"}
+                    ipaObject={ipaObject}
+                    onChange={recordOnChange}
+                    objectName="idp"
+                    metadata={props.metadata}
+                  />
+                </FormGroup>
+                <FormGroup
+                  label="External IdP user identifier attribute"
+                  fieldId="ipaidpsub"
+                >
+                  <IpaTextInput
+                    dataCy="idp-references-tab-settings-textbox-ipaidpsub"
+                    name={"ipaidpsub"}
+                    ariaLabel={"External IdP user identifier attribute"}
+                    ipaObject={ipaObject}
+                    onChange={recordOnChange}
+                    objectName="idp"
+                    metadata={props.metadata}
+                  />
+                </FormGroup>
+                <FormGroup
+                  label="Authorization URI"
+                  fieldId="ipaidpauthendpoint"
+                >
+                  <IpaTextInput
+                    dataCy="idp-references-tab-settings-textbox-ipaidpauthendpoint"
+                    name={"ipaidpauthendpoint"}
+                    ariaLabel={"Authorization URI"}
+                    ipaObject={ipaObject}
+                    onChange={recordOnChange}
+                    objectName="idp"
+                    metadata={props.metadata}
+                  />
+                </FormGroup>
+                <FormGroup
+                  label="Device authorization URI"
+                  fieldId="ipaidpdevauthendpoint"
+                >
+                  <IpaTextInput
+                    dataCy="idp-references-tab-settings-textbox-ipaidpdevauthendpoint"
+                    name={"ipaidpdevauthendpoint"}
+                    ariaLabel={"Device authorization URI"}
+                    ipaObject={ipaObject}
+                    onChange={recordOnChange}
+                    objectName="idp"
+                    metadata={props.metadata}
+                  />
+                </FormGroup>
+                <FormGroup label="Token URI" fieldId="ipaidptokenendpoint">
+                  <IpaTextInput
+                    dataCy="idp-references-tab-settings-textbox-ipaidptokenendpoint"
+                    name={"ipaidptokenendpoint"}
+                    ariaLabel={"Token URI"}
+                    ipaObject={ipaObject}
+                    onChange={recordOnChange}
+                    objectName="idp"
+                    metadata={props.metadata}
+                  />
+                </FormGroup>
+                <FormGroup
+                  label="User info URI"
+                  fieldId="ipaidpuserinfoendpoint"
+                >
+                  <IpaTextInput
+                    dataCy="idp-references-tab-settings-textbox-ipaidpuserinfoendpoint"
+                    name={"ipaidpuserinfoendpoint"}
+                    ariaLabel={"User info URI"}
+                    ipaObject={ipaObject}
+                    onChange={recordOnChange}
+                    objectName="idp"
+                    metadata={props.metadata}
+                  />
+                </FormGroup>
+                <FormGroup label="JWKS URI" fieldId="ipaidpkeysendpoint">
+                  <IpaTextInput
+                    dataCy="idp-references-tab-settings-textbox-ipaidpkeysendpoint"
+                    name={"ipaidpkeysendpoint"}
+                    ariaLabel={"JWKS URI"}
+                    ipaObject={ipaObject}
+                    onChange={recordOnChange}
+                    objectName="idp"
+                    metadata={props.metadata}
+                  />
+                </FormGroup>
+                <FormGroup label="OIDC URL" fieldId="ipaidpissuerurl">
+                  <IpaTextInput
+                    dataCy="idp-references-tab-settings-textbox-ipaidpissuerurl"
+                    name={"ipaidpissuerurl"}
+                    ariaLabel={"OIDC URL"}
+                    ipaObject={ipaObject}
+                    onChange={recordOnChange}
+                    objectName="idp"
+                    metadata={props.metadata}
+                  />
+                </FormGroup>
+              </Form>
+            </FlexItem>
+          </Flex>
+        </SidebarContent>
+      </Sidebar>
+      <ResetIdpPassword
+        idpId={props.idpRef.cn as string}
+        isOpen={isResetPasswordModalOpen}
+        onClose={() => setIsResetPasswordModalOpen(false)}
+        onIdpRefChange={props.onIdpRefChange}
+        onRefresh={props.onRefresh}
+      />
+    </TabLayout>
   );
 };
 

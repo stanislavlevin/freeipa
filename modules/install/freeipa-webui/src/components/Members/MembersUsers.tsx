@@ -1,12 +1,14 @@
 import React from "react";
 // PatternFly
-import { Pagination, PaginationVariant } from "@patternfly/react-core";
+import { PaginationVariant } from "@patternfly/react-core";
 // Components
 import MemberOfToolbar from "../MemberOf/MemberOfToolbar";
 import MemberOfAddModal, { AvailableItems } from "../MemberOf/MemberOfAddModal";
 import MemberOfDeleteModal from "../MemberOf/MemberOfDeleteModal";
 import MemberTable from "src/components/tables/MembershipTable";
 import { MembershipDirection } from "src/components/MemberOf/MemberOfToolbar";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
+
 // Data types
 import { User, UserGroup } from "src/utils/datatypes/globalDataTypes";
 // Redux
@@ -14,6 +16,7 @@ import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Utils
 import { API_VERSION_BACKUP, paginate } from "src/utils/utils";
 import { apiToUser } from "src/utils/userUtils";
@@ -31,6 +34,10 @@ import {
   useAddAsMemberNGMutation,
   useRemoveAsMemberNGMutation,
 } from "src/services/rpcNetgroups";
+import {
+  useAddAsMemberRoleMutation,
+  useRemoveAsMemberRoleMutation,
+} from "src/services/rpcRoles";
 
 interface PropsToMembersUsers {
   entity: Partial<UserGroup>;
@@ -55,9 +62,7 @@ const MembersUsers = (props: PropsToMembersUsers) => {
     page,
     setPage,
     perPage,
-    setPerPage,
     searchValue,
-    setSearchValue,
     membershipDirection,
     setMembershipDirection,
   } = useListPageSearchParams();
@@ -78,13 +83,21 @@ const MembersUsers = (props: PropsToMembersUsers) => {
     membershipDirection === "direct" ? member_user : memberindirect_user;
   userNames = [...userNames];
 
-  let [addMembers] = useAddAsMemberMutation();
+  const [addMembersUG] = useAddAsMemberMutation();
+  const [addMembersNG] = useAddAsMemberNGMutation();
+  const [addMembersRole] = useAddAsMemberRoleMutation();
+  const [removeMembersUG] = useRemoveAsMemberMutation();
+  const [removeMembersNG] = useRemoveAsMemberNGMutation();
+  const [removeMembersRole] = useRemoveAsMemberRoleMutation();
+
+  let addMembers = addMembersUG;
+  let removeMembers = removeMembersUG;
   if (props.from === "netgroup") {
-    [addMembers] = useAddAsMemberNGMutation();
-  }
-  let [removeMembers] = useRemoveAsMemberMutation();
-  if (props.from === "netgroup") {
-    [removeMembers] = useRemoveAsMemberNGMutation();
+    addMembers = addMembersNG;
+    removeMembers = removeMembersNG;
+  } else if (props.from === "roles") {
+    addMembers = addMembersRole;
+    removeMembers = removeMembersRole;
   }
 
   const getUsersNameToLoad = (): string[] => {
@@ -119,10 +132,6 @@ const MembersUsers = (props: PropsToMembersUsers) => {
     setUserNamesToLoad(usersNames);
     props.setDirection(membershipDirection);
   }, [props.entity, membershipDirection, searchValue, page, perPage]);
-
-  React.useEffect(() => {
-    setMembershipDirection(props.direction);
-  }, [props.entity]);
 
   React.useEffect(() => {
     if (userNamesToLoad.length > 0) {
@@ -182,9 +191,9 @@ const MembersUsers = (props: PropsToMembersUsers) => {
 
   // Load available users, delay the search for opening the modal
   const usersQuery = useGettingActiveUserQuery({
-    search: adderSearchValue,
+    searchValue: adderSearchValue,
     apiVersion: API_VERSION_BACKUP,
-    sizelimit: 100,
+    sizeLimit: 100,
     startIdx: 0,
     stopIdx: 100,
   });
@@ -322,9 +331,8 @@ const MembersUsers = (props: PropsToMembersUsers) => {
     <>
       {membershipDisabled ? (
         <MemberOfToolbar
-          searchText={searchValue}
-          onSearchTextChange={setSearchValue}
-          onSearch={() => {}}
+          searchPlaceholder="Search users"
+          searchAriaLabel="Search users"
           refreshButtonEnabled={isRefreshButtonEnabled}
           onRefreshButtonClick={props.onRefreshData}
           deleteButtonEnabled={
@@ -336,17 +344,13 @@ const MembersUsers = (props: PropsToMembersUsers) => {
           addButtonEnabled={isAddButtonEnabled}
           onAddButtonClick={() => setShowAddModal(true)}
           helpIconEnabled={true}
+          onHelpIconClick={() => dispatch(toggleHelpPanel())}
           totalItems={userNames.length}
-          perPage={perPage}
-          page={page}
-          onPerPageChange={setPerPage}
-          onPageChange={setPage}
         />
       ) : (
         <MemberOfToolbar
-          searchText={searchValue}
-          onSearchTextChange={setSearchValue}
-          onSearch={() => {}}
+          searchPlaceholder="Search users"
+          searchAriaLabel="Search users"
           refreshButtonEnabled={isRefreshButtonEnabled}
           onRefreshButtonClick={props.onRefreshData}
           deleteButtonEnabled={
@@ -361,11 +365,8 @@ const MembersUsers = (props: PropsToMembersUsers) => {
           membershipDirection={membershipDirection}
           onMembershipDirectionChange={setMembershipDirection}
           helpIconEnabled={true}
+          onHelpIconClick={() => dispatch(toggleHelpPanel())}
           totalItems={userNames.length}
-          perPage={perPage}
-          page={page}
-          onPerPageChange={setPerPage}
-          onPageChange={setPage}
         />
       )}
       <MemberTable
@@ -386,15 +387,12 @@ const MembersUsers = (props: PropsToMembersUsers) => {
         }
         showTableRows={showTableRows}
       />
-      <Pagination
-        className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-        itemCount={userNames.length}
-        widgetId="pagination-options-menu-bottom"
-        perPage={perPage}
-        page={page}
+      <PaginationLayout
+        list={[]}
+        totalCount={userNames.length}
         variant={PaginationVariant.bottom}
-        onSetPage={(_e, page) => setPage(page)}
-        onPerPageSelect={(_e, perPage) => setPerPage(perPage)}
+        widgetId="pagination-options-menu-bottom"
+        className="pf-v6-u-pb-0 pf-v6-u-pr-md"
       />
       {showAddModal && (
         <MemberOfAddModal

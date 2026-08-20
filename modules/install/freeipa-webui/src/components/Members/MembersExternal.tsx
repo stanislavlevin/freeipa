@@ -1,16 +1,13 @@
 import React from "react";
 // PatternFly
-import {
-  Button,
-  Pagination,
-  PaginationVariant,
-  TextInput,
-} from "@patternfly/react-core";
+import { Button, PaginationVariant, TextInput } from "@patternfly/react-core";
 // Components
 import MemberOfToolbar from "../MemberOf/MemberOfToolbar";
 import { AvailableItems } from "../MemberOf/MemberOfAddModal";
 import MemberOfDeleteModal from "../MemberOf/MemberOfDeleteModal";
 import MemberTable from "src/components/tables/MembershipTable";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
+
 // Data types
 import { UserGroup } from "src/utils/datatypes/globalDataTypes";
 // Redux
@@ -18,6 +15,7 @@ import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // RPC
 import { ErrorResult, MemberPayload } from "src/services/rpc";
 import {
@@ -40,8 +38,7 @@ const MembersExternal = (props: PropsToMembersExternal) => {
   const dispatch = useAppDispatch();
 
   // Get parameters from URL
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { setPage } = useListPageSearchParams();
 
   // Other states
   const [externalsSelected, setExternalsSelected] = React.useState<string[]>(
@@ -226,9 +223,8 @@ const MembersExternal = (props: PropsToMembersExternal) => {
   return (
     <>
       <MemberOfToolbar
-        searchText={searchValue}
-        onSearchTextChange={setSearchValue}
-        onSearch={() => {}}
+        searchPlaceholder="Search external members"
+        searchAriaLabel="Search external members"
         refreshButtonEnabled={isRefreshButtonEnabled}
         onRefreshButtonClick={props.onRefreshData}
         deleteButtonEnabled={isDeleteEnabled}
@@ -236,11 +232,8 @@ const MembersExternal = (props: PropsToMembersExternal) => {
         addButtonEnabled={isAddButtonEnabled}
         onAddButtonClick={() => setShowAddModal(true)}
         helpIconEnabled={true}
+        onHelpIconClick={() => dispatch(toggleHelpPanel())}
         totalItems={props.member_external.length}
-        perPage={perPage}
-        page={page}
-        onPerPageChange={setPerPage}
-        onPageChange={setPage}
       />
       <MemberTable
         entityList={props.member_external}
@@ -252,15 +245,12 @@ const MembersExternal = (props: PropsToMembersExternal) => {
         onCheckItemsChange={setExternalsSelected}
         showTableRows={showTableRows}
       />
-      <Pagination
-        className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-        itemCount={props.member_external.length}
-        widgetId="pagination-options-menu-bottom"
-        perPage={perPage}
-        page={page}
+      <PaginationLayout
+        list={[]}
+        totalCount={props.member_external.length}
         variant={PaginationVariant.bottom}
-        onSetPage={(_e, page) => setPage(page)}
-        onPerPageSelect={(_e, perPage) => setPerPage(perPage)}
+        widgetId="pagination-options-menu-bottom"
+        className="pf-v6-u-pb-0 pf-v6-u-pr-md"
       />
       {showAddModal && (
         <ModalWithFormLayout

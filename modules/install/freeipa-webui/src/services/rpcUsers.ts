@@ -8,6 +8,7 @@ import {
   BatchRPCResponse,
   FindRPCResponse,
   useGettingGenericQuery,
+  GenericPayload,
 } from "./rpc";
 import { apiToUser, userToApi } from "../utils/userUtils";
 import { apiToPwPolicy } from "../utils/pwPolicyUtils";
@@ -19,6 +20,7 @@ import {
   User,
   RadiusServer,
   IDPServer,
+  AlgorithmType,
 } from "../utils/datatypes/globalDataTypes";
 
 /**
@@ -96,6 +98,24 @@ export interface AddUserPayload {
   noprivate?: boolean;
   gidnumber?: string;
   userpassword?: string;
+}
+
+export interface AddOtpTokenPayload {
+  ipatokenuniqueid: string;
+  type: "totp" | "hotp";
+  description?: string;
+  ipatokenowner?: string;
+  ipatokennotbefore?: string;
+  ipatokennotafter?: string;
+  ipatokenvendor?: string;
+  ipatokenmodel?: string;
+  ipatokenserial?: string;
+  ipatokenotpkey?: string;
+  ipatokenotpalgorithm?: AlgorithmType;
+  ipatokenotpdigits?: 6 | 8;
+  ipatokentotpclockoffset?: number;
+  ipatokentotptimestep?: number | string;
+  version?: string;
 }
 
 const extendedApi = api.injectEndpoints({
@@ -441,13 +461,39 @@ const extendedApi = api.injectEndpoints({
       },
       invalidatesTags: ["FullUser"],
     }),
-    addOtpToken: build.mutation<FindRPCResponse, any[]>({
+    addOtpToken: build.mutation<FindRPCResponse, AddOtpTokenPayload>({
       query: (payload) => {
-        const params = [payload[0], payload[1]];
+        const params: Record<string, unknown> = {
+          version: payload.version || API_VERSION_BACKUP,
+        };
+
+        const optionalKeys: Array<
+          keyof Omit<AddOtpTokenPayload, "ipatokenuniqueid" | "apiVersion">
+        > = [
+          "type",
+          "description",
+          "ipatokenowner",
+          "ipatokennotbefore",
+          "ipatokennotafter",
+          "ipatokenvendor",
+          "ipatokenmodel",
+          "ipatokenserial",
+          "ipatokenotpkey",
+          "ipatokenotpalgorithm",
+          "ipatokenotpdigits",
+          "ipatokentotptimestep",
+        ];
+
+        optionalKeys.forEach((key) => {
+          const value = payload[key];
+          if (value !== undefined && value !== "") {
+            params[key] = value;
+          }
+        });
 
         return getCommand({
           method: "otptoken_add",
-          params: params,
+          params: [[payload.ipatokenuniqueid], params],
         });
       },
     }),
@@ -562,20 +608,25 @@ const extendedApi = api.injectEndpoints({
   overrideExisting: false,
 });
 
+type UsersPayload = Pick<
+  Omit<GenericPayload, "method">,
+  "searchValue" | "apiVersion" | "sizeLimit" | "startIdx" | "stopIdx"
+>;
+
 // Active Users
-export const useGettingActiveUserQuery = (payloadData) => {
+export const useGettingActiveUserQuery = (payloadData: UsersPayload) => {
   payloadData["objName"] = "user";
   payloadData["objAttr"] = "uid";
   return useGettingGenericQuery(payloadData);
 };
 // Stage Users
-export const useGettingStageUserQuery = (payloadData) => {
+export const useGettingStageUserQuery = (payloadData: UsersPayload) => {
   payloadData["objName"] = "stageuser";
   payloadData["objAttr"] = "uid";
   return useGettingGenericQuery(payloadData);
 };
 // Preserved users
-export const useGettingPreservedUserQuery = (payloadData) => {
+export const useGettingPreservedUserQuery = (payloadData: UsersPayload) => {
   payloadData["objName"] = "preserved";
   payloadData["objAttr"] = "uid";
   return useGettingGenericQuery(payloadData);

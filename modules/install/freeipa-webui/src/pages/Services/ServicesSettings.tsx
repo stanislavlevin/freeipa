@@ -22,7 +22,6 @@ import IssueNewCertificate from "src/components/modals/CertificateModals/IssueNe
 // Layouts
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
 import TitleLayout from "src/components/layouts/TitleLayout";
-import SecondaryButton from "src/components/layouts/SecondaryButton";
 import KebabLayout from "src/components/layouts/KebabLayout";
 import ModalErrors from "src/components/errors/ModalErrors";
 import TabLayout from "src/components/layouts/TabLayout";
@@ -76,7 +75,7 @@ const ServicesSettings = (props: PropsToServicesSettings) => {
 
   // Update page to show correct links info in Contextual panel
   React.useEffect(() => {
-    props.changeFromPage("service-settings");
+    props.changeFromPage("services-settings");
   }, [props.changeFromPage]);
 
   // Kebab
@@ -103,7 +102,8 @@ const ServicesSettings = (props: PropsToServicesSettings) => {
       data-cy="modal-button-unprovision"
       key="unprov-host"
       variant="danger"
-      onClick={() => onUnprovision()}
+      type="submit"
+      form="services-unprovision-form"
       isDisabled={modalSpinning}
       isLoading={modalSpinning}
       spinnerAriaValueText="Unprovisioning"
@@ -255,40 +255,42 @@ const ServicesSettings = (props: PropsToServicesSettings) => {
     {
       key: 0,
       element: (
-        <SecondaryButton
-          dataCy="services-tab-settings-button-refresh"
-          onClickHandler={props.onRefresh}
+        <Button
+          data-cy="services-tab-settings-button-refresh"
+          variant="secondary"
+          onClick={props.onRefresh}
         >
           Refresh
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 1,
       element: (
-        <SecondaryButton
-          dataCy="services-tab-settings-button-revert"
+        <Button
+          data-cy="services-tab-settings-button-revert"
+          variant="secondary"
           isDisabled={!props.isModified}
-          onClickHandler={onRevert}
+          onClick={onRevert}
         >
           Revert
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 2,
       element: (
-        <SecondaryButton
-          dataCy="services-tab-settings-button-save"
+        <Button
+          data-cy="services-tab-settings-button-save"
+          variant="primary"
           isDisabled={!props.isModified || isSaving}
-          onClickHandler={onSave}
+          onClick={onSave}
           isLoading={isSaving}
           spinnerAriaValueText="Saving"
-          spinnerAriaLabelledBy="Saving"
           spinnerAriaLabel="Saving"
         >
           {isSaving ? "Saving" : "Save"}
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
@@ -321,7 +323,6 @@ const ServicesSettings = (props: PropsToServicesSettings) => {
             isVertical
             label="Jump to section"
             scrollableSelector="#settings-page"
-            offset={220} // for masthead
             expandable={{ default: "expandable", md: "nonExpandable" }}
           >
             <JumpLinksItem key={0} href="#service-settings">
@@ -412,6 +413,8 @@ const ServicesSettings = (props: PropsToServicesSettings) => {
         messageObj={
           props.service.krbcanonicalname ? props.service.krbcanonicalname : ""
         }
+        formId="services-unprovision-form"
+        onSubmit={() => onUnprovision()}
       />
       <IssueNewCertificate
         isOpen={isCertModalOpen}

@@ -6,7 +6,6 @@ import {
   selectEntry,
 } from "../common/data_tables";
 import { navigateTo } from "../common/navigation";
-import { loginAsAdmin, logout } from "../common/authentication";
 
 const fillHostgroup = (hostgroupName: string, hostgroupDescription: string) => {
   cy.dataCy("modal-textbox-hostgroup-name").type(hostgroupName);
@@ -19,7 +18,7 @@ const fillHostgroup = (hostgroupName: string, hostgroupDescription: string) => {
   );
 };
 
-export const createHostgroup = (
+const createHostgroup = (
   hostgroupName: string,
   hostgroupDescription: string
 ) => {
@@ -73,27 +72,21 @@ Then(
 );
 
 Given(
-  "Hostgroup {string} with description {string} exists",
+  "hostgroup {string} with description {string} exists",
   (hostgroupName: string, hostgroupDescription: string) => {
-    loginAsAdmin();
-    navigateTo("host-groups");
-
-    createHostgroup(hostgroupName, hostgroupDescription);
-    validateHostgroup(hostgroupName);
-
-    logout();
+    cy.ipa({
+      command: "hostgroup-add",
+      name: hostgroupName,
+      specificOptions: `--desc="${hostgroupDescription}"`,
+    });
   }
 );
 
 Given("I delete hostgroup {string}", (hostgroupName: string) => {
-  loginAsAdmin();
-  navigateTo("host-groups");
-
-  deleteHostgroup(hostgroupName);
-
-  searchForEntry(hostgroupName);
-  entryDoesNotExist(hostgroupName);
-  logout();
+  cy.ipa({
+    command: "hostgroup-del",
+    name: hostgroupName,
+  });
 });
 
 When("I try to delete hostgroup {string}", (hostgroupName: string) => {
@@ -102,3 +95,47 @@ When("I try to delete hostgroup {string}", (hostgroupName: string) => {
   searchForEntry(hostgroupName);
   entryDoesNotExist(hostgroupName);
 });
+
+Given(
+  "user {string} is manager of hostgroup {string}",
+  (user: string, hostgroup: string) => {
+    cy.ipa({
+      command: "hostgroup-add-member-manager",
+      name: hostgroup,
+      specificOptions: `--users=${user}`,
+    });
+  }
+);
+
+Given(
+  "I remove user member manager {string} from hostgroup {string}",
+  (user: string, hostgroup: string) => {
+    cy.ipa({
+      command: "hostgroup-remove-member-manager",
+      name: hostgroup,
+      specificOptions: `--users=${user}`,
+    });
+  }
+);
+
+Given(
+  "user group {string} is manager of hostgroup {string}",
+  (group: string, hostgroup: string) => {
+    cy.ipa({
+      command: "hostgroup-add-member-manager",
+      name: hostgroup,
+      specificOptions: `--groups=${group}`,
+    });
+  }
+);
+
+Given(
+  "I remove group member manager {string} from hostgroup {string}",
+  (group: string, hostgroup: string) => {
+    cy.ipa({
+      command: "hostgroup-remove-member-manager",
+      name: hostgroup,
+      specificOptions: `--groups=${group}`,
+    });
+  }
+);

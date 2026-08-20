@@ -1,11 +1,12 @@
 import React, { useEffect } from "react";
 // PatternFly
-import { Pagination, PaginationVariant } from "@patternfly/react-core";
+import { PaginationVariant } from "@patternfly/react-core";
 // Data types
 import { User, Role, Host, Service } from "src/utils/datatypes/globalDataTypes";
 // Components
 import MemberOfToolbar from "./MemberOfToolbar";
 import MemberTable from "src/components/tables/MembershipTable";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
 import MemberOfAddModal, { AvailableItems } from "./MemberOfAddModal";
 import MemberOfDeleteModal from "./MemberOfDeleteModal";
 import { MembershipDirection } from "src/components/MemberOf/MemberOfToolbar";
@@ -14,6 +15,7 @@ import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // RPC
 import { ErrorResult } from "src/services/rpc";
 import {
@@ -47,9 +49,7 @@ const MemberOfRoles = (props: MemberOfRolesProps) => {
     page,
     setPage,
     perPage,
-    setPerPage,
     searchValue,
-    setSearchValue,
     membershipDirection,
     setMembershipDirection,
   } = useListPageSearchParams();
@@ -111,10 +111,6 @@ const MemberOfRoles = (props: MemberOfRolesProps) => {
   }, [props.entity, membershipDirection, searchValue, page, perPage]);
 
   React.useEffect(() => {
-    setMembershipDirection(props.direction);
-  }, [props.entity]);
-
-  React.useEffect(() => {
     if (roleNamesToLoad.length > 0) {
       fullRolesQuery.refetch();
     }
@@ -171,9 +167,9 @@ const MemberOfRoles = (props: MemberOfRolesProps) => {
   // Load available roles, delay the search for opening the modal
   const rolesQuery = useGettingRolesQuery(
     {
-      search: adderSearchValue,
+      searchValue: adderSearchValue,
       apiVersion: API_VERSION_BACKUP,
-      sizelimit: 100,
+      sizeLimit: 100,
       startIdx: 0,
       stopIdx: 100,
     },
@@ -292,9 +288,8 @@ const MemberOfRoles = (props: MemberOfRolesProps) => {
     <>
       {membershipDisabled ? (
         <MemberOfToolbar
-          searchText={searchValue}
-          onSearchTextChange={setSearchValue}
-          onSearch={() => {}}
+          searchPlaceholder="Search roles"
+          searchAriaLabel="Search roles"
           refreshButtonEnabled={isRefreshButtonEnabled}
           onRefreshButtonClick={props.onRefreshData}
           deleteButtonEnabled={
@@ -306,17 +301,13 @@ const MemberOfRoles = (props: MemberOfRolesProps) => {
           addButtonEnabled={isAddButtonEnabled}
           onAddButtonClick={() => setShowAddModal(true)}
           helpIconEnabled={true}
+          onHelpIconClick={() => dispatch(toggleHelpPanel())}
           totalItems={roleNames.length}
-          perPage={perPage}
-          page={page}
-          onPerPageChange={setPerPage}
-          onPageChange={setPage}
         />
       ) : (
         <MemberOfToolbar
-          searchText={searchValue}
-          onSearchTextChange={setSearchValue}
-          onSearch={() => {}}
+          searchPlaceholder="Search roles"
+          searchAriaLabel="Search roles"
           refreshButtonEnabled={isRefreshButtonEnabled}
           onRefreshButtonClick={props.onRefreshData}
           deleteButtonEnabled={
@@ -331,11 +322,8 @@ const MemberOfRoles = (props: MemberOfRolesProps) => {
           membershipDirection={membershipDirection}
           onMembershipDirectionChange={setMembershipDirection}
           helpIconEnabled={true}
+          onHelpIconClick={() => dispatch(toggleHelpPanel())}
           totalItems={roleNames.length}
-          perPage={perPage}
-          page={page}
-          onPerPageChange={setPerPage}
-          onPageChange={setPage}
         />
       )}
       <MemberTable
@@ -357,15 +345,12 @@ const MemberOfRoles = (props: MemberOfRolesProps) => {
         showTableRows={showTableRows}
       />
       {roleNames.length > 0 && (
-        <Pagination
-          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-          itemCount={roleNames.length}
-          widgetId="pagination-options-menu-bottom"
-          perPage={perPage}
-          page={page}
+        <PaginationLayout
+          list={[]}
+          totalCount={roleNames.length}
           variant={PaginationVariant.bottom}
-          onSetPage={(_e, page) => setPage(page)}
-          onPerPageSelect={(_e, perPage) => setPerPage(perPage)}
+          widgetId="pagination-options-menu-bottom"
+          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
         />
       )}
       <MemberOfAddModal

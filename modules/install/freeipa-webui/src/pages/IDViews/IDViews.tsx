@@ -22,6 +22,7 @@ import ToolbarLayout, {
 import SearchInputLayout from "src/components/layouts/SearchInputLayout";
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 // Components
 import BulkSelectorPrep from "src/components/BulkSelectorPrep";
 import PaginationLayout from "src/components/layouts/PaginationLayout";
@@ -36,22 +37,22 @@ import { useAppSelector, useAppDispatch } from "src/store/hooks";
 import { IDView } from "src/utils/datatypes/globalDataTypes";
 // Utils
 import { API_VERSION_BACKUP, isViewSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Errors
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
 import GlobalErrors from "src/components/errors/GlobalErrors";
 import ModalErrors from "src/components/errors/ModalErrors";
 // RPC client
-import {
-  ErrorResult,
-  GenericPayload,
-  useSearchEntriesMutation,
-} from "../../services/rpc";
+import { ErrorResult, GenericPayload } from "../../services/rpc";
 import {
   useGettingIDViewsQuery,
   useUnapplyHostsMutation,
@@ -60,18 +61,16 @@ import {
 
 const IDViews = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("id-views");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({ pathname: "id-views" });
+  useUpdateRoute({ pathname: "id-views" });
 
   // API
   const [executeUnapplyHosts] = useUnapplyHostsMutation();
   const [executeUnapplyHostgroups] = useUnapplyHostgroupsMutation();
-
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
 
   // Retrieve API version from environment data
   const apiVersion = useAppSelector(
@@ -82,27 +81,14 @@ const IDViews = () => {
   const [viewsList, setViewsList] = useState<IDView[]>([]);
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, setPage, perPage, searchValue } = useListPageSearchParams();
 
   // Handle API calls errors
   const globalErrors = useApiError([]);
   const modalErrors = useApiError([]);
 
   // Table comps
-  const [selectedPerPage, setSelectedPerPage] = useState<number>(0);
   const [totalCount, setViewsTotalCount] = useState<number>(0);
-  const [searchDisabled, setSearchIsDisabled] = useState<boolean>(false);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -119,17 +105,13 @@ const IDViews = () => {
     setIsDeletion(value);
   };
 
-  const updateShownViewsList = (newShownViewsList: IDView[]) => {
-    setViewsList(newShownViewsList);
-  };
-
   // Page indexes
   const firstIdx = (page - 1) * perPage;
   const lastIdx = page * perPage;
 
   // Derived states - what we get from API
   const viewsDataResponse = useGettingIDViewsQuery({
-    searchValue: "",
+    searchValue: searchValue,
     sizeLimit: 0,
     apiVersion: apiVersion || API_VERSION_BACKUP,
     startIdx: firstIdx,
@@ -138,14 +120,13 @@ const IDViews = () => {
 
   const {
     data: batchResponse,
-    isLoading: isBatchLoading,
+    isFetching: isBatchFetching,
     error: batchError,
   } = viewsDataResponse;
 
   // Handle data when the API call is finished
   useEffect(() => {
     if (viewsDataResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected ID views on refresh
       setViewsTotalCount(0);
       globalErrors.clear();
@@ -170,7 +151,6 @@ const IDViews = () => {
       setViewsList(idViewsList);
       setViewsTotalCount(totalCount);
       setIsKebabOpen(false);
-      setShowTableRows(true);
     }
 
     // API response: Error
@@ -185,27 +165,13 @@ const IDViews = () => {
     }
   }, [viewsDataResponse]);
 
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  useEffect(() => {
-    viewsDataResponse.refetch();
-    setIsKebabOpen(false);
-  }, [page, perPage]);
-
   // Refresh button handling
   const refreshViewsData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected views on refresh
     setViewsTotalCount(0);
     clearSelectedViews();
     setPage(1);
     viewsDataResponse.refetch();
-  };
-
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
   };
 
   const [selectedViews, setSelectedViewsList] = useState<IDView[]>([]);
@@ -214,67 +180,7 @@ const IDViews = () => {
     setSelectedViewsList(emptyList);
   };
 
-  const [retrieveViews] = useSearchEntriesMutation({});
-
-  // Issue a search using a specific search value
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setViewsTotalCount(0);
-    setSearchIsDisabled(true);
-    retrieveViews({
-      searchValue: searchValue,
-      sizeLimit: 0,
-      apiVersion: apiVersion || API_VERSION_BACKUP,
-      startIdx: firstIdx,
-      stopIdx: lastIdx,
-      entryType: "idview",
-    } as GenericPayload).then((result) => {
-      // Manage new response here
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for ID views",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const viewsListResult = result.data?.result.results || [];
-          const viewsListSize = result.data?.result.count || 0;
-          const totalCount = result.data?.result.totalCount || 0;
-          const idViewsList: IDView[] = [];
-
-          for (let i = 0; i < viewsListSize; i++) {
-            idViewsList.push(viewsListResult[i].result);
-          }
-
-          setPage(1);
-          setViewsList(idViewsList);
-          setViewsTotalCount(totalCount);
-          setIsKebabOpen(false);
-          setShowTableRows(true);
-        }
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
   // Show table rows
-  const [showTableRows, setShowTableRows] = useState(!isBatchLoading);
-
   const updateSelectedViews = (views: IDView[], isSelected: boolean) => {
     let newSelectedViews: IDView[] = [];
     if (isSelected) {
@@ -318,13 +224,6 @@ const IDViews = () => {
       updateSelectedViews([view], isSelecting);
     }
   };
-
-  // Show table rows only when data is fully retrieved
-  useEffect(() => {
-    if (showTableRows !== !isBatchLoading) {
-      setShowTableRows(!isBatchLoading);
-    }
-  }, [isBatchLoading]);
 
   // Modals functionality
   const [showAddModal, setShowAddModal] = useState(false);
@@ -448,17 +347,6 @@ const IDViews = () => {
   const selectableViewsTable = viewsList.filter(isViewSelectable); // elements per Table
 
   // Data wrappers
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownViewsList,
-    totalCount,
-  };
-
   // - 'BulkSelectorIDViewPrep'
   const viewsBulkSelectorData = {
     selected: selectedViews,
@@ -471,10 +359,11 @@ const IDViews = () => {
     updateIsDeleteButtonDisabled,
   };
 
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    viewsList,
+    selectedViews.map((item) => ipaPrimaryKey(item.cn)),
+    (item) => ipaPrimaryKey(item.cn)
+  );
 
   // - 'Delete Views'
   const deleteViewsButtonsData = {
@@ -502,13 +391,6 @@ const IDViews = () => {
     updateIsDeletion,
   };
 
-  // - 'SearchInputLayout'
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
   // Keybob for un-apply actions
   const [isKebabOpen, setIsKebabOpen] = React.useState(false);
   const onKebabToggle = () => {
@@ -525,7 +407,7 @@ const IDViews = () => {
       data-cy="id-views-kebab-unapply-hosts"
       key="unapply-hosts"
       onClick={openUnapplyHostModal}
-      isDisabled={!showTableRows || totalCount === 0}
+      isDisabled={isBatchFetching || totalCount === 0}
     >
       Unapply from hosts
     </DropdownItem>,
@@ -533,7 +415,7 @@ const IDViews = () => {
       data-cy="id-views-kebab-unapply-hostgroups"
       key="unapply-hostgroups"
       onClick={openUnapplyHostgroupModal}
-      isDisabled={!showTableRows || totalCount === 0}
+      isDisabled={isBatchFetching || totalCount === 0}
     >
       Unapply from host groups
     </DropdownItem>,
@@ -560,9 +442,7 @@ const IDViews = () => {
           dataCy="search"
           name="search"
           ariaLabel="Search ID views"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          placeholder="Search ID views"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -578,7 +458,7 @@ const IDViews = () => {
         <SecondaryButton
           dataCy="id-views-button-refresh"
           onClickHandler={refreshViewsData}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
         >
           Refresh
         </SecondaryButton>
@@ -589,7 +469,7 @@ const IDViews = () => {
       element: (
         <SecondaryButton
           dataCy="id-views-button-delete"
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isBatchFetching}
           onClickHandler={onDeleteHandler}
         >
           Delete
@@ -602,7 +482,7 @@ const IDViews = () => {
         <SecondaryButton
           dataCy="id-views-button-add"
           onClickHandler={onAddClickHandler}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
         >
           Add
         </SecondaryButton>
@@ -618,7 +498,7 @@ const IDViews = () => {
           idKebab="toggle-action-buttons"
           isKebabOpen={isKebabOpen}
           dropdownItems={dropdownItems}
-          isDisabled={!showTableRows}
+          isDisabled={isBatchFetching}
         />
       ),
     },
@@ -628,14 +508,19 @@ const IDViews = () => {
     },
     {
       key: 8,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 9,
       element: (
         <PaginationLayout
           list={viewsList}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -645,91 +530,95 @@ const IDViews = () => {
   ];
 
   return (
-    <div>
-      <PageSection hasBodyWrapper={false}>
-        <TitleLayout id="Views title" headingLevel="h1" text="ID views" />
-      </PageSection>
-      <PageSection hasBodyWrapper={false} isFilled={false}>
-        <Flex direction={{ default: "column" }}>
-          <FlexItem>
-            <ToolbarLayout toolbarItems={toolbarItems} />
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto" }}>
-            <OuterScrollContainer>
-              <InnerScrollContainer
-                style={{ height: "60vh", overflow: "auto" }}
-              >
-                {batchError !== undefined && batchError ? (
-                  <GlobalErrors errors={globalErrors.getAll()} />
-                ) : (
-                  <IDViewsTable
-                    elementsList={viewsList}
-                    shownElementsList={viewsList}
-                    showTableRows={showTableRows}
-                    idViewsData={viewsTableData}
-                    buttonsData={viewsTableButtonsData}
-                    paginationData={selectedPerPageData}
-                    searchValue={searchValue}
-                  />
-                )}
-              </InnerScrollContainer>
-            </OuterScrollContainer>
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
-            <PaginationLayout
-              list={viewsList}
-              paginationData={paginationData}
-              variant={PaginationVariant.bottom}
-              widgetId="pagination-options-menu-bottom"
-            />
-          </FlexItem>
-        </Flex>
-      </PageSection>
-      <ModalErrors
-        errors={modalErrors.getAll()}
-        dataCy="id-views-modal-error"
-      />
-      <AddIDViewModal
-        show={showAddModal}
-        handleModalToggle={onAddModalToggle}
-        onOpenAddModal={onAddClickHandler}
-        onCloseAddModal={onCloseAddModal}
-        onRefresh={refreshViewsData}
-      />
-      <DeleteIDViewsModal
-        show={showDeleteModal}
-        handleModalToggle={onDeleteModalToggle}
-        selectedViewsData={selectedViewsData}
-        buttonsData={deleteViewsButtonsData}
-        onRefresh={refreshViewsData}
-      />
-      <DualListLayout
-        entry={""}
-        target={"host"}
-        showModal={showHostModal}
-        onCloseModal={closeUnapplyHostModal}
-        onOpenModal={openUnapplyHostModal}
-        tableElementsList={[]}
-        action={onUnapplyHosts}
-        title={"Unapply ID views from hosts"}
-        spinning={unapplySpinning}
-        addBtnName="Unapply"
-        addSpinningBtnName="Unappling"
-      />
-      <DualListLayout
-        entry={""}
-        target={"hostgroup"}
-        showModal={showHostgroupModal}
-        onCloseModal={closeUnapplyHostgroupModal}
-        onOpenModal={openUnapplyHostgroupModal}
-        tableElementsList={[]}
-        action={onUnapplyHostgroups}
-        title={"Unapply ID views from host groups"}
-        spinning={unapplySpinning}
-        addBtnName="Unapply"
-        addSpinningBtnName="Unapplying"
-      />
-    </div>
+    <>
+      <div>
+        <PageSection hasBodyWrapper={false}>
+          <TitleLayout id="Views title" headingLevel="h1" text="ID views" />
+        </PageSection>
+        <PageSection hasBodyWrapper={false} isFilled={false}>
+          <Flex direction={{ default: "column" }}>
+            <FlexItem>
+              <ToolbarLayout toolbarItems={toolbarItems} />
+            </FlexItem>
+            <FlexItem style={{ flex: "0 0 auto" }}>
+              <OuterScrollContainer>
+                <InnerScrollContainer
+                  style={{ height: "60vh", overflow: "auto" }}
+                >
+                  {batchError !== undefined && batchError ? (
+                    <GlobalErrors errors={globalErrors.getAll()} />
+                  ) : (
+                    <IDViewsTable
+                      elementsList={viewsList}
+                      shownElementsList={viewsList}
+                      showTableRows={!isBatchFetching}
+                      idViewsData={viewsTableData}
+                      buttonsData={viewsTableButtonsData}
+                      paginationData={selectedPerPageData}
+                      searchValue={searchValue}
+                    />
+                  )}
+                </InnerScrollContainer>
+              </OuterScrollContainer>
+            </FlexItem>
+            <FlexItem
+              style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}
+            >
+              <PaginationLayout
+                list={viewsList}
+                totalCount={totalCount}
+                variant={PaginationVariant.bottom}
+                widgetId="pagination-options-menu-bottom"
+              />
+            </FlexItem>
+          </Flex>
+        </PageSection>
+        <ModalErrors
+          errors={modalErrors.getAll()}
+          dataCy="id-views-modal-error"
+        />
+        <AddIDViewModal
+          show={showAddModal}
+          handleModalToggle={onAddModalToggle}
+          onOpenAddModal={onAddClickHandler}
+          onCloseAddModal={onCloseAddModal}
+          onRefresh={refreshViewsData}
+        />
+        <DeleteIDViewsModal
+          show={showDeleteModal}
+          handleModalToggle={onDeleteModalToggle}
+          selectedViewsData={selectedViewsData}
+          buttonsData={deleteViewsButtonsData}
+          onRefresh={refreshViewsData}
+        />
+        <DualListLayout
+          entry={""}
+          target={"host"}
+          showModal={showHostModal}
+          onCloseModal={closeUnapplyHostModal}
+          onOpenModal={openUnapplyHostModal}
+          tableElementsList={[]}
+          action={onUnapplyHosts}
+          title={"Unapply ID views from hosts"}
+          spinning={unapplySpinning}
+          addBtnName="Unapply"
+          addSpinningBtnName="Unappling"
+        />
+        <DualListLayout
+          entry={""}
+          target={"hostgroup"}
+          showModal={showHostgroupModal}
+          onCloseModal={closeUnapplyHostgroupModal}
+          onOpenModal={openUnapplyHostgroupModal}
+          tableElementsList={[]}
+          action={onUnapplyHostgroups}
+          title={"Unapply ID views from host groups"}
+          spinning={unapplySpinning}
+          addBtnName="Unapply"
+          addSpinningBtnName="Unapplying"
+        />
+      </div>
+    </>
   );
 };
 

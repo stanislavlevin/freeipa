@@ -469,11 +469,10 @@ const AddTrustModal = (props: PropsToAddTrustModal) => {
     <Button
       data-cy={"modal-button-add"}
       key="add-new"
-      variant="secondary"
       isDisabled={isButtonDisabled}
       isLoading={isAddButtonSpinning}
       type="submit"
-      onClick={onAddTrust}
+      form="add-trust-modal"
     >
       Add
     </Button>,

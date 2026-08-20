@@ -1,11 +1,12 @@
 import React from "react";
 // PatternFly
-import { Pagination, PaginationVariant } from "@patternfly/react-core";
+import { PaginationVariant } from "@patternfly/react-core";
 // Data types
 import { Host, HostGroup } from "src/utils/datatypes/globalDataTypes";
 // Components
 import MemberOfToolbar from "./MemberOfToolbar";
 import MemberTable from "src/components/tables/MembershipTable";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
 import MemberOfAddModal, { AvailableItems } from "./MemberOfAddModal";
 import MemberOfDeleteModal from "./MemberOfDeleteModal";
 import { MembershipDirection } from "src/components/MemberOf/MemberOfToolbar";
@@ -14,6 +15,7 @@ import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // RPC
 import { ErrorResult } from "src/services/rpc";
 import {
@@ -43,9 +45,7 @@ const MemberOfHostGroups = (props: MemberOfHostGroupsProps) => {
     page,
     setPage,
     perPage,
-    setPerPage,
     searchValue,
-    setSearchValue,
     membershipDirection,
     setMembershipDirection,
   } = useListPageSearchParams();
@@ -114,10 +114,6 @@ const MemberOfHostGroups = (props: MemberOfHostGroupsProps) => {
     }
   }, [hostGroupNamesToLoad]);
 
-  React.useEffect(() => {
-    setMembershipDirection(props.direction);
-  }, [props.entity]);
-
   // Update host groups
   React.useEffect(() => {
     if (fullHostGroupsQuery.data && !fullHostGroupsQuery.isFetching) {
@@ -166,9 +162,9 @@ const MemberOfHostGroups = (props: MemberOfHostGroupsProps) => {
 
   // Load available Host groups
   const hostGroupsQuery = useGettingHostGroupsQuery({
-    search: adderSearchValue,
+    searchValue: adderSearchValue,
     apiVersion: API_VERSION_BACKUP,
-    sizelimit: 100,
+    sizeLimit: 100,
     startIdx: 0,
     stopIdx: 100,
   });
@@ -293,9 +289,8 @@ const MemberOfHostGroups = (props: MemberOfHostGroupsProps) => {
   return (
     <>
       <MemberOfToolbar
-        searchText={searchValue}
-        onSearchTextChange={setSearchValue}
-        onSearch={() => {}}
+        searchPlaceholder="Search host groups"
+        searchAriaLabel="Search host groups"
         refreshButtonEnabled={isRefreshButtonEnabled}
         onRefreshButtonClick={props.onRefreshData}
         deleteButtonEnabled={
@@ -310,11 +305,8 @@ const MemberOfHostGroups = (props: MemberOfHostGroupsProps) => {
         membershipDirection={membershipDirection}
         onMembershipDirectionChange={setMembershipDirection}
         helpIconEnabled={true}
+        onHelpIconClick={() => dispatch(toggleHelpPanel())}
         totalItems={hostGroupNames.length}
-        perPage={perPage}
-        page={page}
-        onPerPageChange={setPerPage}
-        onPageChange={setPage}
       />
       <MemberTable
         entityList={hostGroups}
@@ -335,15 +327,12 @@ const MemberOfHostGroups = (props: MemberOfHostGroupsProps) => {
         showTableRows={showTableRows}
       />
       {hostGroupNames.length > 0 && (
-        <Pagination
-          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-          itemCount={hostGroupNames.length}
-          widgetId="pagination-options-menu-bottom"
-          perPage={perPage}
-          page={page}
+        <PaginationLayout
+          list={[]}
+          totalCount={hostGroupNames.length}
           variant={PaginationVariant.bottom}
-          onSetPage={(_e, page) => setPage(page)}
-          onPerPageSelect={(_e, perPage) => setPerPage(perPage)}
+          widgetId="pagination-options-menu-bottom"
+          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
         />
       )}
       <MemberOfAddModal

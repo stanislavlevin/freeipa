@@ -10,15 +10,20 @@ import ServicesManagedBy from "./ServicesManagedBy";
 import BreadCrumb, { BreadCrumbItem } from "src/components/layouts/BreadCrumb";
 import TitleLayout from "src/components/layouts/TitleLayout";
 import { partialServiceToService } from "src/utils/serviceUtils";
-import ContextualHelpPanel from "src/components/ContextualHelpPanel/ContextualHelpPanel";
+
 // Hooks
 import { useServiceSettings } from "src/hooks/useServiceSettingsData";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import {
+  closeHelpPanel,
+  setHelpTopic,
+  toggleHelpPanel,
+} from "src/store/Global/contextual-help-slice";
 // Redux
 import { useAppDispatch } from "src/store/hooks";
 import { updateBreadCrumbPath } from "src/store/Global/routes-slice";
 import DataSpinner from "src/components/layouts/DataSpinner";
 // Navigation
-import { URL_PREFIX } from "src/navigation/NavRoutes";
 import { NotFound } from "src/components/errors/PageErrors";
 import { useSafeParams } from "src/utils/paramsUtils";
 
@@ -36,33 +41,16 @@ const ServicesTabs = ({ section }) => {
 
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("services-settings");
 
   const [breadcrumbItems, setBreadcrumbItems] = React.useState<
     BreadCrumbItem[]
   >([]);
 
-  // Contextual links panel
-  const [fromPageSelected, setFromPageSelected] =
-    React.useState("services-settings");
-  const [isContextualPanelExpanded, setIsContextualPanelExpanded] =
-    React.useState(false);
-
-  const changeFromPage = (fromPage: string) => {
-    setFromPageSelected(fromPage);
-  };
-
-  const onOpenContextualPanel = () => {
-    setIsContextualPanelExpanded(!isContextualPanelExpanded);
-  };
-
-  const onCloseContextualPanel = () => {
-    setIsContextualPanelExpanded(false);
-  };
-
   // - Close links panel when tab section is changed
   React.useEffect(() => {
-    setIsContextualPanelExpanded(false);
-  }, [section]);
+    dispatch(closeHelpPanel());
+  }, [section, dispatch]);
 
   // Data loaded from DB
   const serviceSettingsData = useServiceSettings(decodedId as string);
@@ -88,11 +76,11 @@ const ServicesTabs = ({ section }) => {
     const currentPath: BreadCrumbItem[] = [
       {
         name: "Services",
-        url: URL_PREFIX + "/services",
+        url: "/services",
       },
       {
         name: decodedId,
-        url: URL_PREFIX + "/services/" + doubleEncodedId,
+        url: "/services/" + doubleEncodedId,
         isActive: true,
       },
     ];
@@ -104,7 +92,7 @@ const ServicesTabs = ({ section }) => {
   // Redirect to the settings page if the section is not defined
   React.useEffect(() => {
     if (!section) {
-      navigate(URL_PREFIX + "/services/" + doubleEncodedId);
+      navigate("/services/" + doubleEncodedId);
     }
     setActiveTabKey(section);
   }, [section]);
@@ -126,67 +114,61 @@ const ServicesTabs = ({ section }) => {
 
   return (
     <>
-      <ContextualHelpPanel
-        fromPage={fromPageSelected}
-        isExpanded={isContextualPanelExpanded}
-        onClose={onCloseContextualPanel}
-      >
-        <PageSection hasBodyWrapper={false}>
-          <BreadCrumb breadcrumbItems={breadcrumbItems} />
-          <TitleLayout
-            id={service.krbcanonicalname}
-            preText="Service:"
-            text={service.krbcanonicalname}
-            headingLevel="h1"
-          />
-        </PageSection>
-        <PageSection hasBodyWrapper={false} type="tabs" isFilled>
-          <Tabs
-            activeKey={activeTabKey}
-            onSelect={handleTabClick}
-            variant="secondary"
-            isBox
-            className="pf-v6-u-ml-lg"
-            mountOnEnter
-            unmountOnExit
+      <PageSection hasBodyWrapper={false}>
+        <BreadCrumb breadcrumbItems={breadcrumbItems} />
+        <TitleLayout
+          id={service.krbcanonicalname}
+          preText="Service:"
+          text={service.krbcanonicalname}
+          headingLevel="h1"
+        />
+      </PageSection>
+      <PageSection hasBodyWrapper={false} type="tabs" isFilled>
+        <Tabs
+          activeKey={activeTabKey}
+          onSelect={handleTabClick}
+          variant="secondary"
+          isBox
+          className="pf-v6-u-ml-lg"
+          mountOnEnter
+          unmountOnExit
+        >
+          <Tab
+            eventKey={"settings"}
+            name="details"
+            title={<TabTitleText>Settings</TabTitleText>}
           >
-            <Tab
-              eventKey={"settings"}
-              name="details"
-              title={<TabTitleText>Settings</TabTitleText>}
-            >
-              <ServicesSettings
-                service={service}
-                originalService={serviceSettingsData.originalService}
-                metadata={serviceSettingsData.metadata}
-                onServiceChange={serviceSettingsData.setService}
-                isDataLoading={serviceSettingsData.isLoading}
-                onRefresh={serviceSettingsData.refetch}
-                isModified={serviceSettingsData.modified}
-                onResetValues={serviceSettingsData.resetValues}
-                modifiedValues={serviceSettingsData.modifiedValues}
-                certData={certificates}
-                changeFromPage={changeFromPage}
-                onOpenContextualPanel={onOpenContextualPanel}
-              />
-            </Tab>
-            <Tab
-              eventKey={"memberof"}
-              name="details"
-              title={<TabTitleText>Is a member of</TabTitleText>}
-            >
-              <ServicesMemberOf service={service} tabSection={section} />
-            </Tab>
-            <Tab
-              eventKey={"managedby"}
-              name="details"
-              title={<TabTitleText>Is managed by</TabTitleText>}
-            >
-              <ServicesManagedBy service={service} />
-            </Tab>
-          </Tabs>
-        </PageSection>
-      </ContextualHelpPanel>
+            <ServicesSettings
+              service={service}
+              originalService={serviceSettingsData.originalService}
+              metadata={serviceSettingsData.metadata}
+              onServiceChange={serviceSettingsData.setService}
+              isDataLoading={serviceSettingsData.isLoading}
+              onRefresh={serviceSettingsData.refetch}
+              isModified={serviceSettingsData.modified}
+              onResetValues={serviceSettingsData.resetValues}
+              modifiedValues={serviceSettingsData.modifiedValues}
+              certData={certificates}
+              changeFromPage={(page) => dispatch(setHelpTopic(page))}
+              onOpenContextualPanel={() => dispatch(toggleHelpPanel())}
+            />
+          </Tab>
+          <Tab
+            eventKey={"memberof"}
+            name="details"
+            title={<TabTitleText>Is a member of</TabTitleText>}
+          >
+            <ServicesMemberOf service={service} tabSection={section} />
+          </Tab>
+          <Tab
+            eventKey={"managedby"}
+            name="details"
+            title={<TabTitleText>Is managed by</TabTitleText>}
+          >
+            <ServicesManagedBy service={service} />
+          </Tab>
+        </Tabs>
+      </PageSection>
     </>
   );
 };

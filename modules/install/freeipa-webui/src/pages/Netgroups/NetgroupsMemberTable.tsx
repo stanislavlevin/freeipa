@@ -74,16 +74,6 @@ const NetgroupsMemberTable = (props: PropsToTable) => {
   const [totalCount, setMemberTotalCount] = useState<number>(
     props.members.length
   );
-  const updateSelectedPerPage = () => {
-    // Nothing to do since we are not using bulk selector comp
-    return;
-  };
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
 
   // External host modal
   const [externalHostName, setExternalHost] = useState<string>("");
@@ -372,18 +362,11 @@ const NetgroupsMemberTable = (props: PropsToTable) => {
     }
   }, [selectedMembers]);
 
-  // Entries displayed on the first page
-  const updateShownEntriesList = (newShownEntriesList: string[]) => {
-    setTableMembers(newShownEntriesList);
-  };
-
   const paginationData = {
     page,
     perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownEntriesList,
+    onUpdatePage: setPage,
+    onUpdatePerPage: setPerPage,
     totalCount,
   };
 
@@ -516,7 +499,13 @@ const NetgroupsMemberTable = (props: PropsToTable) => {
           labelId="add-external-host-modal-title"
         />
         <ModalBody id="add-external-host-modal-body">
-          <Form id={"external-modal"}>
+          <Form
+            id={"external-modal"}
+            onSubmit={(event) => {
+              event.preventDefault();
+              addMembers([externalHostName]);
+            }}
+          >
             <FormGroup
               key={"externalHostName"}
               label={"External hostname"}
@@ -550,7 +539,8 @@ const NetgroupsMemberTable = (props: PropsToTable) => {
               !externalHostName.includes(".") ||
               addSpinning
             }
-            onClick={() => addMembers([externalHostName])}
+            type="submit"
+            form="external-modal"
             spinnerAriaValueText="Adding"
             spinnerAriaLabel="Adding"
             isLoading={addSpinning}

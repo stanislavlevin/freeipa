@@ -1,18 +1,21 @@
 import React from "react";
 // PatternFly
-import { Pagination, PaginationVariant } from "@patternfly/react-core";
+import { PaginationVariant } from "@patternfly/react-core";
 // Data types
 import { SudoCmd, SudoCmdGroup } from "src/utils/datatypes/globalDataTypes";
 // Components
 import MemberOfToolbar from "./MemberOfToolbar";
 import MemberTable from "src/components/tables/MembershipTable";
+import PaginationLayout from "src/components/layouts/PaginationLayout";
 import MemberOfAddModal, { AvailableItems } from "./MemberOfAddModal";
 import MemberOfDeleteModal from "./MemberOfDeleteModal";
+
 // Redux
 import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // RPC
 import { ErrorResult } from "src/services/rpc";
 import {
@@ -35,8 +38,7 @@ interface MemberOfSudoCmdGroupsProps {
 const MemberOfSudoCmdGroups = (props: MemberOfSudoCmdGroupsProps) => {
   const dispatch = useAppDispatch();
 
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, setPage, perPage, searchValue } = useListPageSearchParams();
 
   const [sudoGroupsSelected, setSudoGroupsSelected] = React.useState<string[]>(
     []
@@ -119,9 +121,9 @@ const MemberOfSudoCmdGroups = (props: MemberOfSudoCmdGroupsProps) => {
 
   // Load available Sudo groups
   const sudoGroupsQuery = useGettingSudoCmdGroupsQuery({
-    search: adderSearchValue,
+    searchValue: adderSearchValue,
     apiVersion: API_VERSION_BACKUP,
-    sizelimit: 100,
+    sizeLimit: 100,
     startIdx: 0,
     stopIdx: 100,
   });
@@ -251,9 +253,8 @@ const MemberOfSudoCmdGroups = (props: MemberOfSudoCmdGroupsProps) => {
   return (
     <>
       <MemberOfToolbar
-        searchText={searchValue}
-        onSearchTextChange={setSearchValue}
-        onSearch={() => {}}
+        searchPlaceholder="Search sudo command groups"
+        searchAriaLabel="Search sudo command groups"
         refreshButtonEnabled={isRefreshButtonEnabled}
         onRefreshButtonClick={props.onRefreshData}
         deleteButtonEnabled={sudoGroupsSelected.length > 0}
@@ -261,11 +262,8 @@ const MemberOfSudoCmdGroups = (props: MemberOfSudoCmdGroupsProps) => {
         addButtonEnabled={isAddButtonEnabled}
         onAddButtonClick={() => setShowAddModal(true)}
         helpIconEnabled={true}
+        onHelpIconClick={() => dispatch(toggleHelpPanel())}
         totalItems={memberof_sudocmdgroup.length}
-        perPage={perPage}
-        page={page}
-        onPerPageChange={setPerPage}
-        onPageChange={setPage}
       />
       <MemberTable
         entityList={sudoGroups}
@@ -278,15 +276,12 @@ const MemberOfSudoCmdGroups = (props: MemberOfSudoCmdGroupsProps) => {
         showTableRows={showTableRows}
       />
       {memberof_sudocmdgroup.length > 0 && (
-        <Pagination
-          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-          itemCount={memberof_sudocmdgroup.length}
-          widgetId="pagination-options-menu-bottom"
-          perPage={perPage}
-          page={page}
+        <PaginationLayout
+          list={[]}
+          totalCount={memberof_sudocmdgroup.length}
           variant={PaginationVariant.bottom}
-          onSetPage={(_e, page) => setPage(page)}
-          onPerPageSelect={(_e, perPage) => setPerPage(perPage)}
+          widgetId="pagination-options-menu-bottom"
+          className="pf-v6-u-pb-0 pf-v6-u-pr-md"
         />
       )}
       <MemberOfAddModal

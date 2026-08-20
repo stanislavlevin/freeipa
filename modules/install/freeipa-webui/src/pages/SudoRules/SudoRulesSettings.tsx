@@ -1,6 +1,6 @@
 import React from "react";
 // PatternFly
-import { DropdownItem, Flex } from "@patternfly/react-core";
+import { Button, DropdownItem, Flex } from "@patternfly/react-core";
 // Data types
 import { Metadata, SudoRule } from "src/utils/datatypes/globalDataTypes";
 // Redux
@@ -8,6 +8,8 @@ import { useAppDispatch } from "src/store/hooks";
 // Hooks
 import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // RPC
 import {
   AddRemoveAsRunToSudoRulesPayload,
@@ -29,11 +31,11 @@ import { asRecord } from "src/utils/sudoRulesUtils";
 import { containsAny } from "src/utils/utils";
 // Components
 import TitleLayout from "src/components/layouts/TitleLayout";
-import SecondaryButton from "src/components/layouts/SecondaryButton";
 import KebabLayout from "src/components/layouts/KebabLayout";
 import TabLayout from "src/components/layouts/TabLayout";
 import SudoRuleGeneral from "src/components/SudoRuleSections/SudoRuleGeneral";
 import SidebarLayout from "src/components/layouts/SidebarLayout";
+
 import SudoRuleOptions from "src/components/SudoRuleSections/SudoRuleOptions";
 import SudoRulesWho from "src/components/SudoRuleSections/SudoRulesWho";
 import { TableEntry } from "src/components/tables/KeytabTableWithFilter";
@@ -57,6 +59,9 @@ interface PropsToSudoRulesSettings {
 
 const SudoRulesSettings = (props: PropsToSudoRulesSettings) => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("sudo-rules-settings");
+
+  // Contextual help panel
 
   // API calls
   const [saveService] = useSaveSudoRuleMutation();
@@ -695,40 +700,42 @@ const SudoRulesSettings = (props: PropsToSudoRulesSettings) => {
     {
       key: 0,
       element: (
-        <SecondaryButton
-          dataCy="sudo-rules-tab-settings-button-refresh"
-          onClickHandler={props.onRefresh}
+        <Button
+          data-cy="sudo-rules-tab-settings-button-refresh"
+          variant="secondary"
+          onClick={props.onRefresh}
         >
           Refresh
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 1,
       element: (
-        <SecondaryButton
-          dataCy="sudo-rules-tab-settings-button-revert"
+        <Button
+          data-cy="sudo-rules-tab-settings-button-revert"
+          variant="secondary"
           isDisabled={!props.isModified}
-          onClickHandler={onRevert}
+          onClick={onRevert}
         >
           Revert
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
       key: 2,
       element: (
-        <SecondaryButton
-          dataCy="sudo-rules-tab-settings-button-save"
+        <Button
+          data-cy="sudo-rules-tab-settings-button-save"
+          variant="primary"
           isDisabled={!props.isModified || isSaving}
-          onClickHandler={onSave}
+          onClick={onSave}
           isLoading={isSaving}
           spinnerAriaValueText="Saving"
-          spinnerAriaLabelledBy="Saving"
           spinnerAriaLabel="Saving"
         >
           {isSaving ? "Saving" : "Save"}
-        </SecondaryButton>
+        </Button>
       ),
     },
     {
@@ -915,7 +922,10 @@ const SudoRulesSettings = (props: PropsToSudoRulesSettings) => {
   return (
     <>
       <TabLayout id="settings-page" toolbarItems={toolbarFields}>
-        <SidebarLayout itemNames={itemNames}>
+        <SidebarLayout
+          itemNames={itemNames}
+          onHelpClick={() => dispatch(toggleHelpPanel())}
+        >
           {/* General */}
           <Flex direction={{ default: "column" }} flex={{ default: "flex_1" }}>
             <TitleLayout headingLevel="h2" id="general" text="General" />

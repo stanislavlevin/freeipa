@@ -16,13 +16,13 @@ import {
 // Data types
 import { DNSRecord } from "src/utils/datatypes/globalDataTypes";
 // RPC
-import {
-  FindDnsRecordPayload,
-  useDnsRecordFindQuery,
-  useSearchDnsRecordsEntriesMutation,
-} from "src/services/rpcDnsZones";
+import { useDnsRecordFindQuery } from "src/services/rpcDnsZones";
 // Utils
 import { isDnsRecordSelectable } from "src/utils/utils";
+import {
+  getSelectedPerPageData,
+  ipaPrimaryKey,
+} from "src/utils/selectedPerPage";
 // Redux
 import { useAppDispatch } from "src/store/hooks";
 // Hooks
@@ -30,15 +30,16 @@ import useUpdateRoute from "src/hooks/useUpdateRoute";
 import { addAlert } from "src/store/Global/alerts-slice";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
 import useApiError from "src/hooks/useApiError";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Components
 import ToolbarLayout, {
   ToolbarItem,
 } from "src/components/layouts/ToolbarLayout";
 import GlobalErrors from "src/components/errors/GlobalErrors";
-import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { SerializedError } from "@reduxjs/toolkit";
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import PaginationLayout from "src/components/layouts/PaginationLayout";
 import SearchInputLayout from "src/components/layouts/SearchInputLayout";
 import BulkSelectorPrep from "src/components/BulkSelectorPrep";
@@ -52,20 +53,21 @@ interface DnsResourceRecordsProps {
 
 const DnsResourceRecords = (props: DnsResourceRecordsProps) => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("dns-resource-records");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
   useUpdateRoute({ pathname: "dns-records" });
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   // Handle API calls errors
   const globalErrors = useApiError([]);
 
   // States
   const [dnsRecords, setDnsRecords] = React.useState<DNSRecord[]>([]);
-  const [isSearchDisabled, setIsSearchDisabled] = React.useState(false);
   const [totalCount, setTotalCount] = React.useState(0);
 
   // Calculate pagination parameters for server-side pagination
@@ -81,12 +83,11 @@ const DnsResourceRecords = (props: DnsResourceRecordsProps) => {
     stopIdx: stopIdx,
   });
 
-  const { data, isLoading, error } = dnsRecordsResponse;
+  const { data, isFetching, error } = dnsRecordsResponse;
 
   // Handle data when the API call is finished
   React.useEffect(() => {
     if (dnsRecordsResponse.isFetching) {
-      setShowTableRows(false);
       // Reset selected elements on refresh
       setTotalCount(0);
       globalErrors.clear();
@@ -101,8 +102,6 @@ const DnsResourceRecords = (props: DnsResourceRecordsProps) => {
     ) {
       setDnsRecords(data.result);
       setTotalCount(data.count);
-      // Show table elements
-      setShowTableRows(true);
     }
   }, [dnsRecordsResponse]);
 
@@ -110,32 +109,22 @@ const DnsResourceRecords = (props: DnsResourceRecordsProps) => {
   const [selectedElements, setSelectedElements] = React.useState<DNSRecord[]>(
     []
   );
-  const [selectedPerPage, setSelectedPerPage] = React.useState<number>(0);
 
   // Refresh button handling
   const refreshData = () => {
-    // Hide table
-    setShowTableRows(false);
-
     // Reset selected elements on refresh
     setTotalCount(0);
     setSelectedElements([]);
 
-    dnsRecordsResponse
-      .refetch()
-      .then(() => {
-        setShowTableRows(true);
-      })
-      .catch(() => {
-        dispatch(
-          addAlert({
-            name: "refresh-dns-records-error",
-            title: "Error refreshing DNS records",
-            variant: "danger",
-          })
-        );
-        setShowTableRows(true); // Show table even if there's an error
-      });
+    dnsRecordsResponse.refetch().catch(() => {
+      dispatch(
+        addAlert({
+          name: "refresh-dns-records-error",
+          title: "Error refreshing DNS records",
+          variant: "danger",
+        })
+      );
+    });
   };
 
   // 'Delete' button state
@@ -196,102 +185,21 @@ const DnsResourceRecords = (props: DnsResourceRecordsProps) => {
     }
   };
 
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    dnsRecordsResponse.refetch();
-  }, []);
-
   // Show table rows
-  const [showTableRows, setShowTableRows] = React.useState<boolean>(!isLoading);
-
   // Show table rows only when data is fully retrieved
-  React.useEffect(() => {
-    if (showTableRows !== !isLoading) {
-      setShowTableRows(!isLoading);
-    }
-  }, [isLoading]);
-
-  // Search DNS records
-  const [searchDnsRecords] = useSearchDnsRecordsEntriesMutation();
-
-  const submitSearchValue = () => {
-    const payload: FindDnsRecordPayload = {
-      dnsZoneId: props.dnsZoneId,
-      recordName: searchValue,
-      sizeLimit: perPage,
-      startIdx: 0, // Reset to first page for search
-      stopIdx: perPage,
-    };
-
-    setIsSearchDisabled(true);
-
-    searchDnsRecords(payload).then((result) => {
-      if ("data" in result) {
-        const searchError = result.data?.error as
-          | FetchBaseQueryError
-          | SerializedError;
-
-        if (searchError) {
-          // Error
-          let error: string | undefined = "";
-          if ("error" in searchError) {
-            error = searchError.error;
-          } else if ("message" in searchError) {
-            error = searchError.message;
-          }
-          dispatch(
-            addAlert({
-              name: "submit-search-value-error",
-              title: error || "Error when searching for elements",
-              variant: "danger",
-            })
-          );
-        } else {
-          // Success
-          const records = result.data?.result || [];
-          setDnsRecords(records);
-          setTotalCount(records.length);
-          setShowTableRows(true);
-          // Reset to first page
-          setPage(1);
-        }
-        setIsSearchDisabled(false);
-      }
-    });
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    dnsRecords,
+    selectedElements.map((dnsRecord) => ipaPrimaryKey(dnsRecord.idnsname)),
+    (dnsRecord) => ipaPrimaryKey(dnsRecord.idnsname)
+  );
 
   // Data wrappers
-  // TODO: Better separation of concerns
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage: setPage,
-    updatePerPage: setPerPage,
-    updateSelectedPerPage: setSelectedPerPage,
-    updateShownElementsList: setDnsRecords,
-    totalCount,
-  };
-
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue: setSearchValue,
-    submitSearchValue,
-  };
-
   // - 'BulkSelectorPrep'
   const bulkSelectorData = {
     selected: selectedElements,
     updateSelected: updateSelectedDnsRecords,
     selectableTable: selectableDnsRecordsTable,
     nameAttr: "idnsname",
-  };
-
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage: setSelectedPerPage,
   };
 
   // Modals functionality
@@ -320,9 +228,7 @@ const DnsResourceRecords = (props: DnsResourceRecordsProps) => {
         <SearchInputLayout
           name="search"
           ariaLabel="Search DNS records"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={isSearchDisabled}
+          placeholder="Search DNS records"
           dataCy="search"
         />
       ),
@@ -338,7 +244,7 @@ const DnsResourceRecords = (props: DnsResourceRecordsProps) => {
       element: (
         <SecondaryButton
           onClickHandler={refreshData}
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
           dataCy="refresh-dns-records"
         >
           Refresh
@@ -349,7 +255,7 @@ const DnsResourceRecords = (props: DnsResourceRecordsProps) => {
       key: 4,
       element: (
         <SecondaryButton
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || isFetching}
           onClickHandler={() => setShowDeleteModal(true)}
           dataCy="delete-dns-records"
         >
@@ -361,7 +267,7 @@ const DnsResourceRecords = (props: DnsResourceRecordsProps) => {
       key: 5,
       element: (
         <SecondaryButton
-          isDisabled={!showTableRows}
+          isDisabled={isFetching}
           onClickHandler={() => setShowAddModal(true)}
           dataCy="add-dns-records"
         >
@@ -375,14 +281,19 @@ const DnsResourceRecords = (props: DnsResourceRecordsProps) => {
     },
     {
       key: 7,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 8,
       element: (
         <PaginationLayout
           list={dnsRecords}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -402,98 +313,100 @@ const DnsResourceRecords = (props: DnsResourceRecordsProps) => {
 
   // Render component
   return (
-    <div
-      style={{
-        height: `var(--subsettings-calc)`,
-      }}
-      data-cy={"dns-zones-dns-records"}
-    >
-      <PageSection hasBodyWrapper={false} isFilled={false}>
-        <Flex direction={{ default: "column" }}>
-          <FlexItem>
-            <ToolbarLayout toolbarItems={toolbarItems} />
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto" }}>
-            <OuterScrollContainer>
-              <InnerScrollContainer
-                style={{ height: "60vh", overflow: "auto" }}
-              >
-                {error !== undefined && error ? (
-                  <GlobalErrors errors={globalErrors.getAll()} />
-                ) : (
-                  <>
-                    {isLoading || !showTableRows ? (
-                      spinner
-                    ) : (
-                      <MainTable
-                        tableTitle="DNS records table"
-                        shownElementsList={dnsRecords}
-                        pk="idnsname"
-                        keyNames={[
-                          "idnsname",
-                          "dnsrecord_types",
-                          "dnsrecord_data",
-                        ]}
-                        columnNames={["Record name", "Record type", "Data"]}
-                        hasCheckboxes={true}
-                        pathname="dns-records"
-                        showTableRows={showTableRows}
-                        showLink={false}
-                        elementsData={{
-                          isElementSelectable: isDnsRecordSelectable,
-                          selectedElements,
-                          selectableElementsTable: selectableDnsRecordsTable,
-                          setElementsSelected: setDnsRecordsSelected,
-                          clearSelectedElements: () => setSelectedElements([]),
-                        }}
-                        buttonsData={{
-                          updateIsDeleteButtonDisabled: (value) =>
-                            setIsDeleteButtonDisabled(value),
-                          isDeletion,
-                          updateIsDeletion: (value) => setIsDeletion(value),
-                          isDisableEnableOp: true,
-                        }}
-                        paginationData={{
-                          selectedPerPage,
-                          updateSelectedPerPage: setSelectedPerPage,
-                        }}
-                      />
-                    )}
-                  </>
-                )}
-              </InnerScrollContainer>
-            </OuterScrollContainer>
-          </FlexItem>
-          <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
-            <PaginationLayout
-              list={dnsRecords}
-              paginationData={paginationData}
-              variant={PaginationVariant.bottom}
-              widgetId="pagination-options-menu-bottom"
-              className="pf-v6-u-pb-0 pf-v6-u-pr-md"
-            />
-          </FlexItem>
-        </Flex>
-      </PageSection>
-      <AddDnsRecordsModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onRefresh={refreshData}
-        dnsZoneId={props.dnsZoneId}
-      />
-      <DeleteDnsRecordsModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onRefresh={refreshData}
-        dnsZoneId={props.dnsZoneId}
-        elementsToDelete={selectedElements}
-        clearSelectedElements={() => setSelectedElements([])}
-        columnNames={["Record name", "Record type"]}
-        keyNames={["idnsname", "dnsrecord_types"]}
-        updateIsDeleteButtonDisabled={setIsDeleteButtonDisabled}
-        updateIsDeletion={setIsDeletion}
-      />
-    </div>
+    <>
+      <div
+        style={{
+          height: `var(--subsettings-calc)`,
+        }}
+        data-cy={"dns-zones-dns-records"}
+      >
+        <PageSection hasBodyWrapper={false} isFilled={false}>
+          <Flex direction={{ default: "column" }}>
+            <FlexItem>
+              <ToolbarLayout toolbarItems={toolbarItems} />
+            </FlexItem>
+            <FlexItem style={{ flex: "0 0 auto" }}>
+              <OuterScrollContainer>
+                <InnerScrollContainer
+                  style={{ height: "60vh", overflow: "auto" }}
+                >
+                  {error !== undefined && error ? (
+                    <GlobalErrors errors={globalErrors.getAll()} />
+                  ) : (
+                    <>
+                      {isFetching ? (
+                        spinner
+                      ) : (
+                        <MainTable
+                          tableTitle="DNS records table"
+                          shownElementsList={dnsRecords}
+                          pk="idnsname"
+                          keyNames={[
+                            "idnsname",
+                            "dnsrecord_types",
+                            "dnsrecord_data",
+                          ]}
+                          columnNames={["Record name", "Record type", "Data"]}
+                          hasCheckboxes={true}
+                          pathname="dns-records"
+                          showTableRows={!isFetching}
+                          showLink={false}
+                          elementsData={{
+                            isElementSelectable: isDnsRecordSelectable,
+                            selectedElements,
+                            selectableElementsTable: selectableDnsRecordsTable,
+                            setElementsSelected: setDnsRecordsSelected,
+                            clearSelectedElements: () =>
+                              setSelectedElements([]),
+                          }}
+                          buttonsData={{
+                            updateIsDeleteButtonDisabled: (value) =>
+                              setIsDeleteButtonDisabled(value),
+                            isDeletion,
+                            updateIsDeletion: (value) => setIsDeletion(value),
+                            isDisableEnableOp: true,
+                          }}
+                          paginationData={selectedPerPageData}
+                        />
+                      )}
+                    </>
+                  )}
+                </InnerScrollContainer>
+              </OuterScrollContainer>
+            </FlexItem>
+            <FlexItem
+              style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}
+            >
+              <PaginationLayout
+                list={dnsRecords}
+                totalCount={totalCount}
+                variant={PaginationVariant.bottom}
+                widgetId="pagination-options-menu-bottom"
+                className="pf-v6-u-pb-0 pf-v6-u-pr-md"
+              />
+            </FlexItem>
+          </Flex>
+        </PageSection>
+        <AddDnsRecordsModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onRefresh={refreshData}
+          dnsZoneId={props.dnsZoneId}
+        />
+        <DeleteDnsRecordsModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onRefresh={refreshData}
+          dnsZoneId={props.dnsZoneId}
+          elementsToDelete={selectedElements}
+          clearSelectedElements={() => setSelectedElements([])}
+          columnNames={["Record name", "Record type"]}
+          keyNames={["idnsname", "dnsrecord_types"]}
+          updateIsDeleteButtonDisabled={setIsDeleteButtonDisabled}
+          updateIsDeletion={setIsDeletion}
+        />
+      </div>
+    </>
   );
 };
 

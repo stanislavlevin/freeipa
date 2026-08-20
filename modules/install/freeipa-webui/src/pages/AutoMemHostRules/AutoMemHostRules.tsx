@@ -16,11 +16,10 @@ import {
 } from "@patternfly/react-table";
 // Data types
 import { AutomemberEntry } from "src/utils/datatypes/globalDataTypes";
-// Redux
-import { useAppSelector } from "src/store/hooks";
 // Layouts
 import TitleLayout from "src/components/layouts/TitleLayout";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import ToolbarLayout, {
   ToolbarItem,
@@ -35,9 +34,7 @@ import TypeAheadSelect from "src/components/TypeAheadSelect";
 import useApiError from "src/hooks/useApiError";
 import GlobalErrors from "src/components/errors/GlobalErrors";
 // RPC
-import { GenericPayload } from "src/services/rpc";
 import {
-  useSearchHostGroupRulesEntriesMutation,
   ChangeDefaultPayload,
   useChangeDefaultGroupMutation,
 } from "src/services/rpcAutomember";
@@ -48,11 +45,11 @@ import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
 import { useHostGroupsRulesData } from "src/hooks/useHostGroupRules";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Utils
-import {
-  API_VERSION_BACKUP,
-  isAutomemberUserGroupSelectable,
-} from "src/utils/utils";
+import { isAutomemberUserGroupSelectable } from "src/utils/utils";
+import { getSelectedPerPageData } from "src/utils/selectedPerPage";
 // Errors
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { SerializedError } from "@reduxjs/toolkit";
@@ -64,29 +61,23 @@ import ConfirmationModal from "src/components/modals/ConfirmationModal";
 // Automembership host group rules
 const AutoMemHostRules = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("automember-host-rules");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({
+  useUpdateRoute({
     pathname: "host-group-rules",
   });
 
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
-
-  // Retrieve API version from environment data
-  const apiVersion = useAppSelector(
-    (state) => state.global.environment.api_version
-  ) as string;
-
   const NO_SELECTION = "No default group selected";
 
-  const [hostGroups, setHostGroups] = React.useState<string[]>([]);
   const [automemberRules, setAutomemberRules] = React.useState<
     AutomemberEntry[]
   >([]);
   const [defaultGroup, setDefaultGroup] = React.useState<string>(NO_SELECTION);
+  const [previousDefaultGroup, setPreviousDefaultGroup] =
+    React.useState<string>(NO_SELECTION);
   const [errors, setErrors] = React.useState<
     Array<FetchBaseQueryError | SerializedError>
   >([]);
@@ -98,59 +89,57 @@ const AutoMemHostRules = () => {
   const [groupsAvailableToAdd, setGroupsAvailableToAdd] = React.useState<
     string[]
   >([]);
-  const [previousDefaultGroup, setPreviousDefaultGroup] =
-    React.useState<string>(NO_SELECTION);
 
   // Handle API calls errors
   const globalErrors = useApiError([]);
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   const [totalCount, setTotalCount] = React.useState<number>(0);
-  const [searchDisabled, setSearchIsDisabled] = React.useState<boolean>(false);
 
   // Page indexes
   const firstIdx = (page - 1) * perPage;
   const lastIdx = page * perPage;
 
   // API calls via custom hook
-  const hostGroupRulesData = useHostGroupsRulesData();
+  const hostGroupRulesData = useHostGroupsRulesData({
+    searchValue,
+    startIdx: firstIdx,
+    stopIdx: lastIdx,
+  });
   const [changeDefaultGroup] = useChangeDefaultGroupMutation();
-
-  // Show table rows
-  const [showTableRows, setShowTableRows] = React.useState(
-    !hostGroupRulesData.isLoading
-  );
-
-  // Update table rows when the data is loaded
-  React.useEffect(() => {
-    if (showTableRows !== !hostGroupRulesData.isLoading) {
-      setShowTableRows(!hostGroupRulesData.isLoading);
-    }
-  }, [hostGroupRulesData.isLoading]);
 
   // Main API call
   React.useEffect(() => {
-    if (hostGroupRulesData.isFetching) {
-      setShowTableRows(false);
-    } else {
+    if (!hostGroupRulesData.isFetching) {
       if (hostGroupRulesData.errors && hostGroupRulesData.errors.length > 0) {
         setErrors(hostGroupRulesData.errors || []);
       } else {
-        const fullAutomemberIds: AutomemberEntry[] =
-          hostGroupRulesData.automembersIds;
-        const totalAutomembersCount = fullAutomemberIds.length;
-        // Paginate data based on first and last indexes
-        const shownPaginatedRulesList: AutomemberEntry[] = [];
-        if (hostGroupRulesData.automembersIds.length > 0) {
-          const pagAutomemberIds = fullAutomemberIds.slice(firstIdx, lastIdx);
-          shownPaginatedRulesList.push(...pagAutomemberIds);
-        }
         // Update lists
-        setHostGroups(hostGroupRulesData.hostGroups);
-        setAutomemberRules(shownPaginatedRulesList);
+        if (hostGroupRulesData.hostGroups.length > 0) {
+          // Add empty entry as an option
+          const groupsToSelector = [
+            {
+              "data-cy": "typeahead-select-no-selection",
+              value: NO_SELECTION,
+              children: NO_SELECTION,
+            },
+          ];
+
+          // Add the rest of the data from hostgroups
+          const tempGroupsToSelector = hostGroupRulesData.hostGroups.map(
+            (group) => ({
+              "data-cy": "typeahead-select-" + group,
+              value: group,
+              children: group,
+            })
+          );
+          groupsToSelector.push(...tempGroupsToSelector);
+          setHostGroupsOptions(groupsToSelector);
+        }
+
+        setAutomemberRules(hostGroupRulesData.shownAutomembers);
         // If no default group is set, set it as 'No selection'
         if (hostGroupRulesData.defaultGroup === "") {
           setDefaultGroup(NO_SELECTION);
@@ -160,8 +149,8 @@ const AutoMemHostRules = () => {
           setPreviousDefaultGroup(hostGroupRulesData.defaultGroup);
         }
 
-        // Set available host groups to add
-        const allAutomemberIds = fullAutomemberIds.map(
+        // Set available host groups to add (use full unfiltered rule list)
+        const allAutomemberIds = hostGroupRulesData.automembersIds.map(
           (item) => item.automemberRule
         );
         const availableItems = hostGroupRulesData.hostGroups.filter(
@@ -169,40 +158,17 @@ const AutoMemHostRules = () => {
         );
         setGroupsAvailableToAdd(availableItems);
 
-        // Set table count
-        setTotalCount(totalAutomembersCount);
-        // Show table elements
-        setShowTableRows(true);
+        // Set table count from search match total
+        setTotalCount(hostGroupRulesData.totalCount);
       }
     }
   }, [
     hostGroupRulesData.hostGroups,
     hostGroupRulesData.automembersIds,
+    hostGroupRulesData.shownAutomembers,
+    hostGroupRulesData.totalCount,
     hostGroupRulesData.defaultGroup,
   ]);
-
-  // Parse host groups to be shown in the default host group selector
-  React.useEffect(() => {
-    if (hostGroups.length > 0) {
-      // Add empty entry as an option
-      const groupsToSelector = [
-        {
-          "data-cy": "typeahead-select-no-selection",
-          value: NO_SELECTION,
-          children: NO_SELECTION,
-        },
-      ];
-
-      // Add the rest of the data from hostgroups
-      const tempGroupsToSelector = hostGroups.map((group) => ({
-        "data-cy": "typeahead-select-" + group,
-        value: group,
-        children: group,
-      }));
-      groupsToSelector.push(...tempGroupsToSelector);
-      setHostGroupsOptions(groupsToSelector);
-    }
-  }, [hostGroups]);
 
   // On select default group
   const onSelectDefaultGroup = (group: string) => {
@@ -241,35 +207,6 @@ const AutoMemHostRules = () => {
     setIsDisableEnableOp(value);
   };
 
-  // Elements selected (per page)
-  //  - This will help to calculate the remaining elements on a specific page (bulk selector)
-  const [selectedPerPage, setSelectedPerPage] = React.useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-
-  // Automembers displayed on the first page
-  const updateShownAutomembersList = (
-    newShownAutomembersList: AutomemberEntry[]
-  ) => {
-    setAutomemberRules(newShownAutomembersList);
-  };
-
-  // Update search input valie
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
   const [selectedAutomembers, setSelectedAutomembers] = React.useState<
     AutomemberEntry[]
   >([]);
@@ -281,42 +218,10 @@ const AutoMemHostRules = () => {
 
   // Refresh button handling
   const refreshData = () => {
-    setShowTableRows(false);
     setTotalCount(0);
     clearSelectedRules();
     hostGroupRulesData.refetch();
   };
-
-  const [retrieveAutomembers] = useSearchHostGroupRulesEntriesMutation({});
-
-  // Issue a search using a specific search value
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setSearchIsDisabled(true);
-    setTotalCount(0);
-    retrieveAutomembers({
-      searchValue: searchValue,
-      sizeLimit: 0,
-      apiVersion: apiVersion || API_VERSION_BACKUP,
-      startIdx: firstIdx,
-      stopIdx: lastIdx,
-    } as GenericPayload).then((result) => {
-      if ("data" in result) {
-        const automembersListResult = result.data;
-        setTotalCount(result.data?.length ?? 0);
-        setAutomemberRules(automembersListResult || []);
-        // Show table elements
-        setShowTableRows(true);
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    hostGroupRulesData.refetch();
-  }, [page, perPage]);
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -392,17 +297,6 @@ const AutoMemHostRules = () => {
 
   // Data wrappers
   // TODO: Better separation of concerts
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownAutomembersList,
-    totalCount,
-  };
-
   // - 'BulkSelectorPrep'
   const automembersBulkSelectorData = {
     selected: selectedAutomembers,
@@ -416,19 +310,13 @@ const AutoMemHostRules = () => {
     updateIsDisableEnableOp,
   };
 
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    automemberRules,
+    selectedAutomembers.map((rule) => rule.automemberRule),
+    (rule) => rule.automemberRule
+  );
 
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
-  // 'Table'
+  // Data wrappers
   const automembersTableData = {
     isElementSelectable: isAutomemberUserGroupSelectable,
     selectedElements: selectedAutomembers,
@@ -520,10 +408,8 @@ const AutoMemHostRules = () => {
         <SearchInputLayout
           dataCy="search"
           name="search"
-          ariaLabel="Search rules"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          ariaLabel="Search host rules"
+          placeholder="Search host rules"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -552,7 +438,7 @@ const AutoMemHostRules = () => {
         <SecondaryButton
           dataCy="auto-member-host-rules-button-refresh"
           onClickHandler={refreshData}
-          isDisabled={!showTableRows}
+          isDisabled={hostGroupRulesData.isFetching}
         >
           Refresh
         </SecondaryButton>
@@ -563,7 +449,7 @@ const AutoMemHostRules = () => {
       element: (
         <SecondaryButton
           dataCy="auto-member-host-rules-button-delete"
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || hostGroupRulesData.isFetching}
           onClickHandler={onOpenDeleteModal}
         >
           Delete
@@ -575,7 +461,7 @@ const AutoMemHostRules = () => {
       element: (
         <SecondaryButton
           dataCy="auto-member-host-rules-button-add"
-          isDisabled={!showTableRows}
+          isDisabled={hostGroupRulesData.isFetching}
           onClickHandler={onOpenAddModal}
         >
           Add
@@ -588,14 +474,19 @@ const AutoMemHostRules = () => {
     },
     {
       key: 8,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 9,
       element: (
         <PaginationLayout
           list={automemberRules}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -628,7 +519,7 @@ const AutoMemHostRules = () => {
                 ) : (
                   <MainTable
                     shownElementsList={automemberRules}
-                    showTableRows={showTableRows}
+                    showTableRows={!hostGroupRulesData.isFetching}
                     elementsData={automembersTableData}
                     buttonsData={automembersTableButtonsData}
                     paginationData={selectedPerPageData}
@@ -642,7 +533,7 @@ const AutoMemHostRules = () => {
           <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
             <PaginationLayout
               list={automemberRules}
-              paginationData={paginationData}
+              totalCount={totalCount}
               variant={PaginationVariant.bottom}
               widgetId="pagination-options-menu-bottom"
             />
@@ -671,14 +562,15 @@ const AutoMemHostRules = () => {
         title="Default hostgroup"
         isOpen={showChangeConfirmationModal}
         onClose={onCloseConfirmationModal}
+        formId="auto-member-default-host-rules-form"
+        onSubmit={() => onSelectDefaultGroup(defaultGroup)}
         actions={[
           <Button
             data-cy="modal-button-ok"
             variant="primary"
             key="change-default"
-            onClick={() => {
-              onSelectDefaultGroup(defaultGroup);
-            }}
+            type="submit"
+            form="auto-member-default-host-rules-form"
           >
             OK
           </Button>,

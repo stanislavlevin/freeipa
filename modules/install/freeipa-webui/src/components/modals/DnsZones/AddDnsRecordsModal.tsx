@@ -111,8 +111,6 @@ const AddDnsRecordsModal = (props: PropsToAddModal) => {
   // States
   const [isAddButtonSpinning, setIsAddButtonSpinning] =
     React.useState<boolean>(false);
-  const [isAddAnotherButtonSpinning, setIsAddAnotherButtonSpinning] =
-    React.useState<boolean>(false);
 
   // Basic form values
   const [basicFormValues, setBasicFormValues] = React.useState<{
@@ -359,9 +357,8 @@ const AddDnsRecordsModal = (props: PropsToAddModal) => {
   };
 
   // on Add operation
-  const onAddOperation = (keepModalOpen: boolean) => {
-    setIsAddButtonSpinning(!keepModalOpen);
-    setIsAddAnotherButtonSpinning(keepModalOpen);
+  const onAddOperation = () => {
+    setIsAddButtonSpinning(true);
 
     const payload = buildPayload();
 
@@ -392,15 +389,11 @@ const AddDnsRecordsModal = (props: PropsToAddModal) => {
           clearFields();
           // Update data
           props.onRefresh();
-          // 'Add and add another' will keep the modal open
-          if (!keepModalOpen) {
-            props.onClose();
-          }
+          props.onClose();
         }
       }
       // Reset button spinners
       setIsAddButtonSpinning(false);
-      setIsAddAnotherButtonSpinning(false);
     });
   };
 
@@ -418,9 +411,14 @@ const AddDnsRecordsModal = (props: PropsToAddModal) => {
     ));
   };
 
+  const onFormSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onAddOperation();
+  };
+
   // Form fields
   const formFields = (
-    <Form>
+    <Form onSubmit={onFormSubmit} id="add-dns-records-modal-form">
       <FormGroup label="Record name" isRequired>
         <TextInput
           value={basicFormValues.recordName}
@@ -494,9 +492,9 @@ const AddDnsRecordsModal = (props: PropsToAddModal) => {
     <Button
       key="add-new"
       variant="secondary"
+      type="submit"
       isDisabled={isAddButtonSpinning || !areMandatoryFieldsFilled}
-      form="add-modal-form"
-      onClick={() => onAddOperation(false)}
+      form="add-dns-records-modal-form"
       data-cy={"add-dns-records-modal-add-button"}
     >
       {isAddButtonSpinning ? (
@@ -506,23 +504,6 @@ const AddDnsRecordsModal = (props: PropsToAddModal) => {
         </>
       ) : (
         "Add"
-      )}
-    </Button>,
-    <Button
-      key="add-new-another"
-      variant="secondary"
-      isDisabled={isAddAnotherButtonSpinning || !areMandatoryFieldsFilled}
-      form="add-another-modal-form"
-      onClick={() => onAddOperation(true)}
-      data-cy={"add-dns-records-modal-add-another-button"}
-    >
-      {isAddAnotherButtonSpinning ? (
-        <>
-          <Spinner size="sm" className="pf-v6-u-mr-sm" />
-          {"Adding"}
-        </>
-      ) : (
-        "Add and add another"
       )}
     </Button>,
     <Button

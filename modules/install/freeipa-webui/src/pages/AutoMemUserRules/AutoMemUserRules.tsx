@@ -17,10 +17,11 @@ import {
 // Data types
 import { AutomemberEntry } from "src/utils/datatypes/globalDataTypes";
 // Redux
-import { useAppDispatch, useAppSelector } from "src/store/hooks";
+import { useAppDispatch } from "src/store/hooks";
 // Layouts
 import TitleLayout from "src/components/layouts/TitleLayout";
 import HelpTextWithIconLayout from "src/components/layouts/HelpTextWithIconLayout";
+
 import SecondaryButton from "src/components/layouts/SecondaryButton";
 import ToolbarLayout, {
   ToolbarItem,
@@ -35,9 +36,7 @@ import TypeAheadSelect from "src/components/TypeAheadSelect";
 import useApiError from "src/hooks/useApiError";
 import GlobalErrors from "src/components/errors/GlobalErrors";
 // RPC
-import { GenericPayload } from "src/services/rpc";
 import {
-  useSearchUserGroupRulesEntriesMutation,
   ChangeDefaultPayload,
   useChangeDefaultGroupMutation,
 } from "src/services/rpcAutomember";
@@ -46,11 +45,11 @@ import { addAlert } from "src/store/Global/alerts-slice";
 import useUpdateRoute from "src/hooks/useUpdateRoute";
 import useListPageSearchParams from "src/hooks/useListPageSearchParams";
 import { useUserGroupsRulesData } from "src/hooks/useUserGroupsRules";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import { toggleHelpPanel } from "src/store/Global/contextual-help-slice";
 // Utils
-import {
-  API_VERSION_BACKUP,
-  isAutomemberUserGroupSelectable,
-} from "src/utils/utils";
+import { isAutomemberUserGroupSelectable } from "src/utils/utils";
+import { getSelectedPerPageData } from "src/utils/selectedPerPage";
 // Errors
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { SerializedError } from "@reduxjs/toolkit";
@@ -62,25 +61,17 @@ import ConfirmationModal from "src/components/modals/ConfirmationModal";
 // Automembership user group rules
 const AutoMemUserRules = () => {
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("automember-user-rules");
+
+  // Contextual help panel
 
   // Update current route data to Redux and highlight the current page in the Nav bar
-  const { browserTitle } = useUpdateRoute({
+  useUpdateRoute({
     pathname: "user-group-rules",
   });
 
-  // Set the page title to be shown in the browser tab
-  React.useEffect(() => {
-    document.title = browserTitle;
-  }, [browserTitle]);
-
-  // Retrieve API version from environment data
-  const apiVersion = useAppSelector(
-    (state) => state.global.environment.api_version
-  ) as string;
-
   const NO_SELECTION = "No default group selected";
 
-  const [userGroups, setUserGroups] = React.useState<string[]>([]);
   const [automemberRules, setAutomemberRules] = React.useState<
     AutomemberEntry[]
   >([]);
@@ -103,52 +94,31 @@ const AutoMemUserRules = () => {
   const globalErrors = useApiError([]);
 
   // URL parameters: page number, page size, search value
-  const { page, setPage, perPage, setPerPage, searchValue, setSearchValue } =
-    useListPageSearchParams();
+  const { page, perPage, searchValue } = useListPageSearchParams();
 
   const [totalCount, setTotalCount] = React.useState<number>(0);
-  const [searchDisabled, setSearchIsDisabled] = React.useState<boolean>(false);
 
   // Page indexes
   const firstIdx = (page - 1) * perPage;
   const lastIdx = page * perPage;
 
   // API calls via custom hook
-  const userGroupRulesData = useUserGroupsRulesData();
+  const userGroupRulesData = useUserGroupsRulesData({
+    searchValue,
+    startIdx: firstIdx,
+    stopIdx: lastIdx,
+  });
   const [changeDefaultGroup] = useChangeDefaultGroupMutation();
-
-  // Show table rows
-  const [showTableRows, setShowTableRows] = React.useState(
-    !userGroupRulesData.isLoading
-  );
-
-  // Update table rows when the data is loaded
-  React.useEffect(() => {
-    if (showTableRows !== !userGroupRulesData.isLoading) {
-      setShowTableRows(!userGroupRulesData.isLoading);
-    }
-  }, [userGroupRulesData.isLoading]);
 
   // Main API call
   React.useEffect(() => {
-    if (userGroupRulesData.isFetching) {
-      setShowTableRows(false);
-    } else {
+    if (!userGroupRulesData.isFetching) {
       if (userGroupRulesData.errors && userGroupRulesData.errors.length > 0) {
         setErrors(userGroupRulesData.errors || []);
       } else {
-        const fullAutomemberIds: AutomemberEntry[] =
-          userGroupRulesData.automembersIds;
-        const totalAutomembersCount = fullAutomemberIds.length;
-        // Paginate data based on first and last indexes
-        const shownPaginatedRulesList: AutomemberEntry[] = [];
-        if (userGroupRulesData.automembersIds.length > 0) {
-          const pagAutomemberIds = fullAutomemberIds.slice(firstIdx, lastIdx);
-          shownPaginatedRulesList.push(...pagAutomemberIds);
-        }
         // Update lists
         setUserGroups(userGroupRulesData.userGroups);
-        setAutomemberRules(shownPaginatedRulesList);
+        setAutomemberRules(userGroupRulesData.shownAutomembers);
         // If no default group is set, set it as 'No selection'
         if (userGroupRulesData.defaultGroup === "") {
           setDefaultGroup(NO_SELECTION);
@@ -158,8 +128,8 @@ const AutoMemUserRules = () => {
           setPreviousDefaultGroup(userGroupRulesData.defaultGroup);
         }
 
-        // Set available user groups to add (userGroupRulesData.userGroups and fullAutomemberIds)
-        const allAutomemberIds = fullAutomemberIds.map(
+        // Set available user groups to add (use full unfiltered rule list)
+        const allAutomemberIds = userGroupRulesData.automembersIds.map(
           (item) => item.automemberRule
         );
         const availableItems = userGroupRulesData.userGroups.filter(
@@ -167,20 +137,20 @@ const AutoMemUserRules = () => {
         );
         setGroupsAvailableToAdd(availableItems);
 
-        // Set table count
-        setTotalCount(totalAutomembersCount);
-        // Show table elements
-        setShowTableRows(true);
+        // Set table count from search match total
+        setTotalCount(userGroupRulesData.totalCount);
       }
     }
   }, [
     userGroupRulesData.userGroups,
     userGroupRulesData.automembersIds,
+    userGroupRulesData.shownAutomembers,
+    userGroupRulesData.totalCount,
     userGroupRulesData.defaultGroup,
   ]);
 
   // Parse user groups to be shown in the default user group selector
-  React.useEffect(() => {
+  const setUserGroups = (userGroups: string[]) => {
     if (userGroups.length > 0) {
       // Add empty entry as an option
       const groupsToSelector = [
@@ -200,7 +170,7 @@ const AutoMemUserRules = () => {
       groupsToSelector.push(...tempGroupsToSelector);
       setUserGroupsOptions(groupsToSelector);
     }
-  }, [userGroups]);
+  };
 
   // On select default group
   const onSelectDefaultGroup = (group: string) => {
@@ -239,35 +209,6 @@ const AutoMemUserRules = () => {
     setIsDisableEnableOp(value);
   };
 
-  // Elements selected (per page)
-  //  - This will help to calculate the remaining elements on a specific page (bulk selector)
-  const [selectedPerPage, setSelectedPerPage] = React.useState<number>(0);
-
-  const updateSelectedPerPage = (selected: number) => {
-    setSelectedPerPage(selected);
-  };
-
-  // Pagination
-  const updatePage = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const updatePerPage = (newSetPerPage: number) => {
-    setPerPage(newSetPerPage);
-  };
-
-  // Automembers displayed on the first page
-  const updateShownAutomembersList = (
-    newShownAutomembersList: AutomemberEntry[]
-  ) => {
-    setAutomemberRules(newShownAutomembersList);
-  };
-
-  // Update search input valie
-  const updateSearchValue = (value: string) => {
-    setSearchValue(value);
-  };
-
   const [selectedAutomembers, setSelectedAutomembers] = React.useState<
     AutomemberEntry[]
   >([]);
@@ -279,42 +220,10 @@ const AutoMemUserRules = () => {
 
   // Refresh button handling
   const refreshData = () => {
-    setShowTableRows(false);
     setTotalCount(0);
     clearSelectedRules();
     userGroupRulesData.refetch();
   };
-
-  const [retrieveAutomembers] = useSearchUserGroupRulesEntriesMutation({});
-
-  // Issue a search using a specific search value
-  const submitSearchValue = () => {
-    setShowTableRows(false);
-    setSearchIsDisabled(true);
-    setTotalCount(0);
-    retrieveAutomembers({
-      searchValue: searchValue,
-      sizeLimit: 0,
-      apiVersion: apiVersion || API_VERSION_BACKUP,
-      startIdx: firstIdx,
-      stopIdx: lastIdx,
-    } as GenericPayload).then((result) => {
-      if ("data" in result) {
-        const automembersListResult = result.data;
-        setTotalCount((result.data ?? []).length);
-        setAutomemberRules(automembersListResult ?? []);
-        // Show table elements
-        setShowTableRows(true);
-        setSearchIsDisabled(false);
-      }
-    });
-  };
-
-  // Always refetch data when the component is loaded.
-  // This ensures the data is always up-to-date.
-  React.useEffect(() => {
-    userGroupRulesData.refetch();
-  }, [page, perPage]);
 
   // 'Delete' button state
   const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] =
@@ -390,17 +299,6 @@ const AutoMemUserRules = () => {
 
   // Data wrappers
   // TODO: Better separation of concerts
-  // - 'PaginationLayout'
-  const paginationData = {
-    page,
-    perPage,
-    updatePage,
-    updatePerPage,
-    updateSelectedPerPage,
-    updateShownElementsList: updateShownAutomembersList,
-    totalCount,
-  };
-
   // - 'BulkSelectorPrep'
   const automembersBulkSelectorData = {
     selected: selectedAutomembers,
@@ -414,19 +312,13 @@ const AutoMemUserRules = () => {
     updateIsDisableEnableOp,
   };
 
-  const selectedPerPageData = {
-    selectedPerPage,
-    updateSelectedPerPage,
-  };
+  const selectedPerPageData = getSelectedPerPageData(
+    automemberRules,
+    selectedAutomembers.map((rule) => rule.automemberRule),
+    (rule) => rule.automemberRule
+  );
 
-  // SearchInputLayout
-  const searchValueData = {
-    searchValue,
-    updateSearchValue,
-    submitSearchValue,
-  };
-
-  // 'Table'
+  // Data wrappers
   const automembersTableData = {
     isElementSelectable: isAutomemberUserGroupSelectable,
     selectedElements: selectedAutomembers,
@@ -518,10 +410,8 @@ const AutoMemUserRules = () => {
         <SearchInputLayout
           dataCy={"search"}
           name="search"
-          ariaLabel="Search rules"
-          placeholder="Search"
-          searchValueData={searchValueData}
-          isDisabled={searchDisabled}
+          ariaLabel="Search user rules"
+          placeholder="Search user rules"
         />
       ),
       toolbarItemVariant: ToolbarItemVariant.label,
@@ -550,7 +440,7 @@ const AutoMemUserRules = () => {
         <SecondaryButton
           dataCy={"auto-member-user-rules-button-refresh"}
           onClickHandler={refreshData}
-          isDisabled={!showTableRows}
+          isDisabled={userGroupRulesData.isFetching}
         >
           Refresh
         </SecondaryButton>
@@ -561,7 +451,7 @@ const AutoMemUserRules = () => {
       element: (
         <SecondaryButton
           dataCy={"auto-member-user-rules-button-delete"}
-          isDisabled={isDeleteButtonDisabled || !showTableRows}
+          isDisabled={isDeleteButtonDisabled || userGroupRulesData.isFetching}
           onClickHandler={onOpenDeleteModal}
         >
           Delete
@@ -573,7 +463,7 @@ const AutoMemUserRules = () => {
       element: (
         <SecondaryButton
           dataCy={"auto-member-user-rules-button-add"}
-          isDisabled={!showTableRows}
+          isDisabled={userGroupRulesData.isFetching}
           onClickHandler={onOpenAddModal}
         >
           Add
@@ -586,14 +476,19 @@ const AutoMemUserRules = () => {
     },
     {
       key: 8,
-      element: <HelpTextWithIconLayout textContent="Help" />,
+      element: (
+        <HelpTextWithIconLayout
+          textContent="Help"
+          onClick={() => dispatch(toggleHelpPanel())}
+        />
+      ),
     },
     {
       key: 9,
       element: (
         <PaginationLayout
           list={automemberRules}
-          paginationData={paginationData}
+          totalCount={totalCount}
           widgetId="pagination-options-menu-top"
           isCompact={true}
         />
@@ -626,7 +521,7 @@ const AutoMemUserRules = () => {
                 ) : (
                   <MainTable
                     shownElementsList={automemberRules}
-                    showTableRows={showTableRows}
+                    showTableRows={!userGroupRulesData.isFetching}
                     elementsData={automembersTableData}
                     buttonsData={automembersTableButtonsData}
                     paginationData={selectedPerPageData}
@@ -640,7 +535,7 @@ const AutoMemUserRules = () => {
           <FlexItem style={{ flex: "0 0 auto", position: "sticky", bottom: 0 }}>
             <PaginationLayout
               list={automemberRules}
-              paginationData={paginationData}
+              totalCount={totalCount}
               variant={PaginationVariant.bottom}
               widgetId="pagination-options-menu-bottom"
             />
@@ -674,9 +569,8 @@ const AutoMemUserRules = () => {
             data-cy="modal-button-ok"
             variant="primary"
             key="change-default"
-            onClick={() => {
-              onSelectDefaultGroup(defaultGroup);
-            }}
+            type="submit"
+            form="auto-member-default-user-rules-form"
           >
             OK
           </Button>,
@@ -690,6 +584,10 @@ const AutoMemUserRules = () => {
         ]}
         messageText="Are you sure you want to change default group?"
         messageObj={defaultGroup}
+        formId="auto-member-default-user-rules-form"
+        onSubmit={() => {
+          onSelectDefaultGroup(defaultGroup);
+        }}
       />
     </div>
   );

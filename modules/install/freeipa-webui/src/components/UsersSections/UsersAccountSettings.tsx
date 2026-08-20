@@ -87,7 +87,8 @@ const UsersAccountSettings = (props: PropsToUsersAccountSettings) => {
     <SecondaryButton
       dataCy="modal-button-add"
       key="add"
-      onClickHandler={onClickAddTextAreaCertificates}
+      type="submit"
+      form="add-user-certificate-form"
     >
       Add
     </SecondaryButton>,
@@ -168,6 +169,7 @@ const UsersAccountSettings = (props: PropsToUsersAccountSettings) => {
                 objectName="user"
                 metadata={props.metadata}
                 dataCy="user-tab-settings-calendar-krbpasswordexpiration"
+                isDisabled={true}
               />
             </FormGroup>
             <FormGroup label="UID" fieldId="uidnumber">
@@ -417,6 +419,8 @@ const UsersAccountSettings = (props: PropsToUsersAccountSettings) => {
         objectName="user"
         ipaObject={ipaObject}
         metadata={props.metadata}
+        formId="add-user-certificate-form"
+        onSubmit={onClickAddTextAreaCertificates}
       />
     </>
   );

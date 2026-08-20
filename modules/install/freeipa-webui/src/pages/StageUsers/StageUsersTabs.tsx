@@ -6,20 +6,25 @@ import UserSettings from "src/components/UsersSections/UserSettings";
 import BreadCrumb, { BreadCrumbItem } from "src/components/layouts/BreadCrumb";
 import DataSpinner from "src/components/layouts/DataSpinner";
 import TitleLayout from "src/components/layouts/TitleLayout";
-import ContextualHelpPanel from "src/components/ContextualHelpPanel/ContextualHelpPanel";
+
 // Hooks
 import { useStageUserSettings } from "src/hooks/useUserSettingsData";
+import useContextualHelpTopic from "src/hooks/useContextualHelpTopic";
+import {
+  setHelpTopic,
+  toggleHelpPanel,
+} from "src/store/Global/contextual-help-slice";
 // Redux
 import { useAppDispatch } from "src/store/hooks";
 import { updateBreadCrumbPath } from "src/store/Global/routes-slice";
 // Navigation
-import { URL_PREFIX } from "src/navigation/NavRoutes";
 import { NotFound } from "src/components/errors/PageErrors";
 import { UidParams, useSafeParams } from "src/utils/paramsUtils";
 
 const StageUsersTabs = () => {
   const { uid } = useSafeParams<UidParams>(["uid"]);
   const dispatch = useAppDispatch();
+  useContextualHelpTopic("stage-users-settings");
 
   const [breadcrumbItems, setBreadcrumbItems] = React.useState<
     BreadCrumbItem[]
@@ -30,11 +35,11 @@ const StageUsersTabs = () => {
     const currentPath: BreadCrumbItem[] = [
       {
         name: "Stage users",
-        url: URL_PREFIX + "/stage-users",
+        url: "/stage-users",
       },
       {
         name: uid,
-        url: URL_PREFIX + "/stage-users/" + uid,
+        url: "/stage-users/" + uid,
         isActive: true,
       },
     ];
@@ -42,25 +47,6 @@ const StageUsersTabs = () => {
     setActiveTabKey(0);
     dispatch(updateBreadCrumbPath(currentPath));
   }, [uid]);
-
-  // Contextual links panel
-  const [fromPageSelected, setFromPageSelected] = React.useState(
-    "stage-users-settings"
-  );
-  const [isContextualPanelExpanded, setIsContextualPanelExpanded] =
-    React.useState(false);
-
-  const changeFromPage = (fromPage: string) => {
-    setFromPageSelected(fromPage);
-  };
-
-  const onOpenContextualPanel = () => {
-    setIsContextualPanelExpanded(!isContextualPanelExpanded);
-  };
-
-  const onCloseContextualPanel = () => {
-    setIsContextualPanelExpanded(false);
-  };
 
   // Data loaded from DB
   const userSettingsData = useStageUserSettings(uid);
@@ -89,58 +75,52 @@ const StageUsersTabs = () => {
 
   return (
     <>
-      <ContextualHelpPanel
-        fromPage={fromPageSelected}
-        isExpanded={isContextualPanelExpanded}
-        onClose={onCloseContextualPanel}
-      >
-        <PageSection hasBodyWrapper={false}>
-          <BreadCrumb breadcrumbItems={breadcrumbItems} />
-          <TitleLayout
-            id={uid}
-            preText="Staged user:"
-            text={uid}
-            headingLevel="h1"
-          />
-        </PageSection>
-        <PageSection hasBodyWrapper={false} type="tabs" isFilled>
-          <Tabs
-            activeKey={activeTabKey}
-            onSelect={handleTabClick}
-            variant="secondary"
-            isBox
-            className="pf-v6-u-ml-lg"
-            mountOnEnter
-            unmountOnExit
+      <PageSection hasBodyWrapper={false}>
+        <BreadCrumb breadcrumbItems={breadcrumbItems} />
+        <TitleLayout
+          id={uid}
+          preText="Staged user:"
+          text={uid}
+          headingLevel="h1"
+        />
+      </PageSection>
+      <PageSection hasBodyWrapper={false} type="tabs" isFilled>
+        <Tabs
+          activeKey={activeTabKey}
+          onSelect={handleTabClick}
+          variant="secondary"
+          isBox
+          className="pf-v6-u-ml-lg"
+          mountOnEnter
+          unmountOnExit
+        >
+          <Tab
+            eventKey={0}
+            name="details"
+            title={<TabTitleText>Settings</TabTitleText>}
           >
-            <Tab
-              eventKey={0}
-              name="details"
-              title={<TabTitleText>Settings</TabTitleText>}
-            >
-              <UserSettings
-                originalUser={userSettingsData.originalUser}
-                user={userSettingsData.user}
-                metadata={userSettingsData.metadata}
-                pwPolicyData={userSettingsData.pwPolicyData}
-                krbPolicyData={userSettingsData.krbtPolicyData}
-                certData={userSettingsData.certData}
-                onUserChange={userSettingsData.setUser}
-                isDataLoading={userSettingsData.isFetching}
-                onRefresh={userSettingsData.refetch}
-                isModified={userSettingsData.modified}
-                onResetValues={userSettingsData.resetValues}
-                modifiedValues={userSettingsData.modifiedValues}
-                radiusProxyData={userSettingsData.radiusServers}
-                idpData={userSettingsData.idpServers}
-                from="stage-users"
-                changeFromPage={changeFromPage}
-                onOpenContextualPanel={onOpenContextualPanel}
-              />
-            </Tab>
-          </Tabs>
-        </PageSection>
-      </ContextualHelpPanel>
+            <UserSettings
+              originalUser={userSettingsData.originalUser}
+              user={userSettingsData.user}
+              metadata={userSettingsData.metadata}
+              pwPolicyData={userSettingsData.pwPolicyData}
+              krbPolicyData={userSettingsData.krbtPolicyData}
+              certData={userSettingsData.certData}
+              onUserChange={userSettingsData.setUser}
+              isDataLoading={userSettingsData.isFetching}
+              onRefresh={userSettingsData.refetch}
+              isModified={userSettingsData.modified}
+              onResetValues={userSettingsData.resetValues}
+              modifiedValues={userSettingsData.modifiedValues}
+              radiusProxyData={userSettingsData.radiusServers}
+              idpData={userSettingsData.idpServers}
+              from="stage-users"
+              changeFromPage={(page) => dispatch(setHelpTopic(page))}
+              onOpenContextualPanel={() => dispatch(toggleHelpPanel())}
+            />
+          </Tab>
+        </Tabs>
+      </PageSection>
     </>
   );
 };
