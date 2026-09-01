@@ -49,6 +49,10 @@ if api.env.in_server:
         from pki import PKIException
     except ModuleNotFoundError:
         pass
+else:
+    DES_EDE3_CBC_OID = "{1 2 840 113549 3 7}"
+    AES_128_CBC_OID = "{2 16 840 1 101 3 4 1 2}"
+    PKIException = Exception
 
 if six.PY3:
     unicode = str
