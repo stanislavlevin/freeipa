@@ -9,6 +9,7 @@ from ipalib.plugable import Registry
 from .baseldap import (
     LDAPObject, LDAPSearch, LDAPCreate,
     LDAPDelete, LDAPUpdate, LDAPRetrieve)
+from ipaserver.plugins.privilege import principal_has_privilege
 from ipalib.request import context
 from ipalib import ngettext
 from ipalib.text import _
@@ -345,8 +346,14 @@ class certprofile_mod(LDAPUpdate):
             raise errors.ProtectedEntryError(label='certprofile', key=keys[0],
                 reason=_('Certificate profiles cannot be renamed'))
         if 'file' in options:
-            # ensure operator has permission to update a certprofile
-            if not ldap.can_write(dn, 'ipacertprofilestoreissued'):
+            # The profile configuration is updated against Dogtag through the
+            # privileged RA agent, which bypasses the caller's LDAP ACIs; a
+            # --file-only modify also yields an empty LDAP modlist, so no
+            # caller-bound write is enforced at all. Require the CA
+            # Administrator privilege explicitly before contacting Dogtag.
+            op_account = getattr(context, 'principal', None)
+            if not principal_has_privilege(
+                    self.api, op_account, u'CA Administrator'):
                 raise errors.ACIError(info=_(
                     "Insufficient privilege to modify a certificate profile."))
 
