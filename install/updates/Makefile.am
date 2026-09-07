@@ -29,6 +29,9 @@ app_DATA =				\
 	21-replicas_container.update	\
 	21-ca_renewal_container.update	\
 	21-certstore_container.update	\
+	21-deny-anonymous-modify.update	\
+	21-deny-anonymous-sid-read.update	\
+	21-selfservice-bindrule.update	\
 	25-referint.update		\
 	30-ipservices.update		\
 	30-provisioning.update		\
@@ -71,6 +74,7 @@ app_DATA =				\
 	80-schema_compat.update 	\
 	81-externalmembers.update	\
 	90-post_upgrade_plugins.update	\
+	91-admins-privileges.update	\
 	$(NULL)
 
 EXTRA_DIST =				\

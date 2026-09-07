@@ -49,6 +49,10 @@ if api.env.in_server:
         from pki import PKIException
     except ModuleNotFoundError:
         pass
+else:
+    DES_EDE3_CBC_OID = "{1 2 840 113549 3 7}"
+    AES_128_CBC_OID = "{2 16 840 1 101 3 4 1 2}"
+    PKIException = Exception
 
 if six.PY3:
     unicode = str
@@ -1013,6 +1017,15 @@ class vaultconfig_show(Retrieve):
     )
 
     def execute(self, *args, **options):
+        # Intentionally not gated by a privilege check. Although the KRA
+        # client below runs as the RA agent (bypassing the caller's LDAP
+        # ACIs), this command returns only public material: the KRA
+        # transport certificate and the list of KRA servers. It is also a
+        # prerequisite of every vault archive/retrieve -- the client fetches
+        # the transport cert here before wrapping/unwrapping a secret (see
+        # ipaclient/plugins/vault.py) -- so any vault owner or member, not
+        # just administrators, must be able to call it. The only gate is
+        # authentication, which the framework already enforces.
         if not self.api.Command.kra_is_enabled()['result']:
             raise errors.InvocationError(
                 format=_('KRA service is not enabled'))

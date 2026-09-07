@@ -11,6 +11,7 @@ from .baseldap import (
     LDAPObject, LDAPSearch, LDAPCreate,
     LDAPDelete, LDAPUpdate, LDAPRetrieve)
 from .virtual import VirtualCommand
+from ipaserver.plugins.privilege import principal_has_privilege
 from ipalib.request import context
 from ipalib import ngettext
 from ipalib.text import _
@@ -268,9 +269,33 @@ class certprofile_import(LDAPCreate):
 
     PROFILE_ID_PATTERN = re.compile(r'^profileId=([a-zA-Z]\w*)', re.MULTILINE)
 
+    # Dogtag profile policy components (referenced by class_id) that can run
+    # programs / commands on the CA host. certprofile-import otherwise only
+    # validates profileId and passes the rest of the profile straight to
+    # Dogtag, so importing a profile that uses one of these reaches code
+    # execution as pkiuser. Reject them here; a deployment that legitimately
+    # needs such a component must configure the profile directly on the CA,
+    # out of band, rather than through the IPA API.
+    DANGEROUS_CLASS_IDS = frozenset({
+        u'externalprocessconstraintimpl',
+    })
+
+    CLASS_ID_PATTERN = re.compile(r'class_id\s*=\s*(\S+)', re.MULTILINE)
+
     def pre_callback(self, ldap, dn, entry, entry_attrs, *keys, **options):
         ca_enabled_check(self.api)
         context.profile = options['file']
+
+        for class_id in self.CLASS_ID_PATTERN.findall(options['file']):
+            if class_id.strip().lower() in self.DANGEROUS_CLASS_IDS:
+                raise errors.ValidationError(
+                    name='file',
+                    error=_(
+                        "Profile references policy component '%(class_id)s', "
+                        "which can execute programs on the CA host and cannot "
+                        "be imported through IPA."
+                    ) % dict(class_id=class_id.strip())
+                )
 
         matches = self.PROFILE_ID_PATTERN.findall(options['file'])
         if len(matches) == 0:
@@ -357,8 +382,14 @@ class certprofile_mod(LDAPUpdate):
             raise errors.ProtectedEntryError(label='certprofile', key=keys[0],
                 reason=_('Certificate profiles cannot be renamed'))
         if 'file' in options:
-            # ensure operator has permission to update a certprofile
-            if not ldap.can_write(dn, 'ipacertprofilestoreissued'):
+            # The profile configuration is updated against Dogtag through the
+            # privileged RA agent, which bypasses the caller's LDAP ACIs; a
+            # --file-only modify also yields an empty LDAP modlist, so no
+            # caller-bound write is enforced at all. Require the CA
+            # Administrator privilege explicitly before contacting Dogtag.
+            op_account = getattr(context, 'principal', None)
+            if not principal_has_privilege(
+                    self.api, op_account, u'CA Administrator'):
                 raise errors.ACIError(info=_(
                     "Insufficient privilege to modify a certificate profile."))
 
