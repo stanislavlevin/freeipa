@@ -8,6 +8,7 @@ function install_debuginfo() {
     apt-get update && \
     apt-get install -y \
         gdb \
+        which \
         systemd-coredump \
         autofs-debuginfo \
         ${IPA_TESTS_REPO_PATH}/dist/rpms_debuginfo/*.rpm \
