@@ -217,6 +217,7 @@ and integration with Active Directory based infrastructures (Trusts).
 %package server-core
 Summary: The IPA authentication server, core functionality
 Group: System/Base
+Requires: libjemalloc2 >= 5.4.0
 Requires: %name-client = %EVR
 Requires: acl
 Requires: gssproxy >= %gssproxy_version
