@@ -57,7 +57,8 @@
 Name: freeipa
 # don't forget to update .gear/rules
 Version: 4.12.5
-Release: alt5
+# ipa-4-12 + 4.13.2..4.13.4
+Release: alt6.gitb360c852d3
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1172,6 +1173,14 @@ fi
 %python3_sitelibdir/ipaplatform-%version-py%_python3_version.egg-info/
 
 %changelog
+* Thu Oct 08 2026 Stanislav Levin <slev@altlinux.org> 4.12.5-alt6.gitb360c852d3
+- Synced to upstream 4-12 (b360c852d3).
+- Backported fixes for:
+  + CVE (fixes: CVE-2026-11861, CVE-2026-13097, CVE-2026-73196,
+    CVE-2026-73197, CVE-2026-73198, CVE-2026-73199, CVE-2026-19550,
+    CVE-2026-79678, CVE-2026-76578, CVE-2026-14612)
+  + sysusers (closes: #60855)
+
 * Thu May 28 2026 Stanislav Levin <slev@altlinux.org> 4.12.5-alt5
 - Made dogtag-less mode the package-based option.
 - Backported fix for https://pagure.io/freeipa/issue/9962.
