@@ -592,14 +592,6 @@ else
 fi
 
 %build
-%if_with modern_ui
-# prebuild modern webui otherwise it will try `npm clean-install`
-# which requires internet.
-pushd install/freeipa-webui
-npm run build
-popd
-%endif
-
 export PYTHON=%__python3
 %autoreconf
 %configure --with-vendor-suffix=-%release \
