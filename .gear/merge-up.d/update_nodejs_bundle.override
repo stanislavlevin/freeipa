@@ -1,6 +1,7 @@
 # NODEJS_SRC_DIR: a path to NodeJS sources relative to project root
 # default: '.' (cwd)
 # example: NODEJS_SRC_DIR='nodejs/path'
+NODEJS_SRC_DIR='install/freeipa-webui'
 
 # prepare_vendor: a function that is called right before the vendoring (npm),
 # default: empty function (does nothing)
@@ -15,3 +16,13 @@
 # - $1 version
 # - $2 git tag
 # example: post_vendor() { printf 'version: %s, tag: %s\n' "$1" "$2" ; }
+
+# per dist-hook https://github.com/freeipa/freeipa-webui/blob/main/Makefile.am
+post_vendor() {
+    # `npm clean-install` done as this merge hook `npm ci` (alias)
+    # build platform-agnostic static content
+    npm run -q build && rm -rf node_modules && npm clean-install -q --omit=dev
+    # and save build artefact
+    mkdir -p node_modules/__built_content
+    cp -r dist -t node_modules/__built_content
+}

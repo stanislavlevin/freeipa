@@ -583,6 +583,8 @@ git commit -am 'with our changes'
 
 %if_with modern_ui
 pushd install/freeipa-webui
+# prebuilt platform-agnostic static content
+mv node_modules/__built_content/dist -t .
 
 # use native rollup
 mv node_modules/rollup node_modules/rollup.bak
