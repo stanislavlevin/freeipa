@@ -1,0 +1,13 @@
+# prepare_vendor: a function that is called right before the vendoring,
+# default: empty function (does nothing)
+# args:
+# - $1 version
+# - $2 git tag
+# example: prepare_vendor() { printf 'version: %s, tag: %s\n' "$1" "$2" ; }
+
+# post_vendor: a function that is called right after the vendoring,
+# default: empty function (does nothing)
+# args:
+# - $1 version
+# - $2 git tag
+# example: post_vendor() { printf 'version: %s, tag: %s\n' "$1" "$2" ; }
