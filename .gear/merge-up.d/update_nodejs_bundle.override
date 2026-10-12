@@ -1,0 +1,17 @@
+# NODEJS_SRC_DIR: a path to NodeJS sources relative to project root
+# default: '.' (cwd)
+# example: NODEJS_SRC_DIR='nodejs/path'
+
+# prepare_vendor: a function that is called right before the vendoring (npm),
+# default: empty function (does nothing)
+# args:
+# - $1 version
+# - $2 git tag
+# example: prepare_vendor() { printf 'version: %s, tag: %s\n' "$1" "$2" ; }
+
+# post_vendor: a function that is called right after the vendoring (npm),
+# default: empty function (does nothing)
+# args:
+# - $1 version
+# - $2 git tag
+# example: post_vendor() { printf 'version: %s, tag: %s\n' "$1" "$2" ; }

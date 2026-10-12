@@ -1,3 +1,5 @@
 [version]
 pattern = "release-{major:+}-{minor:+}-{patch:+}"
 template = "{major}.{minor}.{patch}"
+[sandbox]
+packages = ["npm", "node"]
