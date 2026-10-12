@@ -118,18 +118,19 @@ class TestPWquality(BasePWpolicy):
             "--minclasses", "0",
         ]
         if has_pw_quality_lib():
-            cmd.extend(
-                [
-                    "--maxrepeat", "0",
-                    "--maxsequence", "0",
-                    "--usercheck", "false",
-                    "--dictcheck" ,"false",
-                    "--dcredit", "0",
-                    "--ucredit", "0",
-                    "--lcredit", "0",
-                    "--ocredit", "0",
-                ]
-            )
+            cmd = [
+                *cmd,
+                *(
+                     "--maxrepeat", "0",
+                     "--maxsequence", "0",
+                     "--usercheck", "false",
+                     "--dictcheck" ,"false",
+                     "--dcredit", "0",
+                     "--ucredit", "0",
+                     "--lcredit", "0",
+                     "--ocredit", "0",
+                ),
+            ]
         self.master.run_command(cmd)
         # minlength => 6 is required for any of the libpwquality settings
         self.master.run_command(
@@ -366,6 +367,10 @@ class TestPWquality(BasePWpolicy):
                      'Password contains too few special characters',),
                     **{'ocredit': -2})
 
+    @pytest.mark.skipif(
+        not has_pw_quality_lib(),
+        reason="Requires support for password quality lib",
+    )
     def test_minlength_mod(self, reset_pwpolicy):
         """Test that the pwpolicy minlength overrides our policy
         """
@@ -589,13 +594,16 @@ class TestPWquality(BasePWpolicy):
     )
     def test_wrong_option(self):
         for values in (
-            ("--maxrepeat", "4"),
-            ("--maxsequence", "4"),
-            ("--dictcheck", "true"),
-            ("--usercheck", "true"),
+            ("--maxrepeat", "0"),
+            ("--maxsequence", "0"),
+            ("--dictcheck", "false"),
+            ("--usercheck", "false"),
+            ("--dcredit", "0"),
+            ("--ucredit", "0"),
+            ("--lcredit", "0"),
+            ("--ocredit", "0"),
         ):
-            args = ["ipa", "pwpolicy-mod", POLICY]
-            args.extend(values)
+            args = ["ipa", "pwpolicy-mod", POLICY, *values]
             result = self.master.run_command(args, raiseonerr=False)
             assert result.returncode != 0
             assert f"error: no such option: {values[0]}" in result.stderr_text
