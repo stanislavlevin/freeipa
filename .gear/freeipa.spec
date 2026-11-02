@@ -58,7 +58,7 @@ Name: freeipa
 # don't forget to update .gear/rules
 Version: 4.12.5
 # ipa-4-12 + 4.13.2..4.13.4
-Release: alt6.gitb360c852d3
+Release: alt7.gitb360c852d3
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1173,6 +1173,9 @@ fi
 %python3_sitelibdir/ipaplatform-%version-py%_python3_version.egg-info/
 
 %changelog
+* Tue Nov 03 2026 Evgeny Sinelnikov <sin@altlinux.org> 4.12.5-alt7.gitb360c852d3
+- Fixed compatibility with Samba 4.22 (closes: #60444).
+
 * Thu Oct 08 2026 Stanislav Levin <slev@altlinux.org> 4.12.5-alt6.gitb360c852d3
 - Synced to upstream 4-12 (b360c852d3).
 - Backported fixes for:
