@@ -19,6 +19,7 @@ class ALTLinuxPathNamespace(BasePathNamespace):
     GENERATE_RNDC_KEY = "/bin/true"
     GPG2 = "/usr/bin/gpg2"
     GSSAPI_SESSION_KEY = "/etc/httpd2/ipasession.key"
+    SAMBA_DCERPCD = "/usr/lib/samba/samba-dcerpcd"
     SYSTEMCTL = "/sbin/systemctl"
     BIN_HOSTNAMECTL = "/usr/bin/hostnamectl"
     BIN_NISDOMAINNAME = "/bin/nisdomainname"
