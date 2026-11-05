@@ -106,6 +106,7 @@ class ALTLinuxPathNamespace(BasePathNamespace):
         BIND_LDAP_SO = BasePathNamespace.BIND_LDAP_SO_64
 
     SYSCONFIG_NFS = "/etc/nfs.conf"
+    SAMBA_DCERPCD = "/usr/lib/samba/samba-dcerpcd"
 
 
 paths = ALTLinuxPathNamespace()
