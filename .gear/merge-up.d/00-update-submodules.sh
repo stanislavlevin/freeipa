@@ -71,19 +71,17 @@ log 'starting vendoring submodules for %s\n' "$upstream_tag"
 
 submodules_src_dir_abs="$(realpath '.')"
 pushd "$submodules_src_dir_abs" >/dev/null
-submodules_dirs="$submodules_src_dir_abs/.submoduledirs"
 
 function finish {
     # clean up temp dir
     rm -rf "$submodules_src_dir_abs/$SUBMODULES_TMPDIR"
-    rm -f "$submodules_dirs"
+    # remove submodule working trees
+    git submodule --quiet deinit --all -f 2>/dev/null ||:
 }
 trap finish EXIT
 
-rm -f "$submodules_dirs"
-git submodule --quiet foreach --recursive "printf '%s\0' "\$displaypath" >> $submodules_dirs"
-xargs -0 rm -rf < "$submodules_dirs"
-git restore --recurse-submodules --pathspec-file-nul --pathspec-from-file "$submodules_dirs"
+# remove submodule working trees
+git submodule --quiet deinit --all -f
 rm -rf "$SUBMODULES_TMPDIR"
 mkdir "$SUBMODULES_TMPDIR"
 rm -rf "$SUBMODULES_DIR"
@@ -103,6 +101,9 @@ post_vendor "$upstream_version" "$upstream_tag"
 
 # move to allow switch branch
 mv "$SUBMODULES_DIR" -t "$SUBMODULES_TMPDIR/"
+
+# remove submodule working trees
+git submodule --quiet deinit --all -f
 
 # restore the tree (can be changed by prepare_vendor hook)
 git restore -- ":^$SUBMODULES_DIR/**"
