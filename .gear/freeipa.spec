@@ -61,7 +61,7 @@
 Name: freeipa
 # don't forget to update .gear/rules
 Version: 4.13.4
-Release: alt5
+Release: alt6
 
 Summary: The Identity, Policy and Audit system
 License: GPLv3+
@@ -1199,6 +1199,9 @@ fi
 %python3_sitelibdir/ipaplatform-%version-py%_python3_version.egg-info/
 
 %changelog
+* Tue Nov 10 2026 Stanislav Levin <slev@altlinux.org> 4.13.4-alt6
+- Explicitly require Dogtag PKI (closes: #61395).
+
 * Thu Nov 05 2026 Stanislav Levin <slev@altlinux.org> 4.13.4-alt5
 - Backported https://codeberg.org/freeipa/freeipa/issues/10101 (closes: #60444).
 
